@@ -21,6 +21,7 @@ pulp = "^2.6.0"
 tqdm = "^4.64.1"
 optuna = "^3.0.5"
 pymysql = "^1.0.2"
+scikit-learn = "^1.2.1"
 
 
 
