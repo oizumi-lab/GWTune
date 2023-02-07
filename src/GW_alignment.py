@@ -16,6 +16,8 @@ from ot.utils import check_random_state, unif
 from ot.backend import get_backend
 from ot.gromov import init_matrix, gwggrad,gwloss
 
+from src.utils_functions import calc_correct_rate_same_dim, calc_correct_rate_top_n
+
 #%%
 def my_entropic_gromov_wasserstein(C1, C2, p, q, loss_fun, epsilon,T,
                                 max_iter=1000, tol=1e-9, verbose=False, log=False):
@@ -122,47 +124,6 @@ def my_entropic_gromov_wasserstein(C1, C2, p, q, loss_fun, epsilon,T,
     else:
         return T
     
-def calc_correct_rate_same_dim(coupling):
-    count = 0
-    for i in range(coupling.shape[0]):
-        idx = np.argmax(coupling[i,:])
-        if i == idx:
-            count += 1
-    correct_rate = count / coupling.shape[0] * 100
-    return correct_rate
-
-def calc_correct_rate_top_n(Pi, top_n, embedding = None, RDM = None, components = False):
-    """対応する点が正解の近傍top_nに入っていれば正解
-
-    Args:
-        Pi (array): shape (m, n) 
-            subject →　pivotの対応関係
-        top_n (int): top n neighbors
-        embedding (array): shape (n, n_dim)
-            pivotのembedding
-        RDM (array): shape(n, n)
-            pivotのRDM
-        components : Trueのとき, Piの成分をそのまま足しあわせる
-
-    Returns:
-        correct_rate: correct rate
-    """
-    if RDM is None:
-        RDM = distance.cdist(embedding, embedding, metric = "cosine")
-    if components:
-        count = 0
-        for i in range(Pi.shape[0]):
-            idx_pivot = np.argsort(RDM[i, :])
-            count += (Pi[i,:][idx_pivot][:top_n]).sum()
-        correct_rate = count * 100
-    else:
-        count = 0
-        for i in range(Pi.shape[0]):
-            idx = np.argmax(Pi[i, :])
-            idx_pivot = np.argsort(RDM[i, :])
-            count += (idx == idx_pivot[:top_n]).sum()
-        correct_rate = count / Pi.shape[0] * 100
-    return correct_rate
          
 
 #%%
@@ -298,7 +259,7 @@ class GW_alignment():
         
         min_gw = self.min_gw[f"{best_trial.number}"]
         min_gwd = self.min_gwd[f"{best_trial.number}"]
-        min_epsilon = best_trial.value
+        min_epsilon = min_epsilon = best_trial.params["epsilon"]
         correct_rate = calc_correct_rate_same_dim(min_gw)
         
         return min_gw, min_gwd, min_epsilon, correct_rate
