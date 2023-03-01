@@ -4,3 +4,4 @@ results
 .python-version
 .venv
 poetry.lock
+scripts/dm_scaling.ipynb
