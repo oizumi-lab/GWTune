@@ -47,16 +47,18 @@ def im_plot(X,Y,title_list):
         cbar = fig.colorbar(a,ax=ax,shrink=0.7)
     plt.show()
 
-def gw_alignment(X,Y,epsilon=0.01,random_init=True):
-    
+def gw_alignment(X,Y,epsilon,random_init=False):
     if random_init:
         T = np.random.uniform(low=0,high=1,size=(n,n))
         T = T/np.sum(T)
+        p,q = np.sum(T,axis=1), np.sum(T,axis=0)
+        gw,log = my_entropic_gromov_wasserstein2(C1=X,C2=Y,p=p,q=q,T=T,epsilon=epsilon,loss_fun="square_loss",verbose=True,log=True)
     else:
+        p = ot.unif(n)
+        q = ot.unif(n)
+        gw, log = ot.gromov.entropic_gromov_wasserstein(
+            X, Y, p, q, 'square_loss', epsilon=epsilon, log=True, verbose=True)
         
-    p,q = np.sum(T,axis=1), np.sum(T,axis=0)
-
-    gw,log = my_entropic_gromov_wasserstein2(C1=X,C2=Y,p=p,q=q,T=T,epsilon=epsilon,loss_fun="square_loss",verbose=True,log=True)
     plt.figure(figsize=(5,5))
     sns.heatmap(gw,square=True)
     plt.show()
@@ -91,25 +93,11 @@ im_plot(X,Y_t,['X','transformed Y'])
 
 #%%
 # Normal GW alignment (without histogram matching)
-p = ot.unif(n)
-q = ot.unif(n)
 epsilon = 0.004485
-
-
-gw_alignment(X,Y,epsilon=epsilon)
-
-
+gw_alignment(X,Y,epsilon=epsilon, random_init=False)
 
 # %%
 # GW alignment after histogram matching
 epsilon = 0.0005
-gw_t, log_t = ot.gromov.entropic_gromov_wasserstein(
-    X, Y_t, p, q, 'square_loss', epsilon=epsilon, log=True, verbose=True)
-
-gwd_t = log_t['gw_dist']
-print(f'With histogram matching: GWD = {gwd_t}')
-
-plt.figure(figsize=(5,5))
-sns.heatmap(gw_t,square=True)
-plt.show()
+gw_alignment(X,Y_t,epsilon=epsilon, random_init=False)
 # %%
