@@ -1,10 +1,14 @@
 # %%
+import os
+import sys
 import numpy as np
 import copy
 import itertools
 import random
 import optuna
+from copy import copy
 import pymysql
+from pysqlite3 import dbapi2 as Database
 from scipy.spatial import distance
 from joblib import parallel_backend
 
@@ -16,126 +20,23 @@ from ot.lp import emd_1d, emd
 from ot.utils import check_random_state, unif
 from ot.backend import get_backend
 from ot.gromov import init_matrix, gwggrad, gwloss
+sys.path.append("../../")
 
 from src.utils.utils_functions import calc_correct_rate_same_dim, calc_correct_rate_top_n
+from src.utils.gw_functions import initialize_matrix
 
 # %%
 
-
 def my_entropic_gromov_wasserstein(C1, C2, p, q, loss_fun, epsilon, T,
-                                   max_iter=1000, tol=1e-9, verbose=False, log=False):
+                                   max_iter=1000, tol=1e-9, verbose=False, log=False, stopping_rounds=None, trial=None):
     """
     日報を書く欄にする
     2023/3/2
     ここまでやりました。(佐々木)
 
-    """
-    C1, C2, p, q = list_to_array(C1, C2, p, q)
-    nx = get_backend(C1, C2, p, q)
-
-    # add T as an input
-    # T = nx.outer(p, q)
-
-    constC, hC1, hC2 = init_matrix(C1, C2, p, q, loss_fun)
-
-    cpt = 0
-    err = 1
-
-    if log:
-        log = {'err': []}
-
-    while (err > tol and cpt < max_iter):
-
-        Tprev = T
-
-        # compute the gradient
-        tens = gwggrad(constC, hC1, hC2, T)
-
-        T = sinkhorn(p, q, tens, epsilon, method='sinkhorn', numItermax=1000)
-
-        if cpt % 10 == 0:
-            # we can speed up the process by checking for the error only all
-            # the 10th iterations
-            err = nx.norm(T - Tprev)
-
-            if log:
-                log['err'].append(err)
-
-            if verbose:
-                if cpt % 200 == 0:
-                    print('{:5s}|{:12s}'.format(
-                        'It.', 'Err') + '\n' + '-' * 19)
-                print('{:5d}|{:8e}|'.format(cpt, err))
-
-        cpt += 1
-
-    if log:
-        log['gw_dist'] = gwloss(constC, hC1, hC2, T)
-        return T, log
-    else:
-        return T
-
-# %%
-
-
-def my_entropic_gromov_wasserstein2(C1, C2, p, q, loss_fun, epsilon, T,
-                                    max_iter=1000, tol=1e-9, verbose=False, log=False, stopping_rounds=False):
-    r"""
-    Returns the gromov-wasserstein transport between :math:`(\mathbf{C_1}, \mathbf{p})` and :math:`(\mathbf{C_2}, \mathbf{q})`
-
-    The function solves the following optimization problem:
-
-    .. math::
-        \mathbf{GW} = \mathop{\arg\min}_\mathbf{T} \quad \sum_{i,j,k,l} L(\mathbf{C_1}_{i,k}, \mathbf{C_2}_{j,l}) \mathbf{T}_{i,j} \mathbf{T}_{k,l} - \epsilon(H(\mathbf{T}))
-
-        s.t. \ \mathbf{T} \mathbf{1} &= \mathbf{p}
-
-             \mathbf{T}^T \mathbf{1} &= \mathbf{q}
-
-             \mathbf{T} &\geq 0
-
-    Where :
-
-    - :math:`\mathbf{C_1}`: Metric cost matrix in the source space
-    - :math:`\mathbf{C_2}`: Metric cost matrix in the target space
-    - :math:`\mathbf{p}`: distribution in the source space
-    - :math:`\mathbf{q}`: distribution in the target space
-    - `L`: loss function to account for the misfit between the similarity matrices
-    - `H`: entropy
-
-    Parameters
-    ----------
-    C1 : array-like, shape (ns, ns)
-        Metric cost matrix in the source space
-    C2 : array-like, shape (nt, nt)
-        Metric cost matrix in the target space
-    p :  array-like, shape (ns,)
-        Distribution in the source space
-    q :  array-like, shape (nt,)
-        Distribution in the target space
-    loss_fun :  string
-        Loss function used for the solver either 'square_loss' or 'kl_loss'
-    epsilon : float
-        Regularization term >0
-    max_iter : int, optional
-        Max number of iterations
-    tol : float, optional
-        Stop threshold on error (>0)
-    verbose : bool, optional
-        Print information along iterations
-    log : bool, optional
-        Record log if True.
-
-    Returns
-    -------
-    T : array-like, shape (`ns`, `nt`)
-        Optimal coupling between the two spaces
-
-    References
-    ----------
-    .. [12] Gabriel Peyré, Marco Cuturi, and Justin Solomon,
-        "Gromov-Wasserstein averaging of kernel and distance matrices."
-        International Conference on Machine Learning (ICML). 2016.
+    2023/3/3
+    Early Stoppingの実装
+    - 引数にstopping_roundsの追加
 
     """
     C1, C2, p, q = list_to_array(C1, C2, p, q)
@@ -148,13 +49,13 @@ def my_entropic_gromov_wasserstein2(C1, C2, p, q, loss_fun, epsilon, T,
 
     cpt = 0
     err = 1
-    if log:
-        log = {'err': []}
-
     err_count = 0
-    min_err = 1
-    patience = 10
     err_flg = True
+
+    if log:
+        log = {'err': []}
+
+
     while (err > tol and cpt < max_iter and err_flg):
 
         Tprev = T
@@ -167,8 +68,9 @@ def my_entropic_gromov_wasserstein2(C1, C2, p, q, loss_fun, epsilon, T,
         if cpt % 10 == 0:
             # we can speed up the process by checking for the error only all
             # the 10th iterations
-            err_prev = copy.deepcopy(err)
+            err_prev = copy(err)
             err = nx.norm(T - Tprev)
+
             if log:
                 log['err'].append(err)
 
@@ -178,13 +80,21 @@ def my_entropic_gromov_wasserstein2(C1, C2, p, q, loss_fun, epsilon, T,
                         'It.', 'Err') + '\n' + '-' * 19)
                 print('{:5d}|{:8e}|'.format(cpt, err))
 
-            if err_prev <= err:
-                err_count += 1
-                if err_count > patience:
-                    print('Early Stopping')
+            if trial:
+                trial.report(gwloss(constC, hC1, hC2, T), cpt//10)
+                if trial.should_prune():
+                    raise optuna.TrialPruned()
+
+            if stopping_rounds:
+                if (err_prev <= err) or (np.abs(err_prev - err) <= 1e-8):
+                    err_count += 1
+                else:
+                    err_count = 0
+
+                if stopping_rounds < err_count:
+                    if verbose:
+                        print('Early stopping')
                     err_flg = False
-            else:
-                err_count = 0
         cpt += 1
 
     if log:
@@ -192,6 +102,7 @@ def my_entropic_gromov_wasserstein2(C1, C2, p, q, loss_fun, epsilon, T,
         return T, log
     else:
         return T
+
 
 # %%
 
@@ -375,6 +286,111 @@ class GW_alignment():
         correct_rate = calc_correct_rate_same_dim(gw)
 
         return gw, gwd, min_epsilon, correct_rate
+
+
+# %%
+class Entropic_GW():
+    def __init__(self, X1, X2, max_iter = 300, epsilon_range =(1.0e-8, 1.0e-2), n_iter = 5, stopping_rounds = None, path=None):
+        self.X1 = X1
+        self.X2 = X2
+        self.max_iter = max_iter
+        self.epsilon_lower, self.epsilon_upper = epsilon_range
+        self.path = path
+        self.stopping_rounds = stopping_rounds
+        self.n_iter = n_iter
+
+        self.best_gwd = 100
+
+
+    def gw_alignment(self, T, epsilon, trial, max_iter=300, stopping_rounds=5):
+        n = self.X1.shape[0]
+        p,q = ot.unif(n), ot.unif(n)
+        gw, log = my_entropic_gromov_wasserstein(
+            C1=self.X1, C2=self.X2, p=p, q=q, T=T, max_iter = max_iter, epsilon=epsilon, loss_fun="square_loss", verbose=False, log=True,
+              trial = trial, stopping_rounds = stopping_rounds)
+        return gw, log
+
+    def make_initial_T(self, initialize):
+        n = self.X1.shape[0]
+        if initialize == 'random':
+            T = initialize_matrix(n)
+        elif initialize == 'permutation':
+            ts = np.zeros(n)
+            ts[0] = 1/n
+            T = initialize_matrix(n, ts=ts)
+        elif initialize == 'uniform':
+            T = np.outer(ot.unif(n),ot.unif(n))
+        return T
+
+    def __call__(self, trial):
+        # hyperparameter
+        epsilon = trial.suggest_float('epsilon', self.epsilon_lower, self.epsilon_upper)
+        # initialize = 'uniform'
+        initialize = trial.suggest_categorical('initialize', ['random', 'permutation', 'uniform'])
+
+        Ts, gws, gwds = [], [], []
+
+        for iter in range(self.n_iter):
+            # make initial T
+            T = self.make_initial_T(initialize)
+            gw, log = self.gw_alignment(T, epsilon, trial, self.max_iter, stopping_rounds=self.stopping_rounds)
+
+            gwd = log["gw_dist"]
+            if gwd == 0.0:
+                break
+            Ts.append(T)
+            gws.append(gw)
+            gwds.append(gwd)
+
+        if len(gwds) == 0:
+            return self.punishment
+            # return float('nan')  # make trial failure
+        # 最小のgwdを発見する
+        idx = np.argmin(gwds)
+        T, gw, gwd = Ts[idx], gws[idx], gwds[idx]
+
+        # データの保存
+        if gwd < self.best_gwd:
+            self.best_trial_number = trial.number
+            self.best_T = T
+            self.best_gw = gw
+            self.best_gwd = gwd
+        return gwd
+
+    def run_study_sqlite(self, filename, study_name, concurrency = 20, num_trial = 1000):
+        save_file_name = filename + ".db"
+        study = optuna.create_study(direction = "minimize",
+                                    study_name = study_name,
+                                    sampler = optuna.samplers.TPESampler(seed = 42),
+                                    storage = "sqlite:///" + self.path + "/" + save_file_name,
+                                    load_if_exists = True)
+        # max_cpu count
+        max_cpu = os.cpu_count()
+        if not concurrency <= max_cpu:
+            raise ValueError("concurrency > max_cpu")
+        # 並列化
+        with parallel_backend("multiprocessing", n_jobs = concurrency):
+            study.optimize(self, n_trials = num_trial)
+
+    def run_study_mysql(self, database_uri, study_name, concurrency = 20, num_trial = 1000, punishment = 10):
+        self.punishment = punishment
+        study = optuna.create_study(direction = "minimize",
+                                    storage = database_uri,
+                                    study_name = study_name,
+                                    sampler = optuna.samplers.TPESampler(seed = 42),
+                                    pruner = optuna.pruners.HyperbandPruner(min_resource=3, max_resource=(self.max_iter//10) * self.n_iter, reduction_factor=3),
+                                    load_if_exists = True)
+        # max_cpu count
+        max_cpu = os.cpu_count()
+        if not concurrency <= max_cpu:
+            raise ValueError("concurrency > max_cpu")
+        # 並列化
+        with parallel_backend("multiprocessing", n_jobs = concurrency):
+            study.optimize(self, n_trials = num_trial)
+
+        self.study = study
+
+
 
 
 # %%
