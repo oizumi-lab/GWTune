@@ -79,7 +79,7 @@ def my_entropic_gromov_wasserstein(C1, C2, p, q, loss_fun, epsilon, T,
 
 
 def my_entropic_gromov_wasserstein2(C1, C2, p, q, loss_fun, epsilon, T,
-                                    max_iter=1000, tol=1e-9, verbose=False, log=False):
+                                    max_iter=1000, tol=1e-9, verbose=False, log=False, stopping_rounds=False):
     r"""
     Returns the gromov-wasserstein transport between :math:`(\mathbf{C_1}, \mathbf{p})` and :math:`(\mathbf{C_2}, \mathbf{q})`
 
