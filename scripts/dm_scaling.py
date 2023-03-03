@@ -39,16 +39,64 @@ def im_plot(X,Y,title_list):
         cbar = fig.colorbar(a,ax=ax,shrink=0.7)
     plt.show()
 
+
+def randOrderedMatrix(n):
+    """各行・各列に重複なしに[0,n]のindexを持つmatrixを作成
+
+    Parameters
+    ----------
+    n : int
+        行列のサイズ
+
+    Returns
+    -------
+    np.ndarray
+        重複なしのindexを要素に持つmatrix
+    """
+    matrix = np.zeros((n, n))
+    rows = np.tile(np.arange(0,n),2)
+    for i in range(n):
+        matrix[i,:] = rows[i:i+n]
+
+    r = np.random.choice(n,n,replace=False)
+    c = np.random.choice(n,n,replace=False)
+    matrix = matrix[r,:]
+    matrix = matrix[:,c]
+    return matrix.astype(int)
+
+
+def initialize_matrix(n):
+    """gw alignmentのための行列初期化
+
+    Parameters
+    ----------
+    n : int
+        行列のサイズ
+
+    Returns
+    -------
+    np.ndarray
+        初期値
+    """
+    matrix = randOrderedMatrix(n)
+    ts = np.random.uniform(0,1,n)
+    ts = ts/(n*np.sum(ts))
+
+    T = np.array([ts[idx] for idx in matrix])
+    return T
+
+
 def gw_alignment(X,Y,epsilon=0.01):
-    T = np.random.uniform(low=0,high=1,size=(n,n))
-    T = T/np.sum(T)
-    p,q = np.sum(T,axis=1), np.sum(T,axis=0)
+    n = X.shape[0]
+    T = initialize_matrix(n)
+    p,q = ot.unif(n), ot.unif(n)
 
     gw,log = my_entropic_gromov_wasserstein2(C1=X,C2=Y,p=p,q=q,T=T,epsilon=epsilon,loss_fun="square_loss",verbose=True,log=True)
     plt.figure(figsize=(5,5))
     sns.heatmap(gw,square=True)
     plt.show()
     return gw, log
+
 
 class Adjust_Disimilarity():
     def __init__(self,X, Y):
@@ -77,7 +125,7 @@ class Adjust_Disimilarity():
         return l
 #%%
 n = 100  # 点数
-sigma = 1.5
+sigma = 1
 
 np.random.seed(42)
 x = np.random.uniform(0,1,size=comb(n,2, exact=True))
@@ -85,6 +133,7 @@ np.random.seed(0)
 y = 2*x + np.random.uniform(0,sigma,size=comb(n,2, exact=True))
 X = squareform(x)
 Y = squareform(y)
+
 #%%
 # RSA correlation
 corr,_ = pearsonr(x,y)
