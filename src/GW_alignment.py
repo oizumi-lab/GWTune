@@ -25,9 +25,9 @@ from src.utils.utils_functions import calc_correct_rate_same_dim, calc_correct_r
 def my_entropic_gromov_wasserstein(C1, C2, p, q, loss_fun, epsilon, T,
                                    max_iter=1000, tol=1e-9, verbose=False, log=False):
     """
-    日報を書く欄にする  
-    2023/3/2  
-    ここまでやりました。(佐々木)  
+    日報を書く欄にする
+    2023/3/2
+    ここまでやりました。(佐々木)
 
     """
     C1, C2, p, q = list_to_array(C1, C2, p, q)
@@ -178,7 +178,7 @@ def my_entropic_gromov_wasserstein2(C1, C2, p, q, loss_fun, epsilon, T,
                         'It.', 'Err') + '\n' + '-' * 19)
                 print('{:5d}|{:8e}|'.format(cpt, err))
 
-            if err_prev < err:
+            if err_prev <= err:
                 err_count += 1
                 if err_count > patience:
                     print('Early Stopping')
