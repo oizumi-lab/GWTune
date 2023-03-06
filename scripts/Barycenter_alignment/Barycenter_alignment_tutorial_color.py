@@ -15,7 +15,7 @@ import sys
 
 sys.path.append("../")
 from src.Barycenter_alignment import Barycenter_alignment
-from GW_alignment_abe import GW_alignment
+from src.GW_alignment import GW_alignment
 #%%
 # load data
 # similarity matrix
