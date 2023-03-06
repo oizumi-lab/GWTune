@@ -67,7 +67,7 @@ n_epsilons = 10 # number of epsilons
 epsilons = np.linspace(0.02, 0.14, n_epsilons)
 epsilon_range = [0.02, 0.14] # search range of epsilon
 n_jobs = 10 # the number of cores
-init_diag = True 
+init_diag = True
 
 DATABASE_URL = 'mysql+pymysql://root@localhost/oizumi'
 name_list = [f"Group {i + 1}" for i in range(n_sub)]
@@ -78,19 +78,19 @@ barycenter = Barycenter_alignment(n_sub, embedding_list, pivot = 0, DATABASE_URL
 
 # GW alignment to the pivot
 # With optuna
-Pi_list_before = barycenter.gw_alignment_to_pivot(optuna = True, 
-                                                  n_init_plan = n_init_plan, 
-                                                  epsilon_range = epsilon_range, 
-                                                  n_trials = n_epsilons, 
-                                                  n_jobs = n_jobs, 
+Pi_list_before = barycenter.gw_alignment_to_pivot(optuna = True,
+                                                  n_init_plan = n_init_plan,
+                                                  epsilon_range = epsilon_range,
+                                                  n_trials = n_epsilons,
+                                                  n_jobs = n_jobs,
                                                   init_diag = init_diag)
 
 # Without using optuna
-# Pi_list_before = barycenter.gw_alignment_to_pivot(optuna = False, 
-#                                                   n_init_plan = n_init_plan, 
-#                                                   epsilons = epsilons, 
-#                                                   n_trials = n_epsilons, 
-#                                                   n_jobs = n_jobs, 
+# Pi_list_before = barycenter.gw_alignment_to_pivot(optuna = False,
+#                                                   n_init_plan = n_init_plan,
+#                                                   epsilons = epsilons,
+#                                                   n_trials = n_epsilons,
+#                                                   n_jobs = n_jobs,
 #                                                   init_diag = init_diag)
 
 #%%
