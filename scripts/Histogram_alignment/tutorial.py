@@ -5,12 +5,15 @@ import pandas as pd
 import torch
 import ot
 import matplotlib.pyplot as plt
-
-# import jax
-# import jax.numpy as jnp
+import os
 
 import warnings
 warnings.simplefilter("ignore")
+
+# %%
+import jax
+import jax.numpy as jnp
+
 
 # # %%
 # gpus = jax.devices('gpu')
@@ -63,12 +66,8 @@ class Tutorial():
         
         return log['gw_dist'], end 
 
-    def _make_df(self, *, arg1, arg2):
-        
-        numpy_end = arg1[0]
+    def _make_df(self, time_list, arg2):
         numpy_log = arg2[0]
-        
-        time_list = [numpy_end] + [a.item() for a in arg1[1:]]
         log_list = [numpy_log] + [a.item() for a in arg2[1:]]
         
         name_list = ['numpy_cpu', 'torch_cpu', 'torch_gpu', 'jax_cpu_end', 'jax_gpu_end']
@@ -165,11 +164,11 @@ class GW_Alignment():
 
         elif self.to_types == 'torch':
             if isinstance(args, np.ndarray):
-                return torch.from_numpy(args).to(self.device)
+                return torch.from_numpy(args).float().to(self.device)
 
             elif isinstance(args, jax.numpy.ndarray):
                 args = np.array(args)
-                return torch.from_numpy(args).to(self.device)
+                return torch.from_numpy(args).float().to(self.device)
 
         elif self.to_types == 'numpy':
             if 'cuda' in self.device:
@@ -235,8 +234,8 @@ class GW_Alignment():
 
 # %%
 if __name__ == '__main__':
-    path1 = '../data/model1.pt'
-    path2 = '../data/model2.pt'
+    path1 = '../../data/model1.pt'
+    path2 = '../../data/model2.pt'
     
     tgw = Tutorial(path1, path2)
     tgw.comparison()
