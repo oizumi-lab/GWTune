@@ -13,7 +13,7 @@ import sys
 
 sys.path.append("../")
 from src.Barycenter_alignment import Barycenter_alignment
-from src.GW_alignment import GW_alignment
+from GW_alignment_abe import GW_alignment
 # %%
 # Parameters
 n_colors = 100 ## 色の数
@@ -79,10 +79,10 @@ embedding_list = np.zeros((n_sub, n_colors, n_dim)) # [(n_colors, n_dim) for i i
 shift_adjustment = np.random.rand(n_colors) # 色の構造を複雑にする
 corr_noise = np.random.normal(0, 0.1) # 共通のノイズ
 for i in range(n_sub):
-    emb = create_circle(n_colors, lamb = 0.7, shift_adjustment = shift_adjustment) 
+    emb = create_circle(n_colors, lamb = 0.7, shift_adjustment = shift_adjustment)
     emb = perturb_points(emb, mu = 0, sig = 0.01, corr_noise = corr_noise)
     embedding_list[i] = emb
-    
+
 #%%
 # simmulationデータの可視化
 # each subject
@@ -104,7 +104,7 @@ plt.show()
 sim_mat_list = np.zeros((n_sub, n_colors, n_colors))
 for i in range(n_sub):
     sim_mat_list[i] = distance.cdist(embedding_list[i], embedding_list[i], 'cosine')
-    
+
 # Show simmilarity matrices
 fig = plt.figure(figsize=(20, 20))
 for i in range(n_sub):
@@ -120,7 +120,7 @@ epsilons = np.linspace(1e-2, 5e-3, 3)
 epsilon_range = [1e-4, 1e-2] # search range of epsilon
 n_trials = 3 # number of epsilons
 n_jobs = 10 # the number of cores
-init_diag = True 
+init_diag = True
 
 DATABASE_URL = 'mysql+pymysql://root@localhost/takeda_GWOT'
 name_list = [f"Subject{i + 1}" for i in range(n_sub)]
@@ -131,19 +131,19 @@ barycenter = Barycenter_alignment(n_sub, embedding_list, pivot = 0, DATABASE_URL
 
 # GW alignment to the pivot
 # With optuna
-#Pi_list_before = barycenter.gw_alignment_to_pivot(optuna = True, 
-#                                                  n_init_plan = n_init_plan, 
-#                                                  epsilon_range = epsilon_range, 
-#                                                  n_trials = n_trials, 
-#                                                  n_jobs = n_jobs, 
+#Pi_list_before = barycenter.gw_alignment_to_pivot(optuna = True,
+#                                                  n_init_plan = n_init_plan,
+#                                                  epsilon_range = epsilon_range,
+#                                                  n_trials = n_trials,
+#                                                  n_jobs = n_jobs,
 #                                                  init_diag = init_diag)
 
 # Without using optuna
-Pi_list_before = barycenter.gw_alignment_to_pivot(optuna = False, 
-                                                  n_init_plan = n_init_plan, 
-                                                  epsilons = epsilons, 
-                                                  n_trials = n_trials, 
-                                                  n_jobs = n_jobs, 
+Pi_list_before = barycenter.gw_alignment_to_pivot(optuna = False,
+                                                  n_init_plan = n_init_plan,
+                                                  epsilons = epsilons,
+                                                  n_trials = n_trials,
+                                                  n_jobs = n_jobs,
                                                   init_diag = init_diag)
 
 #%%

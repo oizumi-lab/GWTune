@@ -2,8 +2,8 @@
 import sys
 sys.path.append("../../")
 
-from src.GW_alignment import my_entropic_gromov_wasserstein, Entropic_GW
-from src.utils.gw_functions import initialize_matrix
+from GW_alignment_abe import my_entropic_gromov_wasserstein, Entropic_GW
+from utils.gw_functions_abe import initialize_matrix
 
 import numpy as np
 import ot
@@ -117,42 +117,3 @@ epsilon = 0.0005
 gw_t, log_t = gw_alignment(X, Y_t, epsilon=epsilon, random_init=False)
 gwd_t = log_t['gw_dist']
 print(f'With histogram matching: GWD = {gwd_t}')  # %%
-
-
-# %%
-# optunaによる最適化
-database_uri = "mysql+pymysql://root@localhost/dm_scaling"
-study_name = 'normal_gw'
-optuna.delete_study(study_name=study_name, storage=database_uri)
-
-gw_instance = Entropic_GW(X,Y,max_iter=1000, epsilon_range =(1.0e-3, 1.0e-2),n_iter=1)
-gw_instance.run_study_mysql(database_uri=database_uri,study_name=study_name,concurrency=10, num_trial=100)
-
-# %%
-plt.imshow(gw_instance.best_gw)
-print(gw_instance.best_gwd)
-# %%
-database_uri = "mysql+pymysql://root@localhost/dm_scaling"
-study_name = 'matching_gw'
-optuna.delete_study(study_name=study_name, storage=database_uri)
-
-gw_t_instance = Entropic_GW(X,Y_t,max_iter=1000, epsilon_range =(1.0e-4, 1.0e-2),n_iter=1)
-gw_t_instance.run_study_mysql(database_uri=database_uri,study_name=study_name,concurrency=10, num_trial=100)
-# %%
-plt.imshow(gw_instance.best_gw)
-print(gw_instance.best_gwd)
-# %%
-import plotly
-import optuna
-database_uri = "mysql+pymysql://root@localhost/dm_scaling"
-study_name = 'matching_gw'
-study = optuna.load_study(storage=database_uri,study_name=study_name)
-optuna.visualization.plot_optimization_history(study).show()
-optuna.visualization.plot_parallel_coordinate(study).show()
-# %%
-
-import numpy as np
-ep = (1.0e-5, 1.0e-3)
-ep_l,ep_u = ep
-print(ep_u)
-# %%
