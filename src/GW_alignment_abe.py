@@ -157,48 +157,6 @@ def gw_alignment(X, Y, epsilon, random_init=False, stopping_rounds=5):
     plt.show()
     return gw, log
 
-
-# %%
-
-
-class Create_initial_plans:
-    def __init__(self, n_init_plan, n_column):
-        self.n_column = n_column
-        self.n_init_plan = n_init_plan
-
-    def rand_plans(self):
-        rand_mat = np.random.rand(self.n_init_plan, self.n_column, self.n_column)
-        row_sums = rand_mat.sum(axis=2)
-        rand_mat /= row_sums[:, :, np.newaxis] * self.n_column
-        return rand_mat
-
-    def unif_plans(self):
-        unif_mat = np.random.uniform(
-            0, 1, (self.n_init_plan, self.n_column, self.n_column)
-        )
-        row_sums = unif_mat.sum(axis=2)
-        unif_mat /= row_sums[:, :, np.newaxis] * self.n_column
-        return unif_mat
-
-    def permutation_plans(self):
-        """
-        対角行列のランダムなpermutation
-        """
-        perm_vec_list = list(itertools.permutations([i for i in range(self.n_column)]))
-        n_perm = len(perm_vec_list)
-        diag_mat = np.diag(np.ones((self.n_column,)) / self.n_column)
-        perm_mat = np.zeros((self.n_init_plan, self.n_column, self.n_column))
-        rand_order = random.sample([i for i in range(n_perm)], n_perm)
-        for i in range(self.n_init_plan):
-            perm_mat[i] = diag_mat[:, perm_vec_list[rand_order[i]]]
-        return perm_mat
-
-    def shifted_plans(self, n_shift):
-        diag_mat = np.diag(np.ones((self.n_column,)) / self.n_column)
-        shifted_mat = diag_mat[:, [k - n_shift for k in range(self.n_column)]]
-        return shifted_mat
-
-
 # %%
 
 
