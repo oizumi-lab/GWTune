@@ -150,3 +150,9 @@ study = optuna.load_study(storage=database_uri,study_name=study_name)
 optuna.visualization.plot_optimization_history(study).show()
 optuna.visualization.plot_parallel_coordinate(study).show()
 # %%
+
+import numpy as np
+ep = (1.0e-5, 1.0e-3)
+ep_l,ep_u = ep
+print(ep_u)
+# %%
