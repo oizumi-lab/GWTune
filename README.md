@@ -1,32 +1,33 @@
 # GW_methods
 
 ## Folder structure of this repository
-
+<pre>
 |-- data  
-|-- scripts  
-|-- src  
-|   -- utils  
+|-- scripts
+|-- src
+|   -- utils
  -- .gitignore  
  -- pyproject.toml  
  -- README.md  
+</pre>
 
-## Roles of folders
-data: Where you put "minimal" data for tutorials. Do not put a large size data.  
-scripts: Where you put scripts for various types of GW alignment tutorials.  
-src: Where you put "core" modules for this project such as GW alignment with hyperparameter optimization or GW barycenter alignment.  
-utils: Where you put utility modules that are not specific to GW alignment but are useful for general purposes.  
+## Roles of the folders
+**data**: Where you put "minimal" data for tutorials. Do not put a large size data.  
+**scripts**: Where you put scripts for various types of GW alignment tutorials.  
+**src**: Where you put "core" modules for this project such as GW alignment with hyperparameter optimization or GW barycenter alignment.  
+**utils**: Where you put utility modules that are not specific to GW alignment but are useful for general purposes.  
 
 ## Core modules in src
 
 ### Basic GW algigment (now mainly Sasaki & Abe)
-GW alignment with the optimization of epsilon and initial transportation plans
+GW alignment with the hyperparameter optimization of epsilon and initial transportation plans
 
 0. util function for selecting cpu and gpu, changing variable types  
 
 1. optimization for epsilon  
   a. grid search  
   b. optuna  (Bayes)
-2. optimization for initial  
+2. optimization for initial transportation plans  
   a. diagonal  
   b. uniform (default option for POT)  
   c. random matrix  
@@ -43,7 +44,7 @@ Procrustes alignment after GW alignment (this should be easy to implement. it ma
 2. histogram alignment using ANN natural objects similarity data  
 
 
-## data for tutorials
-1. Human color similarity judgement data (Tsuchiya Lab)  
-2. ANN natural objects similarity data (Alexnet and VGG?) <- sasaki san  
-3. THINGS data (THINGS team)  
+## Data for tutorials
+1. Human color similarity judgement data (Tsuchiya Lab)  <- Oizumi  
+2. ANN natural objects similarity data (Alexnet and VGG?) <- Sasaki san  
+3. THINGS data (THINGS team)  <- Takeda san  
