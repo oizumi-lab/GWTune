@@ -287,10 +287,4 @@ class InitMatrixForGW_Alignment():
         T = T/n
         return T
     
-
-# %% 
-if __name__ == '__main__':
-    test_builder = Init_Matrix_For_GW_Alignment(2000)
-    t = test_builder.make_initial_T('diag')
-    
 # %% 
