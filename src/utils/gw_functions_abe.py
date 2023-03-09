@@ -17,6 +17,7 @@ from scipy.spatial import distance
 from scipy.spatial.distance import squareform
 from sklearn.metrics import confusion_matrix, accuracy_score
 
+
 def sort_for_scaling(X):
     x = squareform(X, checks=False)
     x_sorted = np.sort(x)

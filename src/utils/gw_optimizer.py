@@ -19,7 +19,7 @@ class Optimizer:
         Args:
             dataset (_type_): _description_
             method (str, optional): _description_. Defaults to 'optuna'.
-            init_plan (list, optional): _description_. Defaults to ['uniform'].
+            init_plans_list (list, optional): _description_. Defaults to ['diag'].
             sampler_name (str, optional): _description_. Defaults to 'random'.
             filename (str, optional): _description_. Defaults to 'test'.
             n_jobs (int, optional): _description_. Defaults to 10.
@@ -32,7 +32,7 @@ class Optimizer:
             _type_: _description_
         """
         if method == 'optuna':
-            Opt = Run_Optuna(self.save_path, filename, sampler_name, init_plans_list, n_jobs, num_trial)
+            Opt = RunOptuna(self.save_path, filename, sampler_name, init_plans_list, n_jobs, num_trial)
         else:
             raise ValueError('no implemented method.')
 
@@ -44,7 +44,7 @@ class Optimizer:
     
 
 
-class Run_Optuna():
+class RunOptuna():
     def __init__(self, save_path, filename, sampler_name, init_plans_list, n_jobs, num_trial):
         self.save_path = save_path
         self.filename = filename

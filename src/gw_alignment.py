@@ -37,7 +37,7 @@ class GW_Alignment():
         self.to_types = to_types
         self.gpu_queue = gpu_queue
         
-        be = Backend(self.device, self.to_types)
+        be = Backend(self.device, self.to_types) # potのnxに書き換えるべき。
         self.pred_dist, self.target_dist, self.p, self.q = be.change_data(pred_dist, target_dist, p, q)
         
         self.size = len(self.pred_dist)
@@ -143,7 +143,7 @@ class GW_Alignment():
             gpu_id = self.gpu_queue.get()
             device = 'cuda:' + str(gpu_id) 
         
-        trial.set_user_attr('size', self.size)
+        
         
         '''
         1.  define hyperparameter (eps, T)
@@ -155,6 +155,8 @@ class GW_Alignment():
         init_mat_plan = trial.suggest_categorical("initialize", init_mat_types)
         init_mat = self.init_mat_builder.make_initial_T(init_mat_plan)
         init_mat = torch.from_numpy(init_mat).float().to(device)
+        
+        trial.set_user_attr('size', self.size)
         
         '''
         2.  Compute GW alignment with hyperparameters defined above.
@@ -199,7 +201,7 @@ class GW_Alignment():
 
 
 # %%
-class Init_Matrix_For_GW_Alignment():
+class InitMatrixForGW_Alignment():
     def __init__(self, matrix_size):
         self.matrix_size = matrix_size
         pass
@@ -269,6 +271,20 @@ class Init_Matrix_For_GW_Alignment():
             ts = ts / (self.matrix_size * np.sum(ts))
 
         T = np.array([ts[idx] for idx in matrix])
+        return T
+    
+    def make_random_initplan(n):
+        # make random initial transportation plan (N x N matrix)
+        T = np.random.rand(n, n) # create a random matrix of size n x n
+        rep = 100 # number of repetitions
+        for i in range(rep):
+            # normalize each row so that the sum is 1
+            p = T.sum(axis=1, keepdims=True)
+            T = T / p
+            # normalize each column so that the sum is 1
+            q = T.sum(axis=0, keepdims=True)
+            T = T / q
+        T = T/n
         return T
     
 
