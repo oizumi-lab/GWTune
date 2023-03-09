@@ -12,9 +12,11 @@ from joblib import parallel_backend
 from copy import copy
 import warnings
 # warnings.simplefilter("ignore")
-sys.path.append("../")
+import os
 
-from utils.utils import Backend
+
+# %%
+# from src.utils.backend import Backend
 
 # %%
 class GW_Alignment():
@@ -55,7 +57,8 @@ class GW_Alignment():
 
         # hyperparameter
         self.epsilon = (1e-4, 1e-2)
-        self.initialize = ["uniform"] #"random", "permutation",
+        self.initialize = ['uniform', 'random', 'permutation', 'diag']
+        self.init_mat_builder = Init_Matrix_For_GW_Alignment(self.size)
 
         # optuna parameter
         self.min_resource = 3
@@ -105,7 +108,33 @@ class GW_Alignment():
         else:
             return T
 
-    def __call__(self, trial):
+    def _choose_init_plans(self, init_plans_list):
+        """
+        ここから、初期値の条件を1個または複数個選択することができる。
+        選択はself.initializeの中にあるものの中から。
+        選択したい条件が1つであっても、リストで入力をすること。
+
+        Args:
+            init_plans_list (list) : 初期値の条件を1個または複数個入れたリスト。
+
+        Raises:
+            ValueError: 選択したい条件が1つであっても、リストで入力をすること。
+
+        Returns:
+            list : 選択希望の条件のリスト。
+        """
+        
+        if type(init_plans_list) != list:
+            raise ValueError('variable named "init_plans_list" is not list!')
+        
+        else:
+            return [v for v in self.initialize if v in init_plans_list]
+        
+    def __call__(self, trial, init_plans_list):
+        
+        '''
+        0.  define the "gpu_queue" here. This will be used when the memory of dataset was too much large for a single GPU board, and so on. 
+        '''
         
         if self.gpu_queue is None:
             device = self.device
@@ -114,20 +143,31 @@ class GW_Alignment():
             gpu_id = self.gpu_queue.get()
             device = 'cuda:' + str(gpu_id) 
         
+        trial.set_user_attr('size', self.size)
         
+        '''
+        1.  define hyperparameter (eps, T)
+        '''
         ep_lower, ep_upper = self.epsilon
         eps = trial.suggest_float("eps", ep_lower, ep_upper, log = True)
         
-        initialize = trial.suggest_categorical("initialize", self.initialize)
-        
-        # size = trial.
-
-        init_plans = Init_Matrix_For_GW_Alignment(self.size)
-        init_mat = init_plans.make_initial_T(initialize)
-
+        init_mat_types = self._choose_init_plans(init_plans_list)
+        init_mat_plan = trial.suggest_categorical("initialize", init_mat_types)
+        init_mat = self.init_mat_builder.make_initial_T(init_mat_plan)
         init_mat = torch.from_numpy(init_mat).float().to(device)
         
+        '''
+        2.  Compute GW alignment with hyperparameters defined above.
+        '''
+        
         gw, logv = self.entropic_GW(device, eps, T = init_mat)
+        
+        
+        '''
+        3.  count the accuracy of alignment and save the results if computation was finished in the right way.
+            If not, set the result of accuracy and gw_loss as float('nan'), respectively. This will be used as a handy marker as bad results to be removed in the evaluation analysis.
+            
+        '''
         
         if torch.count_nonzero(gw).item() != 0:
             gw_loss = logv['gw_dist'].item()
@@ -135,16 +175,23 @@ class GW_Alignment():
             _, pred = torch.max(gw, 1)
             acc = pred.eq(torch.arange(len(gw)).to(device)).sum() / len(gw)
 
-            torch.save(gw, self.save_path + '/GW({} pictures, epsilon={}).pt'.format(gw.shape[0], round(eps, 6)))
+            torch.save(gw, self.save_path + '/GW({} pictures, epsilon={}).pt'.format(self.size, round(eps, 6)))
             
         else:
-            gw_loss = 1e6
-            acc = -1
+            gw_loss = float('nan')
+            acc = float('nan')
+        
+        '''
+        4. delete unnecessary memory for next computation. If not, memory error would happen especially when using CUDA.
+        '''
         
         del gw, logv
         torch.cuda.empty_cache()
         gc.collect()
         
+        '''
+        5.  "gpu_queue" can manage the GPU boards for the next computation.
+        '''
         if self.gpu_queue is not None:
             self.gpu_queue.put(gpu_id)
 
@@ -159,24 +206,28 @@ class Init_Matrix_For_GW_Alignment():
 
     def make_initial_T(self, initialize):
         
-        if initialize == "random":
+        if initialize == 'random':
             T = self.initialize_matrix(self.matrix_size)
             return T
         
-        elif initialize == "permutation":
+        elif initialize == 'permutation':
             ts = np.zeros(self.matrix_size)
             ts[0] = 1 / self.matrix_size
             T = self.initialize_matrix(self.matrix_size, ts=ts)
             return T
         
-        elif initialize == "beta":
+        elif initialize == 'beta':
             ts = np.random.beta(2, 5, self.matrix_size)
             ts = ts / (self.matrix_size * np.sum(ts))
             T = self.initialize_matrix(self.matrix_size, ts=ts)
             return T
         
-        elif initialize == "uniform":
+        elif initialize == 'uniform':
             T = np.outer(ot.unif(self.matrix_size), ot.unif(self.matrix_size))
+            return T
+
+        elif initialize == 'diag':
+            T = np.diag(np.ones(self.matrix_size) / self.matrix_size)
             return T
 
         else:
@@ -221,3 +272,9 @@ class Init_Matrix_For_GW_Alignment():
         return T
     
 
+# %% 
+if __name__ == '__main__':
+    test_builder = Init_Matrix_For_GW_Alignment(2000)
+    t = test_builder.make_initial_T('diag')
+    
+# %% 

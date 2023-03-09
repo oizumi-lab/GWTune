@@ -1,1 +1,0 @@
-data_path = '../../data/'

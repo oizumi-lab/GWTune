@@ -1,4 +1,4 @@
 print("Success to import src!")
-path_data = '../data/'
+
+from src.utils import gw_optimizer, backend
 from src import gw_alignment
-from src.utils import gw_optimizer

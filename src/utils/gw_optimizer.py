@@ -13,13 +13,13 @@ class Optimizer:
         self.save_path = save_path
         pass
     
-    def optimizer(self, dataset, method = 'optuna', init_plan = 'diag', sampler_name = 'random', filename = 'test', n_jobs = 10, num_trial = 50):
+    def optimizer(self, dataset, method = 'optuna', init_plans_list = ['diag'], sampler_name = 'random', filename = 'test', n_jobs = 10, num_trial = 50):
         """_summary_
 
         Args:
             dataset (_type_): _description_
             method (str, optional): _description_. Defaults to 'optuna'.
-            init_plan (str, optional): _description_. Defaults to 'diag'.
+            init_plan (list, optional): _description_. Defaults to ['uniform'].
             sampler_name (str, optional): _description_. Defaults to 'random'.
             filename (str, optional): _description_. Defaults to 'test'.
             n_jobs (int, optional): _description_. Defaults to 10.
@@ -32,7 +32,7 @@ class Optimizer:
             _type_: _description_
         """
         if method == 'optuna':
-            Opt = Run_Optuna(self.save_path, filename, sampler_name, init_plan, n_jobs, num_trial)
+            Opt = Run_Optuna(self.save_path, filename, sampler_name, init_plans_list, n_jobs, num_trial)
         else:
             raise ValueError('no implemented method.')
 
@@ -45,33 +45,31 @@ class Optimizer:
 
 
 class Run_Optuna():
-    def __init__(self, save_path, filename, sampler_name, init_plan, n_jobs, num_trial):
+    def __init__(self, save_path, filename, sampler_name, init_plans_list, n_jobs, num_trial):
         self.save_path = save_path
         self.filename = filename
         self.sampler_name = sampler_name
-        self.init_plan = init_plan
+        self.init_plans_list = init_plans_list
         self.n_jobs = n_jobs
         self.num_trial = num_trial
         
         
     def run_study(self, dataset):
-        
-        save_file_name = self.init_plan + ',' + self.filename
-        
-        if not os.path.exists(self.save_path + '/' + save_file_name):    
+        if not os.path.exists(self.save_path + '/' + self.filename):    
             study = optuna.create_study(directions = ["minimize", "maximize"],
-                                        study_name = save_file_name,
+                                        study_name = self.filename,
                                         sampler = self.choose_sampler(),
-                                        storage = "sqlite:///" + self.save_path + "/" + save_file_name + '.db',
+                                        storage = "sqlite:///" + self.save_path + "/" + self.filename + '.db',
                                         load_if_exists = True)
             
+
             with parallel_backend("multiprocessing", n_jobs = self.n_jobs):
-                study.optimize(dataset, n_trials = self.num_trial, n_jobs = self.n_jobs)
+                study.optimize(lambda trial: dataset(trial, self.init_plans_list), n_trials = self.num_trial, n_jobs = self.n_jobs)
 
         else:
             study = optuna.create_study(directions = ["minimize", "maximize"],
-                                        study_name = save_file_name,
-                                        storage = "sqlite:///" + self.save_path + "/"  + save_file_name + '.db',
+                                        study_name = self.filename,
+                                        storage = "sqlite:///" + self.save_path + "/"  + self.filename + '.db',
                                         load_if_exists = True)
         return study
     

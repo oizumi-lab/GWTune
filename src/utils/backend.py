@@ -58,11 +58,12 @@ class Backend():
         """
         if self.to_types == 'jax':
             if isinstance(args, torch.Tensor):
-                if args.is_cuda == True:
-                    args = args.to('cpu')
+                if args.is_cuda == True: args = args.to('cpu')    
+                args = jnp.array(args)
             
-            args = jnp.array(args)
-            
+            if isinstance(args, np.ndarray):
+                args = jnp.array(args)
+        
             if 'cuda' in self.device or 'gpu' in self.device: # ここ、のちに拡張工事が必要。
                 gpus = jax.devices("gpu")
                 return jax.device_put(args, gpus[0])
@@ -78,6 +79,9 @@ class Backend():
                 args = np.array(args)
                 return torch.from_numpy(args).float().to(self.device)
 
+            else:
+                return args
+
         elif self.to_types == 'numpy':
             if 'cuda' in self.device:
                 raise ValueError("numpy doesn't work on CUDA")
@@ -87,6 +91,9 @@ class Backend():
 
             elif isinstance(args, jax.numpy.ndarray):
                 return np.array(args)
+
+            else:
+                return args
         
         else:
             raise ValueError("Unknown type of non implemented here.")
