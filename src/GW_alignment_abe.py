@@ -152,10 +152,6 @@ def gw_alignment(X, Y, epsilon, random_init=False, stopping_rounds=5):
             X, Y, p, q, "square_loss", epsilon=epsilon, log=True, verbose=True
         )
 
-    plt.figure(figsize=(5, 5))
-    sns.heatmap(gw, square=True)
-    plt.show()
-    return gw, log
 
 
 

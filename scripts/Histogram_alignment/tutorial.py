@@ -1,6 +1,4 @@
 # %%
-import jax.numpy as jnp
-import jax
 import time
 import numpy as np
 import pandas as pd
@@ -12,7 +10,8 @@ import os
 import warnings
 warnings.simplefilter("ignore")
 
-from gw_alignment import GW_Alignment
+from src.gw_alignment import GW_Alignment
+
 # %%
 
 
