@@ -58,7 +58,7 @@ class GW_Alignment():
         # hyperparameter
         self.epsilon = (1e-4, 1e-2)
         self.initialize = ['uniform', 'random', 'permutation', 'diag']
-        self.init_mat_builder = Init_Matrix_For_GW_Alignment(self.size)
+        self.init_mat_builder = InitMatrixForGW_Alignment(self.size)
 
         # optuna parameter
         self.min_resource = 3
