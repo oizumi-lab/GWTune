@@ -37,11 +37,11 @@ class Test():
 
     def optimizer_test(self, device, to_types):
         test_gw = GW_Alignment(self.model1, self.model2, self.p, self.q, device=device, to_types=to_types, speed_test=True)
-        
+
         opt = gw_optimizer.Optimizer(test_gw.save_path)
-        
+
         study = opt.optimizer(test_gw, method = 'optuna', init_plans_list = ['diag'], sampler_name = 'random', filename = 'test', n_jobs = 10, num_trial = 50)
-        
+
         return study
 
 
