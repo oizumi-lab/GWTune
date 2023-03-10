@@ -35,12 +35,12 @@ class Test():
         q = ot.unif(len(model2))
         return model1, model2, p, q
 
-    def optimizer_test(self, device, to_types):
-        test_gw = GW_Alignment(self.model1, self.model2, self.p, self.q, device=device, to_types=to_types, speed_test=True)
+    def optimizer_test(self, filename, device, to_types):
+        test_gw = GW_Alignment(self.model1, self.model2, self.p, self.q, device = device, to_types = to_types, filename = filename, gpu_queue = None)
 
         opt = gw_optimizer.Optimizer(test_gw.save_path)
 
-        study = opt.optimizer(test_gw, method = 'optuna', init_plans_list = ['diag'], sampler_name = 'random', filename = 'test', n_jobs = 10, num_trial = 50)
+        study = opt.optimizer(test_gw, method = 'optuna', init_plans_list = ['diag'], eps_list = [1e-4, 1e-2], sampler_name = 'random', filename = filename, n_jobs = 10, num_trial = 50)
 
         return study
 
@@ -51,9 +51,10 @@ if __name__ == '__main__':
     path2 = '../data/model2.pt'
 
     tgw = Test(path1, path2)
+    filename = 'test'
     device = 'cuda'
     to_types = 'torch'
-    tgw.optimizer_test(device, to_types)
+    tgw.optimizer_test(filename, device, to_types)
 
 
 # %%
