@@ -1,10 +1,19 @@
 # %%
+import os
 import numpy as np
 import jax
 import jax.numpy as jnp
 import torch
 import random
+import ot
 
+# %%
+# JAXの環境変数。
+os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = 'false'
+jax.config.update("jax_enable_x64", True)
+
+
+# %%
 def fix_seed(seed=42):     
     # Python
     random.seed(seed)
@@ -88,7 +97,7 @@ class Backend():
                 return torch.from_numpy(args).float().to(self.device)
 
             else:
-                return args
+                return args.to(self.device)
 
         elif self.to_types == 'numpy':
             if 'cuda' in self.device or 'gpu' in self.device:
@@ -111,18 +120,24 @@ class Backend():
 if __name__ == '__main__':
     test_numpy1 = np.arange(10)
     test_numpy2 = np.arange(10, 20)
-     
-    backend = Backend(device = 'gpu', to_types = 'jax')
-    test_jax1 = backend.change_data(test_numpy1)
-    test_jax2 = backend.change_data(test_numpy2)
+    
+    # %%
+    backend = Backend(device = 'cpu', to_types = 'jax')
+    test_jax1, test_jax2 = backend.change_data(test_numpy1, test_numpy2)
     print(test_jax1, test_jax2)
     print(type(test_jax1), type(test_jax2))
     
     # %%
     backend = Backend(device = 'cuda', to_types = 'torch')
     test_torch1 = backend.change_data(test_numpy1)
-    test_torch2 = backend.change_data(test_numpy2)
-    print(test_torch1, test_torch2)
-    print(type(test_torch1), type(test_torch2))
+    print(test_torch1)
+    print(type(test_torch1))
+
+    # %%
+    tt = np.arange(3)
+    tt_jax = jnp.array(tt)
+    gpus = jax.devices('gpu')
+    tt_jax = jax.device_put(tt_jax, gpus[0])
+   
 
 # %%
