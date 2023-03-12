@@ -41,7 +41,7 @@ class GW_Alignment():
 
         self.size = len(self.pred_dist)
 
-        self.save_path = '../data/gw_alignment/result/' + self.filename 
+        self.save_path = '../result/gw_alignment/' + self.filename 
 
         if not os.path.exists(self.save_path):
             os.makedirs(self.save_path)
@@ -133,8 +133,14 @@ class GW_Alignment():
         '''
         ep_lower, ep_upper = eps_list
         
-        eps = trial.suggest_float("eps", ep_lower, ep_upper, log = True)
-
+        if len(eps_list) == 2:
+            eps = trial.suggest_float("eps", ep_lower, ep_upper, log = True)
+        elif len(eps_list) == 3:
+            ep_lower, ep_upper, ep_step = eps_list
+            eps = trial.suggest_float("eps", ep_lower, ep_upper, ep_step)
+        else:
+            raise ValueError("The eps_list doesn't match.")
+        
         # seed = trial.suggest_int("seed", 0, 9, 1)
 
         init_mat_types = self._choose_init_plans(init_plans_list) # リストを入力して、実行可能な方法のみをリストにして返す。
@@ -163,11 +169,13 @@ class GW_Alignment():
             acc = pred.eq(torch.arange(len(gw)).to(device)).sum() / len(gw)
 
             torch.save(gw, self.save_path + '/GW({} pictures, epsilon = {}, trial = {}).pt'.format(self.size, round(eps, 6), trial.number))
-
+            acc = acc.item()
+            
         else:
             gw_loss = float('nan')
             acc = float('nan')
 
+        trial.set_user_attr('acc', acc)
         '''
         4. delete unnecessary memory for next computation. If not, memory error would happen especially when using CUDA.
         '''
@@ -182,4 +190,4 @@ class GW_Alignment():
         if self.gpu_queue is not None:
             self.gpu_queue.put(gpu_id)
 
-        return gw_loss, acc
+        return gw_loss

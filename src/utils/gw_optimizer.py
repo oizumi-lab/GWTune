@@ -13,7 +13,15 @@ class Optimizer:
         self.save_path = save_path
         pass
     
-    def optimizer(self, dataset, method = 'optuna', init_plans_list = ['diag'], eps_list = [1e-4, 1e-2], sampler_name = 'random', filename = 'test', n_jobs = 10, num_trial = 50):
+    def optimizer(self, 
+                  dataset, 
+                  method = 'optuna',
+                  init_plans_list = ['diag'],
+                  eps_list = [1e-4, 1e-2],
+                  sampler_name = 'random',
+                  filename = 'test',
+                  n_jobs = 10,
+                  num_trial = 50):
         """_summary_
 
         Args:
@@ -55,7 +63,7 @@ class RunOptuna():
 
     def run_study(self, dataset):
         if not os.path.exists(self.save_path + '/' + self.filename):
-            study = optuna.create_study(directions = ["minimize", "maximize"],
+            study = optuna.create_study(direction = "minimize",
                                         study_name = self.filename,
                                         sampler = self.choose_sampler(),
                                         storage = "sqlite:///" + self.save_path + "/" + self.filename + '.db',
@@ -65,7 +73,7 @@ class RunOptuna():
                 study.optimize(lambda trial: dataset(trial, self.init_plans_list, self.eps_list), n_trials = self.num_trial, n_jobs = self.n_jobs)
 
         else:
-            study = optuna.create_study(directions = ["minimize", "maximize"],
+            study = optuna.create_study(direction = "minimize",
                                         study_name = self.filename,
                                         storage = "sqlite:///" + self.save_path + "/"  + self.filename + '.db',
                                         load_if_exists = True)
@@ -85,10 +93,10 @@ class RunOptuna():
         return sampler
 
     def load_graph(self, study):
-        best_trial = study.best_trials[0]
+        best_trial = study.best_trial
         eps = best_trial.params['eps']
-        acc = best_trial.values[1]
-        size = 2000
+        acc = best_trial.user_attrs['acc']
+        size = best_trial.user_attrs['size']
         number = best_trial.number
 
         gw = torch.load(self.save_path + '/GW({} pictures, epsilon = {}, trial = {}).pt'.format(size, round(eps, 6), number))

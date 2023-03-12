@@ -1,10 +1,19 @@
 # %%
+import os
 import numpy as np
 import jax
 import jax.numpy as jnp
 import torch
 import random
+import ot
 
+# %%
+# JAXの環境変数。
+os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = 'false'
+jax.config.update("jax_enable_x64", True)
+
+
+# %%
 def fix_seed(seed=42):     
     # Python
     random.seed(seed)
@@ -37,10 +46,15 @@ class Backend():
         Returns:
             output : 変換したい変数のリスト
         """
+        
         output = []
         for a in args:
             a = self._change_types(a)
             output.append(a)
+        
+        if len(args) == 1:
+            output = output[0]
+        
         return output
 
     def _change_types(self, args):
@@ -59,12 +73,12 @@ class Backend():
         if self.to_types == 'jax':
             if isinstance(args, torch.Tensor):
                 if args.is_cuda == True: args = args.to('cpu')    
-                args = jnp.array(args)
+                args = jnp.asarray(args)
             
             if isinstance(args, np.ndarray):
-                args = jnp.array(args)
+                args = jnp.asarray(args)
         
-            if 'cuda' in self.device or 'gpu' in self.device: # ここ、のちに拡張工事が必要。
+            if 'cuda' in self.device or 'gpu' in self.device: # ここ、のちに拡張工事が必要。GPUのボード番号の選択ができるようにしないといけない。
                 gpus = jax.devices("gpu")
                 return jax.device_put(args, gpus[0])
             else:
@@ -72,6 +86,9 @@ class Backend():
                 return jax.device_put(args, cpus[0])
         
         elif self.to_types == 'torch':
+            if 'gpu' in self.device:
+                raise ValueError('torch uses "cuda" instead of "gpu".')
+            
             if isinstance(args, np.ndarray):
                 return torch.from_numpy(args).float().to(self.device)
 
@@ -80,10 +97,10 @@ class Backend():
                 return torch.from_numpy(args).float().to(self.device)
 
             else:
-                return args
+                return args.to(self.device)
 
         elif self.to_types == 'numpy':
-            if 'cuda' in self.device:
+            if 'cuda' in self.device or 'gpu' in self.device:
                 raise ValueError("numpy doesn't work on CUDA")
 
             if isinstance(args, torch.Tensor):
@@ -99,7 +116,28 @@ class Backend():
             raise ValueError("Unknown type of non implemented here.")
         
 
+# %%
+if __name__ == '__main__':
+    test_numpy1 = np.arange(10)
+    test_numpy2 = np.arange(10, 20)
+    
+    # %%
+    backend = Backend(device = 'cpu', to_types = 'jax')
+    test_jax1, test_jax2 = backend.change_data(test_numpy1, test_numpy2)
+    print(test_jax1, test_jax2)
+    print(type(test_jax1), type(test_jax2))
+    
+    # %%
+    backend = Backend(device = 'cuda', to_types = 'torch')
+    test_torch1 = backend.change_data(test_numpy1)
+    print(test_torch1)
+    print(type(test_torch1))
 
+    # %%
+    tt = np.arange(3)
+    tt_jax = jnp.array(tt)
+    gpus = jax.devices('gpu')
+    tt_jax = jax.device_put(tt_jax, gpus[0])
+   
 
-
-
+# %%

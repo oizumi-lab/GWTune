@@ -12,8 +12,8 @@ class InitMatrix():
         """
         To do : 説明を書く
         """
+        np.random.seed(seed) # numpyの乱数を固定する。seed値の変更も可能。
         if initialize == 'random':
-            np.random.seed(seed)
             T = self.make_random_initplan()
             return T
 

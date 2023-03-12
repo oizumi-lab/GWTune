@@ -9,6 +9,7 @@ import os, sys
 
 sys.path.append('../')
 os.getcwd()
+# nvidia-smi --query-compute-apps=timestamp,pid,name,used_memory --format=csv # GPUをだれが使用しているのかを確認できるコマンド。
 
 # %%
 from src.gw_alignment import GW_Alignment
