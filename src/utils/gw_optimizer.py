@@ -59,6 +59,8 @@ class RunOptuna():
         self.eps_list = eps_list
         self.n_jobs = n_jobs
         self.num_trial = num_trial
+        
+        self.initialize = ['uniform', 'random', 'permutation', 'diag'] # 実装済みの方法の名前を入れる。
 
 
     def run_study(self, dataset):
@@ -79,13 +81,42 @@ class RunOptuna():
                                         load_if_exists = True)
         return study
 
+    def _choose_init_plans(self, init_plans_list):
+        """
+        ここから、初期値の条件を1個または複数個選択することができる。
+        選択はself.initializeの中にあるものの中から。
+        選択したい条件が1つであっても、リストで入力をすること。
+        
+        Args:
+            init_plans_list (list) : 初期値の条件を1個または複数個入れたリスト。
+        
+        Raises:
+            ValueError: 選択したい条件が1つであっても、リストで入力をすること。
+        
+        Returns:
+            list : 選択希望の条件のリスト。
+        """
+
+        if type(init_plans_list) != list:
+            raise ValueError('variable named "init_plans_list" is not list!')
+
+        else:
+            return [v for v in self.initialize if v in init_plans_list]
+    
     def choose_sampler(self):
 
         if self.sampler_name == 'random':
             sampler = optuna.samplers.RandomSampler(seed = 42)
 
         elif self.sampler_name == 'grid_search':
-            sampler = optuna.samplers.GridSampler(seed = 42)
+            init_mat_types = self._choose_init_plans(self.init_plans_list) # リストを入力して、実行可能な方法のみをリストにして返す。
+            
+            search_space = {
+                "eps": np.logspace(-4, -2),
+                "initialize": init_mat_types
+            }
+            
+            sampler = optuna.samplers.GridSampler(search_space)
 
         else:
             raise ValueError('not implemented sampler yet.')

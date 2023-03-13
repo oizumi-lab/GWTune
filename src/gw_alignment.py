@@ -47,7 +47,6 @@ class GW_Alignment():
             os.makedirs(self.save_path)
 
         # hyperparameter
-        self.initialize = ['uniform', 'random', 'permutation', 'diag']
         self.init_mat_builder = InitMatrix(self.size)
 
     def entropic_GW(self, device, epsilon, T = None, log = True, verbose = False):
@@ -93,28 +92,6 @@ class GW_Alignment():
         else:
             return T
 
-    def _choose_init_plans(self, init_plans_list):
-        """
-        ここから、初期値の条件を1個または複数個選択することができる。
-        選択はself.initializeの中にあるものの中から。
-        選択したい条件が1つであっても、リストで入力をすること。
-        
-        Args:
-            init_plans_list (list) : 初期値の条件を1個または複数個入れたリスト。
-        
-        Raises:
-            ValueError: 選択したい条件が1つであっても、リストで入力をすること。
-        
-        Returns:
-            list : 選択希望の条件のリスト。
-        """
-
-        if type(init_plans_list) != list:
-            raise ValueError('variable named "init_plans_list" is not list!')
-
-        else:
-            return [v for v in self.initialize if v in init_plans_list]
-
     def __call__(self, trial, init_plans_list, eps_list):
 
         '''
@@ -142,11 +119,14 @@ class GW_Alignment():
             raise ValueError("The eps_list doesn't match.")
         
         # seed = trial.suggest_int("seed", 0, 9, 1)
-
-        init_mat_types = self._choose_init_plans(init_plans_list) # リストを入力して、実行可能な方法のみをリストにして返す。
-        init_mat_plan = trial.suggest_categorical("initialize", init_mat_types) # 上記のリストから、1つの方法を取り出す(optunaがうまく選択してくれる)。
+        
+        init_mat_plan = trial.suggest_categorical("initialize", init_plans_list) # 上記のリストから、1つの方法を取り出す(optunaがうまく選択してくれる)。
         init_mat = self.init_mat_builder.make_initial_T(init_mat_plan) # epsの値全部を計算する際、randomは何回も計算していいけど、diag, uniformは一回だけでいいので、うまく切り分けよう。
         init_mat = torch.from_numpy(init_mat).float().to(device)
+        
+        '''
+        randomの時にprunerを設定する場合は、if init_mat_plan == "random": pruner をしたのwhileループにいれたら良い。
+        '''
 
         trial.set_user_attr('size', self.size)
 
