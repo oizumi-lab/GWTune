@@ -254,4 +254,4 @@ class GW_Alignment():
         if self.gpu_queue is not None:
             self.gpu_queue.put(gpu_id)
 
-        return gw_loss, acc
+        return gw_loss
