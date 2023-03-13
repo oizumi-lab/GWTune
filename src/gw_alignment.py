@@ -72,13 +72,17 @@ class GW_Alignment():
             C1, C2, p, q = self.pred_dist.to(device), self.target_dist.to(device), self.p.to(device), self.q.to(device)
         else:
             C1, C2, p, q = self.pred_dist, self.target_dist, self.p, self.q
+        
         nx = ot.backend.get_backend(C1, C2, p, q)
 
         # add T as an input
         if T is None:
             T = nx.outer(p, q)
-
+        
         constC, hC1, hC2 = ot.gromov.init_matrix(C1, C2, p, q, loss_fun = "square_loss")
+        
+        # constC, hC1, hC2, nx = self.mat_gw(device)
+        
         cpt = 0
         err = 1
 
@@ -110,7 +114,7 @@ class GW_Alignment():
         else:
             return T
 
-    def mat_gw(self, device):
+    def _mat_gw(self, device):
         """
         2023/3/13(阿部)
         gwd計算のための行列初期化。entropic_GWの最初と全く同じ
@@ -132,7 +136,7 @@ class GW_Alignment():
         nx = ot.backend.get_backend(C1, C2, p, q)
 
         constC, hC1, hC2 = ot.gromov.init_matrix(C1, C2, p, q, loss_fun = "square_loss")
-        return constC, hC1, hC2
+        return constC, hC1, hC2, nx
 
 
     def iter_entropic_gw(self, device, eps, init_mat_plan, trial):
@@ -141,7 +145,7 @@ class GW_Alignment():
 
         """
         min_gwd = float('inf')
-        for i,seed in enumerate(np.random.randint(self.n_iter)):
+        for i, seed in enumerate(np.random.randint(self.n_iter)):
             np.random.seed(seed)
             init_mat = self.init_mat_builder.make_initial_T(init_mat_plan)
             gw, logv = self.entropic_gw(device, eps, T = init_mat)
@@ -152,7 +156,7 @@ class GW_Alignment():
                 best_init_mat = init_mat
                 best_logv = logv
 
-            constC, hC1, hC2 = self.mat_gw(device)
+            constC, hC1, hC2 = self._mat_gw(device)
             trial.report(ot.gromov.gwloss(constC, hC1, hC2, gw), i)
             if trial.should_prune():
                 raise optuna.TrialPruned()
