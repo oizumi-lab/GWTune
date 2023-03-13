@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 import optuna
 from joblib import parallel_backend
 import warnings
+import ot
+import copy
 # warnings.simplefilter("ignore")
 import os
 
@@ -57,6 +59,7 @@ class GW_Alignment():
         # hyperparameter
         self.initialize = ['uniform', 'random', 'permutation', 'diag']
         self.init_mat_builder = InitMatrix(self.size)
+        self.n_iter = 100
 
         # optuna parameter
         self.min_resource = 3
@@ -91,7 +94,7 @@ class GW_Alignment():
 
             if cpt % 10 == 0:
                 # we can speed up the process by checking for the error only all the 10th iterations
-                err_prev = copy(err)
+                err_prev = copy.copy(err)
                 err = nx.norm(T - Tprev)
                 if log:
                     log['err'].append(err)
@@ -100,7 +103,7 @@ class GW_Alignment():
                         print('{:5s}|{:12s}'.format('It.', 'Err') + '\n' + '-' * 19)
                     print('{:5d}|{:8e}|'.format(cpt, err))
                 if trial:
-                    trial.report(gwloss(constC, hC1, hC2, T), cpt // 10)
+                    trial.report(ot.gromov.gwloss(constC, hC1, hC2, T), cpt // 10)
                     if trial.should_prune():
                         raise optuna.TrialPruned()
             cpt += 1
@@ -136,38 +139,32 @@ class GW_Alignment():
         return constC, hC1, hC2
 
 
-    def iter_mat_by_ep(self, eps, init_mat_plan, trial, device):
-        """_summary_
-        阿部
-        Parameters
-        ----------
-        eps : _type_
-            _description_
-        init_mat_plan : _type_
-            _description_
-        device : _type_
-            _description_
+    def iter_entropic_gw(self, eps, init_mat_plan, trial, device):
+        """
+        n_iter回くりかえす関数
+
         """
         min_gwd = float('inf')
         for i,seed in enumerate(np.random.randint(self.n_iter)):
             np.random.seed(seed)
             init_mat = self.init_mat_builder.make_initial_T(init_mat_plan)
-            gw, logv = self.entropic_GW(device, eps, T = init_mat)
+            gw, logv = self.entropic_gw(device, eps, T = init_mat)
             gwd = logv['gw_dist']
             if gwd < min_gwd:
                 min_gwd = gwd
                 best_gw = gw
                 best_init_mat = init_mat
+                best_logv = logv
 
             constC, hC1, hC2 = self.mat_gw(device)
             trial.report(ot.gromov.gwloss(constC, hC1, hC2, gw), i)
             if trial.should_prune():
                 raise optuna.TrialPruned()
-        return min_gwd, best_gw, best_init_mat
+        return best_gw, best_logv
 
 
 
-    def __call__(self, trial, init_plans_list):
+    def __call__(self, trial, init_plans_list, eps_list):
 
         '''
         0.  define the "gpu_queue" here. This will be used when the memory of dataset was too much large for a single GPU board, and so on.
@@ -209,12 +206,12 @@ class GW_Alignment():
         '''
         2. for文で回す
         '''
-        # if init_mat_plan in ['uniform', 'diag']:
-        #     gw
-        # elif init_mat_plan in ['random', 'permutation']:
-        #     gw
-        # else:
-        #     raise ValueError('Not defined initialize matrix.')
+        if init_mat_plan in ['uniform', 'diag']:
+            gw, logv = self.entropic_gw(device, eps, T = init_mat)
+        elif init_mat_plan in ['random', 'permutation']:
+            gw, logv = self.iter_entropic_gw()
+        else:
+            raise ValueError('Not defined initialize matrix.')
 
         '''
         2.  Compute GW alignment with hyperparameters defined above.
