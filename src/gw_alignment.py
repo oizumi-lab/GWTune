@@ -102,10 +102,6 @@ class GW_Alignment():
                     if cpt % 200 == 0:
                         print('{:5s}|{:12s}'.format('It.', 'Err') + '\n' + '-' * 19)
                     print('{:5d}|{:8e}|'.format(cpt, err))
-                if trial:
-                    trial.report(ot.gromov.gwloss(constC, hC1, hC2, T), cpt // 10)
-                    if trial.should_prune():
-                        raise optuna.TrialPruned()
             cpt += 1
 
         if log:
