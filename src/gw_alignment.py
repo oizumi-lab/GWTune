@@ -161,7 +161,7 @@ class GW_Alignment():
 
     def iter_mat_by_ep(self, eps, init_mat_plan, trial, device):
         """_summary_
-
+        阿部
         Parameters
         ----------
         eps : _type_
