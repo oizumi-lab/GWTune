@@ -185,8 +185,6 @@ class GW_Alignment():
         else:
             raise ValueError("The eps_list doesn't match.")
 
-        # seed = trial.suggest_int("seed", 0, 9, 1)
-
         init_mat_plan = trial.suggest_categorical("initialize", init_plans_list) # 上記のリストから、1つの方法を取り出す(optunaがうまく選択してくれる)。
         init_mat = self.init_mat_builder.make_initial_T(init_mat_plan) # epsの値全部を計算する際、randomは何回も計算していいけど、diag, uniformは一回だけでいいので、うまく切り分けよう。
         init_mat = torch.from_numpy(init_mat).float().to(device)
@@ -209,12 +207,6 @@ class GW_Alignment():
         else:
             raise ValueError('Not defined initialize matrix.')
 
-        '''
-
-        '''
-
-        gw, logv = self.entropic_GW(device, eps, T = init_mat)
-
 
         '''
         3.  count the accuracy of alignment and save the results if computation was finished in the right way.
@@ -228,11 +220,12 @@ class GW_Alignment():
             acc = pred.eq(torch.arange(len(gw)).to(device)).sum() / len(gw)
 
             torch.save(gw, self.save_path + '/GW({} pictures, epsilon={}).pt'.format(self.size, round(eps, 6)))
-
+            acc = acc.item() 
         else:
             gw_loss = float('nan')
             acc = float('nan')
 
+        trial.set_user_attr('acc', acc)
         '''
         4. delete unnecessary memory for next computation. If not, memory error would happen especially when using CUDA.
         '''
