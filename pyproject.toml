@@ -31,52 +31,9 @@ jaxlib = "^0.4.6"
 
 
 
-[tool.poetry.group.dev.dependencies]
+[poetry.group.dev.dependencies]
 autopep8 = "^2.0.1"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.mypy]
-# エラー時のメッセージを詳細表示
-show_error_context = true
-# エラー発生箇所の行数/列数を表示
-show_column_numbers = true
-# import 先のチェックを行わない (デフォルトだとサードパーティーライブラリまでチェックする)
-ignore_missing_imports = true
-# 関数定義の引数/戻り値に型アノテーション必須
-disallow_untyped_defs = true
-# デフォルト引数に None を取る場合型アノテーションに Optional 必須
-no_implicit_optional = true
-# 戻り値が Any 型ではない関数の戻り値の型アノテーションが Any のとき警告
-warn_return_any = true
-# mypy エラーに該当しない箇所に `# type: ignore` コメントが付与されていたら警告
-# ※ `# type: ignore` が付与されている箇所は mypy のエラーを無視出来る
-warn_unused_ignores = true
-# 冗長なキャストに警告
-warn_redundant_casts = true
-
-[tool.black]
-line-length = 120
-
-[tool.isort]
-profile = "black"
-line_length = 120
-# 各ライブラリ群の説明を追記する
-import_heading_stdlib      = "Standard Library"
-import_heading_thirdparty  = "Third Party Library"
-import_heading_firstparty  = "First Party Library"
-import_heading_localfolder = "Local Library"
-# from third_party import lib1, lib2...のような記述時の改行方法の設定(https://pycqa.github.io/isort/docs/configuration/multi_line_output_modes.html)
-multi_line_output = 3
-# 最後の要素の末尾に","を付けるようにする設定
-include_trailing_comma = true
-
-[tool.flake8]
-max-line-length = 120
-# E203: ":"の前の空白を入れないルール
-# W503: 演算子の前に改行しないようにするルール
-extend-ignore = ["E203", "W503"]
-exclude = [".venv", ".git", "__pycache__",]
-max-complexity = 10
