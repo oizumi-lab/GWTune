@@ -41,7 +41,14 @@ class Test():
 
         opt = gw_optimizer.Optimizer(test_gw.save_path)
 
-        study = opt.optimizer(test_gw, method = 'optuna', init_plans_list = ['diag'], eps_list = [1e-4, 1e-2], sampler_name = 'random', filename = filename, n_jobs = 10, num_trial = 50)
+        study = opt.optimizer(test_gw, 
+                              method = 'optuna', 
+                              init_plans_list = ['diag'], 
+                              eps_list = [1e-4, 1e-2], 
+                              sampler_name = 'grid_search', 
+                              filename = filename, 
+                              n_jobs = 10, 
+                              num_trial = 50)
 
         return study
 
