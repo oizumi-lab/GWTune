@@ -112,7 +112,7 @@ class RunOptuna():
         mplstyle.use('fast')
         N = T.shape[0]
         plt.figure(figsize=(8,6))
-        sns.heatmap(T.to('cpu').numpy())
+        sns.heatmap(T.to('cpu').numpy(), square = True)
 
         plt.title('GW results ({} pictures, eps={}, acc.= {})'.format(N, round(epsilon, 6), round(acc, 4)))
         plt.tight_layout()
