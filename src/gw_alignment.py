@@ -56,7 +56,7 @@ class GW_Alignment():
 
         # hyperparameter
         self.initialize = ['uniform', 'random', 'permutation', 'diag']
-        self.init_mat_builder = InitMatrixForGW_Alignment(self.size)
+        self.init_mat_builder = InitMatrix(self.size)
 
         # optuna parameter
         self.min_resource = 3
@@ -112,28 +112,6 @@ class GW_Alignment():
 
         else:
             return T
-
-    def _choose_init_plans(self, init_plans_list):
-        """
-        ここから、初期値の条件を1個または複数個選択することができる。
-        選択はself.initializeの中にあるものの中から。
-        選択したい条件が1つであっても、リストで入力をすること。
-
-        Args:
-            init_plans_list (list) : 初期値の条件を1個または複数個入れたリスト。
-
-        Raises:
-            ValueError: 選択したい条件が1つであっても、リストで入力をすること。
-
-        Returns:
-            list : 選択希望の条件のリスト。
-        """
-
-        if type(init_plans_list) != list:
-            raise ValueError('variable named "init_plans_list" is not list!')
-
-        else:
-            return [v for v in self.initialize if v in init_plans_list]
 
     def mat_gw(self, device):
         """_
@@ -205,13 +183,25 @@ class GW_Alignment():
         '''
         1.  define hyperparameter (eps, T)
         '''
-        ep_lower, ep_upper = self.epsilon
-        eps = trial.suggest_float("eps", ep_lower, ep_upper, log = True)
+        ep_lower, ep_upper = eps_list
 
-        init_mat_types = self._choose_init_plans(init_plans_list)
-        init_mat_plan = trial.suggest_categorical("initialize", init_mat_types)
-        init_mat = self.init_mat_builder.make_initial_T(init_mat_plan)
+        if len(eps_list) == 2:
+            eps = trial.suggest_float("eps", ep_lower, ep_upper, log = True)
+        elif len(eps_list) == 3:
+            ep_lower, ep_upper, ep_step = eps_list
+            eps = trial.suggest_float("eps", ep_lower, ep_upper, ep_step)
+        else:
+            raise ValueError("The eps_list doesn't match.")
+
+        # seed = trial.suggest_int("seed", 0, 9, 1)
+
+        init_mat_plan = trial.suggest_categorical("initialize", init_plans_list) # 上記のリストから、1つの方法を取り出す(optunaがうまく選択してくれる)。
+        init_mat = self.init_mat_builder.make_initial_T(init_mat_plan) # epsの値全部を計算する際、randomは何回も計算していいけど、diag, uniformは一回だけでいいので、うまく切り分けよう。
         init_mat = torch.from_numpy(init_mat).float().to(device)
+
+        '''
+        randomの時にprunerを設定する場合は、if init_mat_plan == "random": pruner を、self.entropi_GWのなかにあるwhileループにいれたら良い。
+        '''
 
         seed = trial.suggest_init('seed', 0, 100)
 
@@ -266,99 +256,3 @@ class GW_Alignment():
             self.gpu_queue.put(gpu_id)
 
         return gw_loss, acc
-
-
-# %%
-class InitMatrixForGW_Alignment():
-    def __init__(self, matrix_size):
-        self.matrix_size = matrix_size
-        pass
-
-    def make_initial_T(self, initialize):
-
-        if initialize == 'random':
-            T = self.initialize_matrix(self.matrix_size)
-            return T
-
-        elif initialize == 'permutation':
-            ts = np.zeros(self.matrix_size)
-            ts[0] = 1 / self.matrix_size
-            T = self.initialize_matrix(self.matrix_size, ts=ts)
-            return T
-
-        elif initialize == 'beta':
-            ts = np.random.beta(2, 5, self.matrix_size)
-            ts = ts / (self.matrix_size * np.sum(ts))
-            T = self.initialize_matrix(self.matrix_size, ts=ts)
-            return T
-
-        elif initialize == 'uniform':
-            T = np.outer(ot.unif(self.matrix_size), ot.unif(self.matrix_size))
-            return T
-
-        elif initialize == 'diag':
-            T = np.diag(np.ones(self.matrix_size) / self.matrix_size)
-            return T
-
-        else:
-            raise ValueError('Not defined initialize matrix.')
-
-    def randOrderedMatrix(self):
-        """
-        各行・各列に重複なしに[0,n]のindexを持つmatrixを作成
-
-        Parameters
-            n : int 行列のサイズ
-        Returns
-            np.ndarray 重複なしのindexを要素に持つmatrix
-        """
-        matrix = np.zeros((self.matrix_size, self.matrix_size))
-        rows = np.tile(np.arange(0, self.matrix_size), 2)
-
-        for i in range(self.matrix_size):
-            matrix[i, :] = rows[i : i + self.matrix_size]
-
-        r = np.random.choice(self.matrix_size, self.matrix_size, replace=False)
-        c = np.random.choice(self.matrix_size, self.matrix_size, replace=False)
-        matrix = matrix[r, :]
-        matrix = matrix[:, c]
-        return matrix.astype(int)
-
-    def initialize_matrix(self, ts=None):
-        """
-        gw alignmentのための行列初期化
-
-        Parameters
-            n : int 行列のサイズ
-        Returns
-            np.ndarray 初期値
-        """
-        matrix = self.randOrderedMatrix(self.matrix_size)
-        if ts is None:
-            ts = np.random.uniform(0, 1, self.matrix_size)
-            ts = ts / (self.matrix_size * np.sum(ts))
-
-        T = np.array([ts[idx] for idx in matrix])
-        return T
-
-    def make_random_initplan(n):
-        # make random initial transportation plan (N x N matrix)
-        T = np.random.rand(n, n) # create a random matrix of size n x n
-        rep = 100 # number of repetitions
-        for i in range(rep):
-            # normalize each row so that the sum is 1
-            p = T.sum(axis=1, keepdims=True)
-            T = T / p
-            # normalize each column so that the sum is 1
-            q = T.sum(axis=0, keepdims=True)
-            T = T / q
-        T = T/n
-        return T
-
-
-# %%
-if __name__ == '__main__':
-    test_builder = Init_Matrix_For_GW_Alignment(2000)
-    t = test_builder.make_initial_T('diag')
-
-# %%
