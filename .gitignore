@@ -4,6 +4,7 @@ results
 .python-version
 .venv
 poetry.lock
+pyproject.toml
 scripts/dm_scaling.ipynb
 scripts/Histogram_alignment/dm_scaling_abe.py
 databases/

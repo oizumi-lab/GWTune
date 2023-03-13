@@ -12,9 +12,9 @@ class Optimizer:
     def __init__(self, save_path) -> None:
         self.save_path = save_path
         pass
-    
-    def optimizer(self, 
-                  dataset, 
+
+    def optimizer(self,
+                  dataset,
                   method = 'optuna',
                   init_plans_list = ['diag'],
                   eps_list = [1e-4, 1e-2],
@@ -59,7 +59,7 @@ class RunOptuna():
         self.eps_list = eps_list
         self.n_jobs = n_jobs
         self.num_trial = num_trial
-        
+
         self.initialize = ['uniform', 'random', 'permutation', 'diag'] # 実装済みの方法の名前を入れる。
         self.init_mat_types = self._choose_init_plans(self.init_plans_list) # リストを入力して、実行可能な方法のみをリストにして返す。
 
@@ -86,13 +86,13 @@ class RunOptuna():
         ここから、初期値の条件を1個または複数個選択することができる。
         選択はself.initializeの中にあるものの中から。
         選択したい条件が1つであっても、リストで入力をすること。
-        
+
         Args:
             init_plans_list (list) : 初期値の条件を1個または複数個入れたリスト。
-        
+
         Raises:
             ValueError: 選択したい条件が1つであっても、リストで入力をすること。
-        
+
         Returns:
             list : 選択希望の条件のリスト。
         """
@@ -102,19 +102,19 @@ class RunOptuna():
 
         else:
             return [v for v in self.initialize if v in init_plans_list]
-    
+
     def choose_sampler(self):
 
         if self.sampler_name == 'random':
             sampler = optuna.samplers.RandomSampler(seed = 42)
 
         elif self.sampler_name == 'grid_search':
-            
+
             search_space = {
                 "eps": np.logspace(-4, -2),
                 "initialize": self.init_mat_types
             }
-            
+
             sampler = optuna.samplers.GridSampler(search_space)
 
         else:
@@ -137,7 +137,7 @@ class RunOptuna():
         df_test = study.trials_dataframe()
         success_test = df_test[df_test['values_1'] != float('nan')]
         success_test = success_test[success_test['values_0'] != float('nan')]
-        
+
         plt.figure()
         plt.title('The evaluation of GW results for random pictures')
         plt.scatter(success_test['values_1'], np.log(success_test['values_0']), label = 'init diag plan ('+str(self.train_size)+')', c = 'C0')
@@ -145,7 +145,7 @@ class RunOptuna():
         plt.ylabel('log(GWD)')
         plt.legend()
         plt.show()
-    
+
     def plot_coupling(self, T, epsilon, acc):
         mplstyle.use('fast')
         N = T.shape[0]

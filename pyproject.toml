@@ -31,7 +31,7 @@ jaxlib = "^0.4.6"
 
 
 
-[tool.poetry.group.dev.dependencies]
+[poetry.group.dev.dependencies]
 autopep8 = "^2.0.1"
 
 [build-system]
