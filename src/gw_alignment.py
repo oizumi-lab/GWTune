@@ -79,12 +79,11 @@ class GW_Alignment():
         constC, hC1, hC2 = ot.gromov.init_matrix(C1, C2, p, q, loss_fun = "square_loss")
         cpt = 0
         err = 1
-        err_flg = False
 
         if log:
             log = {'err': []}
 
-        while (err > tol and cpt < max_iter and err_flg):
+        while (err > tol and cpt < max_iter):
             Tprev = T
             # compute the gradient
             tens = ot.gromov.gwggrad(constC, hC1, hC2, T)
@@ -255,4 +254,4 @@ class GW_Alignment():
         if self.gpu_queue is not None:
             self.gpu_queue.put(gpu_id)
 
-        return gw_loss, acc
+        return gw_loss
