@@ -211,9 +211,6 @@ class GW_Alignment():
 
         '''
 
-        '''
-
-        gw, logv = self.entropic_GW(device, eps, T = init_mat)
 
 
         '''
