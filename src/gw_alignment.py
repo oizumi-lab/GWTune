@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 import optuna
 from joblib import parallel_backend
 import warnings
-import ot
 import copy
 # warnings.simplefilter("ignore")
 import os
@@ -112,7 +111,8 @@ class GW_Alignment():
             return T
 
     def mat_gw(self, device):
-        """_
+        """
+        2023/3/13(阿部)
         gwd計算のための行列初期化。entropic_GWの最初と全く同じ
 
         Args:
@@ -135,7 +135,7 @@ class GW_Alignment():
         return constC, hC1, hC2
 
 
-    def iter_entropic_gw(self, eps, init_mat_plan, trial, device):
+    def iter_entropic_gw(self, device, eps, init_mat_plan, trial):
         """
         n_iter回くりかえす関数
 
@@ -200,17 +200,17 @@ class GW_Alignment():
         trial.set_user_attr('size', self.size)
 
         '''
-        2. for文で回す
+        2.  Compute GW alignment with hyperparameters defined above.
         '''
         if init_mat_plan in ['uniform', 'diag']:
             gw, logv = self.entropic_gw(device, eps, T = init_mat)
         elif init_mat_plan in ['random', 'permutation']:
-            gw, logv = self.iter_entropic_gw()
+            gw, logv = self.iter_entropic_gw(device, eps, init_mat_plan, trial)
         else:
             raise ValueError('Not defined initialize matrix.')
 
         '''
-        2.  Compute GW alignment with hyperparameters defined above.
+
         '''
 
         gw, logv = self.entropic_GW(device, eps, T = init_mat)
