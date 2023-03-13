@@ -61,7 +61,7 @@ class RunOptuna():
         self.num_trial = num_trial
         
         self.initialize = ['uniform', 'random', 'permutation', 'diag'] # 実装済みの方法の名前を入れる。
-
+        self.init_mat_types = self._choose_init_plans(self.init_plans_list) # リストを入力して、実行可能な方法のみをリストにして返す。
 
     def run_study(self, dataset):
         if not os.path.exists(self.save_path + '/' + self.filename):
@@ -72,7 +72,7 @@ class RunOptuna():
                                         load_if_exists = True)
 
             with parallel_backend("multiprocessing", n_jobs = self.n_jobs):
-                study.optimize(lambda trial: dataset(trial, self.init_plans_list, self.eps_list), n_trials = self.num_trial, n_jobs = self.n_jobs)
+                study.optimize(lambda trial: dataset(trial, self.init_mat_types, self.eps_list), n_trials = self.num_trial, n_jobs = self.n_jobs)
 
         else:
             study = optuna.create_study(direction = "minimize",
@@ -109,11 +109,10 @@ class RunOptuna():
             sampler = optuna.samplers.RandomSampler(seed = 42)
 
         elif self.sampler_name == 'grid_search':
-            init_mat_types = self._choose_init_plans(self.init_plans_list) # リストを入力して、実行可能な方法のみをリストにして返す。
             
             search_space = {
                 "eps": np.logspace(-4, -2),
-                "initialize": init_mat_types
+                "initialize": self.init_mat_types
             }
             
             sampler = optuna.samplers.GridSampler(search_space)

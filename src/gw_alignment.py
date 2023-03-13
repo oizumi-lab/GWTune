@@ -125,7 +125,7 @@ class GW_Alignment():
         init_mat = torch.from_numpy(init_mat).float().to(device)
         
         '''
-        randomの時にprunerを設定する場合は、if init_mat_plan == "random": pruner をしたのwhileループにいれたら良い。
+        randomの時にprunerを設定する場合は、if init_mat_plan == "random": pruner を、self.entropi_GWのなかにあるwhileループにいれたら良い。
         '''
 
         trial.set_user_attr('size', self.size)
