@@ -6,4 +6,10 @@ results
 poetry.lock
 scripts/dm_scaling.ipynb
 scripts/Histogram_alignment/dm_scaling_abe.py
+<<<<<<< HEAD
 databases
+=======
+databases/
+*.pt
+*.db
+>>>>>>> 0f138d50418290278e602711e1d9bcfd2e0b2f72
