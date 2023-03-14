@@ -80,6 +80,7 @@ class GW_Alignment():
             T = torch.from_numpy(T).float().to(device)
         else:
             C1, C2, p, q = self.pred_dist, self.target_dist, self.p, self.q
+
         nx = ot.backend.get_backend(C1, C2, p, q)
 
         # add T as an input
@@ -87,6 +88,9 @@ class GW_Alignment():
             T = nx.outer(p, q)
 
         constC, hC1, hC2 = ot.gromov.init_matrix(C1, C2, p, q, loss_fun = "square_loss")
+
+        # constC, hC1, hC2, nx = self.mat_gw(device)
+
         cpt = 0
         err = 1
 
