@@ -1,7 +1,7 @@
 # %%
 import os, sys, gc
-import jax.numpy as jnp
 import jax
+import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 import torch
@@ -51,9 +51,6 @@ class GW_Alignment():
 
         # gw alignmentに関わるparameter
         self.max_iter = 1000
-        self.stopping_rounds = None
-        self.n_iter = 1
-        self.punishment = float("nan")
 
         # hyperparameter
         self.initialize = ['uniform', 'random', 'permutation', 'diag']
@@ -62,14 +59,25 @@ class GW_Alignment():
 
         # optuna parameter
         self.min_resource = 3
-        self.max_resource = (self.max_iter // 10) * self.n_iter
+        self.max_resource = (self.max_iter // 10)
         self.reduction_factor = 3
 
+
+    def change_variables(self, vars):
+        '''
+        2023/3/14 阿部
+
+        インスタンス変数を外部から変更する関数
+        '''
+        for key, value in vars.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
 
     def entropic_gw(self, device, epsilon, T = None, max_iter = 1000, tol = 1e-9, log = True, verbose = False, trial = None):
 
         if self.to_types == 'torch':
             C1, C2, p, q = self.pred_dist.to(device), self.target_dist.to(device), self.p.to(device), self.q.to(device)
+            T = torch.from_numpy(T).float().to(device)
         else:
             C1, C2, p, q = self.pred_dist, self.target_dist, self.p, self.q
         nx = ot.backend.get_backend(C1, C2, p, q)
@@ -110,41 +118,15 @@ class GW_Alignment():
         else:
             return T
 
-    def mat_gw(self, device):
-        """
-        2023/3/13(阿部)
-        gwd計算のための行列初期化。entropic_GWの最初と全く同じ
-
-        Args:
-            init_plans_list (list) : 初期値の条件を1個または複数個入れたリスト。
-
-        Raises:
-            ValueError: 選択したい条件が1つであっても、リストで入力をすること。
-
-        Returns:
-            list : 選択希望の条件のリスト。
-        """
-
-        if self.to_types == 'torch':
-            C1, C2, p, q = self.pred_dist.to(device), self.target_dist.to(device), self.p.to(device), self.q.to(device)
-        else:
-            C1, C2, p, q = self.pred_dist, self.target_dist, self.p, self.q
-        nx = ot.backend.get_backend(C1, C2, p, q)
-
-        constC, hC1, hC2 = ot.gromov.init_matrix(C1, C2, p, q, loss_fun = "square_loss")
-        return constC, hC1, hC2
-
-
     def iter_entropic_gw(self, device, eps, init_mat_plan, trial):
         """
-        n_iter回くりかえす関数
+        初期値をn_iter回繰り返して最適化。early stoppingも実装
 
         """
         min_gwd = float('inf')
-        for i,seed in enumerate(np.random.randint(self.n_iter)):
-            np.random.seed(seed)
-            init_mat = self.init_mat_builder.make_initial_T(init_mat_plan)
-            gw, logv = self.entropic_gw(device, eps, T = init_mat)
+        for i, seed in enumerate(np.random.randint(0, 100000, self.n_iter)):
+            init_mat = self.init_mat_builder.make_initial_T(init_mat_plan, seed)
+            gw, logv = self.entropic_gw(device, eps, T = init_mat, max_iter = self.max_iter, verbose=True)
             gwd = logv['gw_dist']
             if gwd < min_gwd:
                 min_gwd = gwd
@@ -152,16 +134,12 @@ class GW_Alignment():
                 best_init_mat = init_mat
                 best_logv = logv
 
-            constC, hC1, hC2 = self.mat_gw(device)
-            trial.report(ot.gromov.gwloss(constC, hC1, hC2, gw), i)
+            trial.report(min_gwd, i) # 最小値を報告
             if trial.should_prune():
                 raise optuna.TrialPruned()
-        return best_gw, best_logv
-
-
+        return best_gw, best_logv, best_init_mat
 
     def __call__(self, trial, init_plans_list, eps_list):
-
         '''
         0.  define the "gpu_queue" here. This will be used when the memory of dataset was too much large for a single GPU board, and so on.
         '''
@@ -186,47 +164,58 @@ class GW_Alignment():
             raise ValueError("The eps_list doesn't match.")
 
         init_mat_plan = trial.suggest_categorical("initialize", init_plans_list) # 上記のリストから、1つの方法を取り出す(optunaがうまく選択してくれる)。
-        init_mat = self.init_mat_builder.make_initial_T(init_mat_plan) # epsの値全部を計算する際、randomは何回も計算していいけど、diag, uniformは一回だけでいいので、うまく切り分けよう。
-        init_mat = torch.from_numpy(init_mat).float().to(device)
+        # init_matをdeviceに上げる作業はentropic_gw中で行うことにしました。(2023/3/14 阿部)
 
         '''
         randomの時にprunerを設定する場合は、if init_mat_plan == "random": pruner を、self.entropi_GWのなかにあるwhileループにいれたら良い。
         '''
-
-        seed = trial.suggest_init('seed', 0, 100)
-
         trial.set_user_attr('size', self.size)
 
         '''
         2.  Compute GW alignment with hyperparameters defined above.
         '''
         if init_mat_plan in ['uniform', 'diag']:
-            gw, logv = self.entropic_gw(device, eps, T = init_mat)
+            init_mat = self.init_mat_builder.make_initial_T(init_mat_plan)
+            gw, logv = self.entropic_gw(device, eps, T = init_mat, max_iter = self.max_iter)
+
         elif init_mat_plan in ['random', 'permutation']:
-            gw, logv = self.iter_entropic_gw(device, eps, init_mat_plan, trial)
+            gw, logv, init_mat = self.iter_entropic_gw(device, eps, init_mat_plan, trial)
         else:
             raise ValueError('Not defined initialize matrix.')
 
-        '''
-
-
-
+        if not os.path.exists(self.save_path):
+            os.makedirs(self.save_path)
         '''
         3.  count the accuracy of alignment and save the results if computation was finished in the right way.
             If not, set the result of accuracy and gw_loss as float('nan'), respectively. This will be used as a handy marker as bad results to be removed in the evaluation analysis.
         '''
+        nx = ot.backend.get_backend(gw)
 
-        if torch.count_nonzero(gw).item() != 0:
-            gw_loss = logv['gw_dist'].item()
-
-            _, pred = torch.max(gw, 1)
-            acc = pred.eq(torch.arange(len(gw)).to(device)).sum() / len(gw)
-
-            torch.save(gw, self.save_path + '/GW({} pictures, epsilon={}).pt'.format(self.size, round(eps, 6)))
-            acc = acc.item()
-        else:
+        if nx.array_equal(gw, nx.zeros(gw.shape)): # gwが0行列ならnanを返す
             gw_loss = float('nan')
             acc = float('nan')
+        else:
+            gw_loss = logv['gw_dist'] # optuna内でfloatにしてくれる
+
+            pred = nx.argmax(gw, 1)
+            correct = (pred == nx.arange(len(gw), type_as = gw)).sum()
+            acc = correct / len(gw)
+
+            # make save dir.
+            if init_mat_plan == 'diag':
+                res_path = self.save_path + '/diag'
+            else:
+                res_path = self.save_path + '/unsupervised'
+            if not os.path.exists(res_path):
+                os.makedirs(res_path)
+            # save data
+            if self.to_types == 'torch':
+                torch.save(gw, res_path + f'/gw_{trial.number}.pt')
+                torch.save(init_mat, res_path + f'/init_mat_{trial.number}.pt')
+            elif self.to_types == 'numpy':
+                np.save(res_path + f'/gw_{trial.number}', gw)
+                np.save(res_path + f'/init_mat_{trial.number}', init_mat)
+            # jaxの保存方法を作成してください
 
         trial.set_user_attr('acc', acc)
         '''

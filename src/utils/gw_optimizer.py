@@ -22,23 +22,7 @@ class Optimizer:
                   filename = 'test',
                   n_jobs = 10,
                   num_trial = 50):
-        """_summary_
 
-        Args:
-            dataset (_type_): _description_
-            method (str, optional): _description_. Defaults to 'optuna'.
-            init_plans_list (list, optional): _description_. Defaults to ['diag'].
-            sampler_name (str, optional): _description_. Defaults to 'random'.
-            filename (str, optional): _description_. Defaults to 'test'.
-            n_jobs (int, optional): _description_. Defaults to 10.
-            num_trial (int, optional): _description_. Defaults to 50.
-
-        Raises:
-            ValueError: _description_
-
-        Returns:
-            _type_: _description_
-        """
         if method == 'optuna':
             Opt = RunOptuna(self.save_path, filename, sampler_name, init_plans_list, eps_list, n_jobs, num_trial)
         else:
@@ -155,3 +139,5 @@ class RunOptuna():
         plt.title('GW results ({} pictures, eps={}, acc.= {})'.format(N, round(epsilon, 6), round(acc, 4)))
         plt.tight_layout()
         plt.show()
+
+# %%
