@@ -35,10 +35,11 @@ class Optimizer:
         return study
 
 class RunOptuna():
-    def __init__(self, save_path, filename, sampler_name, init_plans_list, eps_list, n_jobs, num_trial):
+    def __init__(self, save_path, filename, sampler_name, pruner_name, init_plans_list, eps_list, n_jobs, num_trial):
         self.save_path = save_path
         self.filename = filename
         self.sampler_name = sampler_name
+        self.pruner_name = pruner_name
         self.init_plans_list = init_plans_list
         self.eps_list = eps_list
         self.n_jobs = n_jobs
@@ -52,6 +53,7 @@ class RunOptuna():
             study = optuna.create_study(direction = "minimize",
                                         study_name = self.filename,
                                         sampler = self.choose_sampler(),
+                                        pruner = self.choose_pruner(dataset),
                                         storage = "sqlite:///" + self.save_path + "/" + self.filename + '.db',
                                         load_if_exists = True)
 
@@ -88,7 +90,10 @@ class RunOptuna():
             return [v for v in self.initialize if v in init_plans_list]
 
     def choose_sampler(self):
-
+        '''
+        2023/3/15 阿部
+        TPE Sampler追加
+        '''
         if self.sampler_name == 'random':
             sampler = optuna.samplers.RandomSampler(seed = 42)
 
@@ -101,10 +106,27 @@ class RunOptuna():
 
             sampler = optuna.samplers.GridSampler(search_space)
 
+        elif self.sampler_name.lower() == 'tpe':
+            sampler = optuna.samplers.TPESampler(constant_liar = True, seed = 42) # 分散最適化のときはTrueにするのが良いらしい(阿部)
+
         else:
             raise ValueError('not implemented sampler yet.')
 
         return sampler
+
+    def choose_pruner(self, dataset):
+        '''
+        2023/3/15 阿部
+        Median PrunerとHyperbandPrunerを追加
+        (RandomSampler, MedianPruner)か(TPESampler, HyperbandPruner)がbestらしい
+        '''
+        if self.pruner_name == 'median':
+            pruner = optuna.pruners.MedianPruner(n_startup_trials = dataset.n_startup_trials, n_warmup_steps = dataset.n_warmup_steps)
+        elif self.pruner_name == 'hyperband':
+            pruner = optuna.pruners.HyperbandPruner(min_resource = dataset.min_resource, max_resource = dataset.n_iter, reduction_factor = dataset.reduction_factor)
+        else:
+            raise ValueError('not implemented pruner yet.')
+        return pruner
 
     def load_graph(self, study):
         best_trial = study.best_trial

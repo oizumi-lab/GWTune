@@ -20,7 +20,7 @@ from src.utils.init_matrix import InitMatrix
 
 # %%
 class GW_Alignment():
-    def __init__(self, pred_dist, target_dist, p, q, device='cpu', to_types='torch', speed_test=False, gpu_queue = None, save_path = None):
+    def __init__(self, pred_dist, target_dist, p, q, max_iter = 1000, device='cpu', to_types='torch', speed_test=False, gpu_queue = None, save_path = None):
         """
         2023/3/6 大泉先生
 
@@ -50,17 +50,20 @@ class GW_Alignment():
             os.makedirs(self.save_path)
 
         # gw alignmentに関わるparameter
-        self.max_iter = 1000
+        self.max_iter = max_iter
 
         # hyperparameter
         self.initialize = ['uniform', 'random', 'permutation', 'diag']
         self.init_mat_builder = InitMatrix(self.size)
-        self.n_iter = 100
 
-        # optuna parameter
-        self.min_resource = 3
-        self.max_resource = (self.max_iter // 10)
-        self.reduction_factor = 3
+        # pruner parameter
+        self.n_iter = 100
+        # MedianPruner
+        self.n_startup_trials = 5
+        self.n_warmup_steps = 5
+        # HyperbandPruner
+        self.min_resource = 5
+        self.reduction_factor = 2 # self.max_resource = self.n_iter
 
 
     def change_variables(self, vars):
@@ -137,10 +140,9 @@ class GW_Alignment():
                 best_gw = gw
                 best_init_mat = init_mat
                 best_logv = logv
-
             trial.report(min_gwd, i) # 最小値を報告
             if trial.should_prune():
-                raise optuna.TrialPruned()
+                raise optuna.TrialPruned(f"Trial was pruned at iteration {i}")
         return best_gw, best_logv, best_init_mat
 
     def __call__(self, trial, init_plans_list, eps_list):
