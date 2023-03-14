@@ -37,7 +37,7 @@ class Test():
         return model1, model2, p, q
 
     def optimizer_test(self, filename, device, to_types):
-        test_gw = GW_Alignment(self.model1, self.model2, self.p, self.q, device = device, to_types = to_types, gpu_queue = None)
+        test_gw = GW_Alignment(self.model1, self.model2, self.p, self.q, max_iter = 50, device = device, to_types = to_types, gpu_queue = None)
 
         opt = gw_optimizer.Optimizer(test_gw.save_path)
 

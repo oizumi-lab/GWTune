@@ -19,12 +19,13 @@ class Optimizer:
                   init_plans_list = ['diag'],
                   eps_list = [1e-4, 1e-2],
                   sampler_name = 'random',
+                  pruner_name = 'median',
                   filename = 'test',
                   n_jobs = 10,
                   num_trial = 50):
 
         if method == 'optuna':
-            Opt = RunOptuna(self.save_path, filename, sampler_name, init_plans_list, eps_list, n_jobs, num_trial)
+            Opt = RunOptuna(self.save_path, filename, sampler_name, pruner_name, init_plans_list, eps_list, n_jobs, num_trial)
         else:
             raise ValueError('no implemented method.')
 
