@@ -14,27 +14,23 @@ import matplotlib.colors as colors
 from scipy import stats
 import warnings
 
-# %%
-from src.mydataset import GWD_Dataset
-from src.utils import torch_fix_seed
+import scipy as sp
 warnings.simplefilter("ignore")
 # optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-torch_fix_seed()
 
 # %%
 class Adjust_Distribution():
-    def __init__(self, model1, model2, gpu_queue = None, random_dataset = True):
+    def __init__(self, model1, model2, save_path, gpu_queue = None, random_dataset = True):
         self.model1 = model1
         self.model2 = model2
+        self.save_path = save_path
+        
         self.gpu_queue = gpu_queue
         self.random_dataset = random_dataset
-        
-        self.adjust_path = "./GWD/Test/adjust"
-        self.test_path = "./GWD/Test/"
-        
-        if not os.path.exists(self.adjust_path):
-            os.makedirs(self.adjust_path)
+
+        if not os.path.exists(self.save_path):
+            os.makedirs(self.save_path)
     
     def make_limit(self):
         # m1 = self.model1.detach().clone()
@@ -55,7 +51,7 @@ class Adjust_Distribution():
         return lim_max.item(), lim_min.item()
     
     def make_histogram(self, data):
-        
+    
         lim_max, lim_min = self.make_limit()
         bin = 100
         
@@ -116,7 +112,7 @@ class Adjust_Distribution():
     def model_normalize(self, data, lam, alpha):
         data = alpha * ((torch.pow(1 + data, lam) - 1) / lam)
         return data
-    
+
     def L2_wasserstain(self, m1, m2):
         
         # lim_max, lim_min = self.make_limit()
@@ -136,9 +132,8 @@ class Adjust_Distribution():
         
         cost_matrix = torch.cdist(ind1.unsqueeze(dim=1), ind2.unsqueeze(dim=1), p = 1).to(hist1.device)
         
-        res = ot.emd2(h1_prob, h2_prob, cost_matrix, center_dual = False)
+        # res = ot.emd2(h1_prob, h2_prob, cost_matrix, center_dual = False)
         # res = ot.sinkhorn2(h1_prob, h2_prob, cost_matrix, reg = 1)
-        
         # res = torch.sum(torch.mm(WassDists, cost_matrix))
             
         if res == 0:
@@ -147,36 +142,6 @@ class Adjust_Distribution():
         
         return res
 
-    def run_study(self, filename, n_gpu = 10, num_trial = 5000):
-        
-        save_file_name = "adjust (" + filename + ").db"
-        
-        # search_space = {
-        #     'alpha1': np.logspace(-1, 1, num = num_alpha1),
-        #     'lam1': np.logspace(-6, 0, num = num_lam1),
-        # }
-        
-        # if not os.path.exists(self.adjust_path  + "/" + save_file_name):
-        study = optuna.create_study(direction = "minimize",
-                                    study_name = 'adjust',
-                                    # sampler = optuna.samplers.GridSampler(search_space),
-                                    sampler = optuna.samplers.RandomSampler(seed = 42),
-                                    # sampler = optuna.samplers.TPESampler(seed = 42),
-                                    # storage = "sqlite:///" + self.adjust_path + "/" + save_file_name,
-                                    load_if_exists = False)
-        
-        torch_fix_seed()
-        # with parallel_backend("multiprocessing", n_jobs = n_gpu):
-        study.optimize(self, n_trials = num_trial)
-
-        # else:
-        #     study = optuna.create_study(direction = "minimize",
-        #                                 study_name = 'adjust',
-        #                                 storage = "sqlite:///" + self.adjust_path + "/" + save_file_name,
-        #                                 load_if_exists = True)
-        
-        return study
-    
     def best_parameters(self, study):
         
         best_trial = study.best_trial
@@ -270,29 +235,28 @@ class Adjust_Distribution():
         optuna.visualization.plot_optimization_history(study).show()
         optuna.visualization.plot_parallel_coordinate(study).show()
         # optuna.visualization.plot_contour(study).show()
+    
+# # %%
+# if __name__ == '__main__':
+#     model1 = torch.load('../../data/model1.pt')#.to('cuda')
+#     model2 = torch.load('../../data/model2.pt')#.to('cuda')
+#     tt = Adjust_Distribution(model1, model2, './')
+    
+#     m1 = tt.make_histogram(model1) #43939422
+#     m2 = tt.make_histogram(model2)
+    
+#     # m1 = tt.make_histogram(model1)
+#     # m2 = tt.make_histogram(model2) #43939408
+     
+#     ind1 = torch.arange(len(m1)).float()
+#     ind2 = torch.arange(len(m2)).float()
+#     cost_matrix = torch.cdist(ind1.unsqueeze(dim=1), ind2.unsqueeze(dim=1), p = 1)
+        
+#     # %%
+#     # ot_emd = ot.emd2(m1, m2, cost_matrix)
+#     ot_emd = ot.emd2(m1.to('cpu').numpy(), m2.to('cpu').numpy(), cost_matrix.to('cpu').numpy())
+
+
+    
 
 # %%
-if __name__ == '__main__':
-    test = GWD_Dataset(train_size = 10000, random_dataset = True, device = 'cuda:3')
-    model1, model2, p, q, filename = test.extract(sort_dataset=True)
-    
-    # %%
-    tt = Adjust_Distribution(model1, model2)
-    
-    # ss = tt.model_normalize(model1, 0.00041, 4.5)
-    
-    # tt.make_histogram(ss)
-    
-    # tt.L2_wasserstain(ss, model2)
- 
-    
-    # %%
-    filename = 'run_test'
-    study = tt.run_study(filename)
-    # %%
-    tt.make_graph(study)
-    # %%
-    tt.eval_study(study)
-    # %%
-    
-    

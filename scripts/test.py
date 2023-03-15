@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 import os, sys
 
 sys.path.append('../')
-os.getcwd()
 # nvidia-smi --query-compute-apps=timestamp,pid,name,used_memory --format=csv # GPUをだれが使用しているのかを確認できるコマンド。
 
 # %%
@@ -52,6 +51,21 @@ class Test():
 
         return study
 
+    def adjustment_test(self, filename, device, to_types):
+        test_gw = GW_Alignment(self.model1, self.model2, self.p, self.q, device = device, to_types = to_types, filename = filename, gpu_queue = None)
+
+        opt = gw_optimizer.Optimizer(test_gw.save_path)
+
+        study = opt.optimizer(test_gw, 
+                              method = 'optuna', 
+                              init_plans_list = ['diag'], 
+                              eps_list = [1e-4, 1e-2], 
+                              sampler_name = 'grid_search', 
+                              filename = filename, 
+                              n_jobs = 10, 
+                              num_trial = 50)
+
+        return study
 
 # %%
 if __name__ == '__main__':

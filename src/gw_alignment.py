@@ -13,6 +13,7 @@ import warnings
 import copy
 # warnings.simplefilter("ignore")
 import os
+os.getcwd()
 
 # %%
 from src.utils.backend import Backend

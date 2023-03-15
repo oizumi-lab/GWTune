@@ -1,4 +1,6 @@
-print("Success to import src!")
+from os.path import dirname, basename, isfile, join
+import os, glob
+print("Success to import src!", os.getcwd())
 
-from src.utils import backend, gw_optimizer
-from src import gw_alignment
+import src.gw_alignment
+import src.utils
