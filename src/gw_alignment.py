@@ -124,37 +124,6 @@ class GW_Alignment():
         else:
             return T
 
-    def iter_entropic_gw(self, device, eps, init_mat_plan, trial):
-        """
-        初期値をn_iter回繰り返して最適化。early stoppingも実装
-
-        """
-        min_gwd = float('inf')
-        for i, seed in enumerate(np.random.randint(0, 100000, self.n_iter)):
-            init_mat = self.init_mat_builder.make_initial_T(init_mat_plan, seed)
-            gw, logv = self.entropic_gw(device, eps, T = init_mat, max_iter = self.max_iter)
-            # 失敗したらinf
-            nx = ot.backend.get_backend(gw)
-            if nx.array_equal(gw, nx.zeros(gw.shape)):
-                gwd = float('inf')
-            else:
-                gwd = logv['gw_dist']
-
-            if gwd < min_gwd:
-                min_gwd = gwd
-                best_gw = gw
-                best_init_mat = init_mat
-                best_logv = logv
-            if isinstance(min_gwd, torch.Tensor):
-                min_gwd = min_gwd.item()
-            trial.report(min_gwd, i) # 最小値を報告
-            if trial.should_prune():
-                raise optuna.TrialPruned(f"Trial was pruned at iteration {i}")
-        # trialが全て失敗したら
-        if min_gwd == float('inf'):
-            raise optuna.TrialPruned("All iteration was Failed.")
-        return best_gw, best_logv, best_init_mat
-
     def gw_alignment_help(self,init_mat_plan, device, eps, seed):
         init_mat = self.init_mat_builder.make_initial_T(init_mat_plan, seed)
         gw, logv = self.entropic_gw(device, eps, T = init_mat, max_iter = self.max_iter)
@@ -219,11 +188,8 @@ class GW_Alignment():
                 gw_loss = float('nan')
                 acc = float('nan')
                 raise optuna.TrialPruned(f"Failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
-            # init_mat = self.init_mat_builder.make_initial_T(init_mat_plan)
-            # gw, logv = self.entropic_gw(device, eps, T = init_mat, max_iter = self.max_iter)
 
         elif init_mat_plan in ['random', 'permutation']:
-            # gw, logv, init_mat = self.iter_entropic_gw(device, eps, init_mat_plan, trial)
             gw_loss = float('inf')
             for i, seed in enumerate(np.random.randint(0, 100000, self.n_iter)):
                 # current_init_mat = self.init_mat_builder.make_initial_T(init_mat_plan, seed)
