@@ -55,6 +55,7 @@ class Test():
                               method = 'optuna',
                               init_plans_list = ['diag'],
                               eps_list = [1e-4, 1e-2],
+                              eps_log = True,
                               sampler_name = 'random',
                               pruner_name = 'median',
                               filename = filename,

@@ -145,7 +145,7 @@ class GW_Alignment():
             l.append(v)
         return  l
 
-    def __call__(self, trial, init_plans_list, eps_list, file_path):
+    def __call__(self, trial, file_path, init_plans_list, eps_list, eps_log=True):
         '''
         0.  define the "gpu_queue" here. This will be used when the memory of dataset was too much large for a single GPU board, and so on.
         '''
@@ -162,7 +162,7 @@ class GW_Alignment():
         ep_lower, ep_upper = eps_list
 
         if len(eps_list) == 2:
-            eps = trial.suggest_float("eps", ep_lower, ep_upper, log = True)
+            eps = trial.suggest_float("eps", ep_lower, ep_upper, log = eps_log)
         elif len(eps_list) == 3:
             ep_lower, ep_upper, ep_step = eps_list
             eps = trial.suggest_float("eps", ep_lower, ep_upper, ep_step)

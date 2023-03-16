@@ -20,6 +20,7 @@ class Optimizer:
                   method = 'optuna',
                   init_plans_list = ['diag'],
                   eps_list = [1e-4, 1e-2],
+                  eps_log = True,
                   sampler_name = 'random',
                   pruner_name = 'median',
                   filename = 'test',
@@ -43,7 +44,7 @@ class Optimizer:
             raise ValueError('no implemented SQL.')
 
         if method == 'optuna':
-            Opt = RunOptuna(file_path, to_types, storage, filename, sampler_name, pruner_name, sql_name, init_plans_list, eps_list, n_jobs, num_trial, delete_study)
+            Opt = RunOptuna(file_path, to_types, storage, filename, sampler_name, pruner_name, sql_name, init_plans_list, eps_list, eps_log, n_jobs, num_trial, delete_study)
         else:
             raise ValueError('no implemented method.')
 
@@ -54,7 +55,7 @@ class Optimizer:
         return study
 
 class RunOptuna():
-    def __init__(self, file_path, to_types, storage, filename, sampler_name, pruner_name, sql_name, init_plans_list, eps_list, n_jobs, num_trial, delete_study):
+    def __init__(self, file_path, to_types, storage, filename, sampler_name, pruner_name, sql_name, init_plans_list, eps_list, eps_log, n_jobs, num_trial, delete_study):
         self.file_path = file_path
         self.to_types = to_types
         self.storage = storage
@@ -64,6 +65,7 @@ class RunOptuna():
         self.sql_name = sql_name
         self.init_plans_list = init_plans_list
         self.eps_list = eps_list
+        self.eps_log = eps_log
         self.n_jobs = n_jobs
         self.num_trial = num_trial
         self.delete_study = delete_study
@@ -89,7 +91,7 @@ class RunOptuna():
                                         load_if_exists = True)
 
             with parallel_backend("multiprocessing", n_jobs = self.n_jobs):
-                study.optimize(lambda trial: dataset(trial, self.init_mat_types, self.eps_list, self.file_path), n_trials = self.num_trial, n_jobs = self.n_jobs)
+                study.optimize(lambda trial: dataset(trial, self.file_path, self.init_mat_types, self.eps_list, self.eps_log), n_trials = self.num_trial, n_jobs = self.n_jobs)
 
         else:
             study = optuna.create_study(direction = "minimize",
