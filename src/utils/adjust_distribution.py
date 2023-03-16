@@ -21,16 +21,17 @@ warnings.simplefilter("ignore")
 
 # %%
 class Adjust_Distribution():
-    def __init__(self, model1, model2, save_path, gpu_queue = None, random_dataset = True):
+    def __init__(self, model1, model2, adjust_path, gpu_queue = None, random_dataset = True):
         self.model1 = model1
         self.model2 = model2
-        self.save_path = save_path
+        self.adjust_path = adjust_path
+        self.size = len(model1)
         
         self.gpu_queue = gpu_queue
         self.random_dataset = random_dataset
-
-        if not os.path.exists(self.save_path):
-            os.makedirs(self.save_path)
+    
+        if not os.path.exists(self.adjust_path):
+            os.makedirs(self.adjust_path)
     
     def make_limit(self):
         # m1 = self.model1.detach().clone()
@@ -162,101 +163,13 @@ class Adjust_Distribution():
         model1_norm = self.model_normalize(self.model1, lam1, a1) 
         model2_norm = self.model_normalize(self.model2, lam2, a2)
         return model1_norm, model2_norm
-
-    def make_graph(self, study):
-        
-        a1, lam1, a2, lam2 = self.best_parameters(study)
-        model1_norm = self.model_normalize(self.model1, lam1, a1) 
-        model2_norm = self.model_normalize(self.model2, lam2, a2)
     
-        plt.figure()
-        plt.subplot(121)
-
-        model_numpy1 = model1_norm.to('cpu').numpy()
-        # np.fill_diagonal(model_numpy1, np.nan)
-        
-        model_numpy2 = model2_norm.to('cpu').numpy()
-        # np.fill_diagonal(model_numpy2, np.nan)
-        mappable = ScalarMappable(cmap=plt.cm.jet, norm = colors.Normalize(vmin=0, vmax=1))
-        
-        plt.title('model1 (a:{:.3g}, lam:{:.3g})'.format(a1, lam1))
-        plt.imshow(model_numpy1, cmap=plt.cm.jet)
-        plt.colorbar(orientation='horizontal')
-
-        plt.subplot(122)
-        plt.title('model2 (a:{:.3g}, lam:{:.3g})'.format(a2, lam2))
-        plt.imshow(model_numpy2, cmap=plt.cm.jet)
-        plt.colorbar(orientation='horizontal')
-
-        plt.tight_layout()
-        plt.show()
-        
-        lim_max, lim_min = self.make_limit()
-        # bins = 100
-        
-        # hist1 = torch.histc(model1_norm, bins = bins, min = lim_min, max = lim_max)
-        # hist2 = torch.histc(model2_norm, bins = bins, min = lim_min, max = lim_max)
-        
-        hist1 = self.make_histogram(model1_norm)
-        hist2 = self.make_histogram(model2_norm)
-        
-        x = np.linspace(lim_min, lim_max, len(hist1))
-        plt.figure()
-        plt.title('histgram')
-        plt.bar(x, hist1.to('cpu').numpy(), label = 'model1 : AlexNet', alpha = 0.6, width = 9e-3)
-        plt.bar(x, hist2.to('cpu').numpy(), label = 'model2 : VGG19', alpha = 0.6, width = 9e-3)
-    
-        plt.legend()
-        plt.xlabel('dis-similarity value')
-        plt.ylabel('count')
-        plt.tight_layout()
-        plt.show()
-        
-        
-        corr = stats.pearsonr(model1_norm[~torch.isnan(model1_norm)].to('cpu').numpy(),
-                              model2_norm[~torch.isnan(model2_norm)].to('cpu').numpy())
-    
-        print('peason\'s r (without diag element) =', corr[0])
-
-    def make_eval_graph(self, study):
-        df_test = study.trials_dataframe()
-        success_test = df_test[df_test['values_1'] != -1]
-        success_test = success_test[success_test['values_0'] > 1e-7]
-        
-        plt.figure()
-        plt.title('The evaluation of GW results for random pictures')
-        plt.scatter(success_test['values_1'], np.log(success_test['values_0']), label = 'init diag plan ('+str(self.train_size)+')', c = 'C0')
-        plt.xlabel('accuracy')
-        plt.ylabel('log(GWD)')
-        plt.legend()
-        plt.show()
-    
-    def eval_study(self, study):
-        optuna.visualization.plot_optimization_history(study).show()
-        optuna.visualization.plot_parallel_coordinate(study).show()
-        # optuna.visualization.plot_contour(study).show()
-    
-# # %%
-# if __name__ == '__main__':
-#     model1 = torch.load('../../data/model1.pt')#.to('cuda')
-#     model2 = torch.load('../../data/model2.pt')#.to('cuda')
-#     tt = Adjust_Distribution(model1, model2, './')
-    
-#     m1 = tt.make_histogram(model1) #43939422
-#     m2 = tt.make_histogram(model2)
-    
-#     # m1 = tt.make_histogram(model1)
-#     # m2 = tt.make_histogram(model2) #43939408
-     
-#     ind1 = torch.arange(len(m1)).float()
-#     ind2 = torch.arange(len(m2)).float()
-#     cost_matrix = torch.cdist(ind1.unsqueeze(dim=1), ind2.unsqueeze(dim=1), p = 1)
-        
-#     # %%
-#     # ot_emd = ot.emd2(m1, m2, cost_matrix)
-#     ot_emd = ot.emd2(m1.to('cpu').numpy(), m2.to('cpu').numpy(), cost_matrix.to('cpu').numpy())
-
-
-    
-
 # %%
+if __name__ == '__main__':
+    model1 = torch.load('../../data/model1.pt')#.to('cuda')
+    model2 = torch.load('../../data/model2.pt')#.to('cuda')
+    tt = Adjust_Distribution(model1, model2, '../../results/adjust_histogram')
+    
+    
+
+    
