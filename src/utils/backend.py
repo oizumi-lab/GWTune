@@ -97,7 +97,7 @@ class Backend(ot.backend.Backend):
     def load(self, file):
         raise NotImplementedError()
 
-    def to(self, a, device):
+    def to(self, a, device, dtype = None):
         raise NotImplementedError()
 
 
@@ -122,8 +122,17 @@ class NumpyBackend(ot.backend.NumpyBackend, Backend):
     def load(self, file):
         return np.load(file)
 
-    def to(self, a, device):
-        return a
+    def item(self,a):
+        if isinstance(a, np.ndarray):
+            raise ValueError('Input is not scalar. Use .to_numpy.')
+        else:
+            return a
+
+    def to(self, a, device, dtype = None):
+        if dtype is None:
+            return a
+        else:
+            return a.astype(dtype)
 
 
 class TorchBackend(ot.backend.TorchBackend, Backend):
@@ -148,8 +157,19 @@ class TorchBackend(ot.backend.TorchBackend, Backend):
     def load(self, file):
         return torch.load(file)
 
-    def to(self, a, device):
-        return a.to(device)
+    def item(self,a):
+        if a.ndim > 0:
+            raise ValueError('Input is not scalar. Use .to_numpy.')
+        else:
+            return a.item()
+
+    def to(self, a, device, dtype = None):
+        if dtype is None:
+            return a.to(device)
+        elif dtype == 'float':
+            return a.float().to(device)
+        else:
+            ValueError('Not implemented type.')
 
 class JaxBackend(ot.backend.JaxBackend, Backend):
 
@@ -174,97 +194,11 @@ class JaxBackend(ot.backend.JaxBackend, Backend):
     def load(self, file):
         return jax.numpy.load(file)
 
-    def to(self, a, device):
-        return jax.device_put(a, device)
-
-
-class ChangeTypes():
-    def __init__(self, device = 'cpu', to_types = 'torch'):
-        """
-        入力された変数の型を揃えてあげる。バラバラな場合でも、単一の型に変換できるはず。
-        基本的には3つ(numpy, torch, jax)の型のみ受付られる。
-        """
-        self.device = device
-        self.to_types = to_types
-        pass
-
-    def change_data(self, *args):
-        """
-        3つのデータ型(numpy, torch, jax)を変換したい型にして、変換後にCPUかGPUかの選択ができる(当然numpyはcpuのみ。jitとかで高速化できるけど)。
-        Input :
-            *args : 変換したい変数を全て受け取る。詳しくは可変型変数を調べてください。
-        Returns:
-            output : 変換したい変数のリスト
-        """
-
-        output = []
-        for a in args:
-            a = self._change_types(a)
-            output.append(a)
-
-        if len(args) == 1:
-            output = output[0]
-
-        return output
-
-    def _change_types(self, args):
-        """
-        ここで、任意の3type(numpy, torch, jax)を変換したいtypeに変換する。
-        変換後、CPU or GPUの選択ができる。
-
-        おそらく、今後、拡張が必要な気がする。GPUの番号指定を行えるようにする必要がある。
-
-        Args:
-            to_types (_type_):
-
-        Returns:
-            args :
-        """
-        if self.to_types == 'jax':
-            if isinstance(args, torch.Tensor):
-                if args.is_cuda == True: args = args.to('cpu')
-                args = jnp.asarray(args)
-
-            if isinstance(args, np.ndarray):
-                args = jnp.asarray(args)
-
-            if 'cuda' in self.device or 'gpu' in self.device: # ここ、のちに拡張工事が必要。GPUのボード番号の選択ができるようにしないといけない。
-                gpus = jax.devices("gpu")
-                return jax.device_put(args, gpus[0])
-            else:
-                cpus = jax.devices("cpu")
-                return jax.device_put(args, cpus[0])
-
-        elif self.to_types == 'torch':
-            if 'gpu' in self.device:
-                raise ValueError('torch uses "cuda" instead of "gpu".')
-
-            if isinstance(args, np.ndarray):
-                return torch.from_numpy(args).float().to(self.device)
-
-            elif isinstance(args, jax.numpy.ndarray):
-                args = np.array(args)
-                return torch.from_numpy(args).float().to(self.device)
-
-            else:
-                return args.to(self.device)
-
-        elif self.to_types == 'numpy':
-            if 'cuda' in self.device or 'gpu' in self.device:
-                raise ValueError("numpy doesn't work on CUDA")
-
-            if isinstance(args, torch.Tensor):
-                return args.to('cpu').numpy()
-
-            elif isinstance(args, jax.numpy.ndarray):
-                return np.array(args)
-
-            else:
-                return args
-
+    def to(self, a, device, dtype = None):
+        if dtype is None:
+            return jax.device_put(a, device)
         else:
-            raise ValueError("Unknown type of non implemented here.")
-
+            ValueError('Not implemented type.')
 
 # %%
 if __name__ == '__main__':

@@ -3,6 +3,7 @@ import os, sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 
 # %%
+import os, sys
 import time
 import numpy as np
 import pandas as pd
@@ -48,7 +49,7 @@ class Test():
         study = opt.optimizer(test_gw,
                               to_types = test_gw.to_types,
                               method = 'optuna',
-                              init_plans_list = ['diag'],
+                              init_plans_list = ['random'],
                               eps_list = [1e-4, 1e-2],
                               eps_log = True,
                               sampler_name = 'random',
@@ -58,7 +59,7 @@ class Test():
                               storage = "mysql+pymysql://root@localhost/TestGW_Methods",
                               n_jobs = 10,
                               num_trial = 10,
-                              delete_study = False,
+                              delete_study = True,
                               )
 
         return study

@@ -78,14 +78,10 @@ class GW_Alignment():
                 setattr(self, key, value)
 
     def entropic_gw(self, device, epsilon, T = None, max_iter = 1000, tol = 1e-9, log = True, verbose = False, trial = None):
+        C1, C2, p, q = self.nx.to(self.pred_dist, device), self.nx.to(self.target_dist, device), self.nx.to(self.p, device), self.nx.to(self.q, device)
 
-        if self.to_types == 'torch':
-            C1, C2, p, q = self.pred_dist.to(device), self.target_dist.to(device), self.p.to(device), self.q.to(device)
-            T = torch.from_numpy(T).float().to(device)
-        else:
-            C1, C2, p, q = self.pred_dist, self.target_dist, self.p, self.q
-
-        self.nx = ot.backend.get_backend(C1, C2, p, q)
+        T = self.nx.from_numpy(T)
+        T = self.nx.to(T, device, dtype = 'float')
 
         # add T as an input
         if T is None:
@@ -183,6 +179,7 @@ class GW_Alignment():
         '''
         if init_mat_plan in ['uniform', 'diag']:
             gw, logv, gw_loss, init_mat, gw_success = self.gw_alignment_help(init_mat_plan, device, eps, seed=42)
+            gw_loss = self.nx.item(gw_loss)
             if not gw_success:
                 gw_loss = float('nan')
                 acc = float('nan')
@@ -194,7 +191,7 @@ class GW_Alignment():
                 # current_init_mat = self.init_mat_builder.make_initial_T(init_mat_plan, seed)
                 # current_gw, current_logv = self.entropic_gw(device, eps, T = current_init_mat, max_iter = self.max_iter)
                 c_gw, c_logv, c_gw_loss, c_init_mat, c_gw_success = self.gw_alignment_help(init_mat_plan, device, eps, seed)
-                c_gw_loss, = self.exit_torch(c_gw_loss)
+                c_gw_loss = self.nx.item(c_gw_loss)
                 if not c_gw_success: # gw alignmentが失敗したならinf
                     c_gw_loss = float('inf')
 
@@ -214,7 +211,7 @@ class GW_Alignment():
                 acc = float('nan')
                 raise optuna.TrialPruned(f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
             # seedの保存
-            trial.set_user_attr('seed',best_seed)
+            trial.set_user_attr('seed', int(best_seed))
         else:
             raise ValueError('Not defined initialize matrix.')
         '''
@@ -231,10 +228,10 @@ class GW_Alignment():
         acc = correct / len(gw)
 
         # save data
-        nx.save(file_path + f'/gw_{trial.number}', gw)
-        nx.save(file_path + f'/init_mat_{trial.number}', init_mat)
+        self.nx.save(file_path + f'/gw_{trial.number}', gw)
+        self.nx.save(file_path + f'/init_mat_{trial.number}', init_mat)
 
-        gw_loss, acc = self.exit_torch(gw_loss, acc)
+        acc = self.nx.item(acc)
         # jaxの保存方法を作成してください
 
         trial.set_user_attr('acc', acc)
