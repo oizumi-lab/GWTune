@@ -204,6 +204,7 @@ class GW_Alignment():
                     gw = c_gw
                     init_mat = c_init_mat
                     logv = c_logv
+                    best_seed = seed
 
                 trial.report(gw_loss, i) # 最小値を報告
                 if trial.should_prune():
@@ -213,6 +214,8 @@ class GW_Alignment():
                 gw_loss = float('nan')
                 acc = float('nan')
                 raise optuna.TrialPruned(f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
+            # seedの保存
+            trial.set_user_attr('seed',best_seed)
         else:
             raise ValueError('Not defined initialize matrix.')
         '''
