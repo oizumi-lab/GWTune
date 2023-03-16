@@ -97,6 +97,9 @@ class Backend(ot.backend.Backend):
     def load(self, file):
         raise NotImplementedError()
 
+    def to(self, a, device):
+        raise NotImplementedError()
+
 
 class NumpyBackend(ot.backend.NumpyBackend, Backend):
 
@@ -119,6 +122,9 @@ class NumpyBackend(ot.backend.NumpyBackend, Backend):
     def load(self, file):
         return np.load(file)
 
+    def to(self, a, device):
+        return a
+
 
 class TorchBackend(ot.backend.TorchBackend, Backend):
 
@@ -137,10 +143,13 @@ class TorchBackend(ot.backend.TorchBackend, Backend):
             return args.to(device)
 
     def save(self, file, a):
-        torch.save(a, file)
+        torch.save(a, file + '.pt')
 
     def load(self, file):
         return torch.load(file)
+
+    def to(self, a, device):
+        return a.to(device)
 
 class JaxBackend(ot.backend.JaxBackend, Backend):
 
@@ -165,6 +174,8 @@ class JaxBackend(ot.backend.JaxBackend, Backend):
     def load(self, file):
         return jax.numpy.load(file)
 
+    def to(self, a, device):
+        return jax.device_put(a, device)
 
 
 class ChangeTypes():

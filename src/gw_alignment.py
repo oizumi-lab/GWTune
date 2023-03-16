@@ -15,7 +15,7 @@ import copy
 import os
 
 # %%
-from utils.backend import Backend
+from utils.backend import make_backend
 from utils.init_matrix import InitMatrix
 
 # %%
@@ -37,8 +37,10 @@ class GW_Alignment():
         self.to_types = to_types
         self.gpu_queue = gpu_queue
 
-        be = Backend(self.device, self.to_types) # potのnxに書き換えるべき。
-        self.pred_dist, self.target_dist, self.p, self.q = be.change_data(pred_dist, target_dist, p, q)
+        self.nx = make_backend(self.to_types)
+        self.pred_dist, self.target_dist, self.p, self.q = self.nx.change_data(pred_dist, target_dist, p, q)
+        # be = Backend(self.device, self.to_types) # potのnxに書き換えるべき。
+        # self.pred_dist, self.target_dist, self.p, self.q = be.change_data(pred_dist, target_dist, p, q)
 
         self.size = len(self.pred_dist)
 
@@ -83,11 +85,11 @@ class GW_Alignment():
         else:
             C1, C2, p, q = self.pred_dist, self.target_dist, self.p, self.q
 
-        nx = ot.backend.get_backend(C1, C2, p, q)
+        self.nx = ot.backend.get_backend(C1, C2, p, q)
 
         # add T as an input
         if T is None:
-            T = nx.outer(p, q)
+            T = self.nx.outer(p, q)
 
         constC, hC1, hC2 = ot.gromov.init_matrix(C1, C2, p, q, loss_fun = "square_loss")
 
@@ -108,7 +110,7 @@ class GW_Alignment():
             if cpt % 10 == 0:
                 # we can speed up the process by checking for the error only all the 10th iterations
                 err_prev = copy.copy(err)
-                err = nx.norm(T - Tprev)
+                err = self.nx.norm(T - Tprev)
                 if log:
                     log['err'].append(err)
                 if verbose:
@@ -129,8 +131,7 @@ class GW_Alignment():
         gw, logv = self.entropic_gw(device, eps, T = init_mat, max_iter = self.max_iter)
         gw_loss = logv['gw_dist']
 
-        nx = ot.backend.get_backend(gw)
-        if nx.array_equal(gw, nx.zeros(gw.shape)):
+        if self.nx.array_equal(gw, self.nx.zeros(gw.shape)):
             gw_success = False
         else:
             gw_success = True
@@ -180,8 +181,6 @@ class GW_Alignment():
         '''
         2.  Compute GW alignment with hyperparameters defined above.
         '''
-        nx = ot.backend.get_backend(self.pred_dist)
-
         if init_mat_plan in ['uniform', 'diag']:
             gw, logv, gw_loss, init_mat, gw_success = self.gw_alignment_help(init_mat_plan, device, eps, seed=42)
             if not gw_success:
@@ -227,18 +226,13 @@ class GW_Alignment():
         #     gw_loss = float('nan')
         #     acc = float('nan')
         #     raise optuna.TrialPruned("Failed.")
-        pred = nx.argmax(gw, 1)
-        correct = (pred == nx.arange(len(gw), type_as = gw)).sum()
+        pred = self.nx.argmax(gw, 1)
+        correct = (pred == self.nx.arange(len(gw), type_as = gw)).sum()
         acc = correct / len(gw)
 
         # save data
-        if self.to_types == 'torch':
-            torch.save(gw, file_path + f'/gw_{trial.number}.pt')
-            torch.save(init_mat, file_path + f'/init_mat_{trial.number}.pt')
-
-        elif self.to_types == 'numpy':
-            np.save(file_path + f'/gw_{trial.number}', gw)
-            np.save(file_path + f'/init_mat_{trial.number}', init_mat)
+        nx.save(file_path + f'/gw_{trial.number}', gw)
+        nx.save(file_path + f'/init_mat_{trial.number}', init_mat)
 
         gw_loss, acc = self.exit_torch(gw_loss, acc)
         # jaxの保存方法を作成してください
