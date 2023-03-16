@@ -9,53 +9,24 @@ from joblib import parallel_backend
 import matplotlib.style as mplstyle
 import seaborn as sns
 
-class Optimizer:
-    def __init__(self, save_path) -> None:
-        self.save_path = save_path
-        pass
-
-    def optimizer(self,
-                  dataset,
-                  to_types = 'torch',
-                  method = 'optuna',
-                  init_plans_list = ['diag'],
-                  eps_list = [1e-4, 1e-2],
-                  eps_log = True,
-                  sampler_name = 'random',
-                  pruner_name = 'median',
-                  filename = 'test',
-                  sql_name = 'sqlite',
-                  storage = None,
-                  n_jobs = 10,
-                  num_trial = 50,
-                  delete_study = False
-                  ):
-        # make file_path
-        file_path = self.save_path + '/' + filename
-        if not os.path.exists(file_path):
-            os.makedirs(file_path)
-        # make db path
-        if sql_name == 'sqlite':
-            storage = "sqlite:///" + file_path +  '/' + filename + '.db',
-        elif sql_name == 'mysql':
-            if storage == None:
-                raise ValueError('mysql path was not set.')
-        else:
-            raise ValueError('no implemented SQL.')
-
-        if method == 'optuna':
-            Opt = RunOptuna(file_path, to_types, storage, filename, sampler_name, pruner_name, sql_name, init_plans_list, eps_list, eps_log, n_jobs, num_trial, delete_study)
-        else:
-            raise ValueError('no implemented method.')
-
-        study = Opt.run_study(dataset)
-
-        Opt.load_graph(study)
-
-        return study
 
 class RunOptuna():
-    def __init__(self, file_path, to_types, storage, filename, sampler_name, pruner_name, sql_name, init_plans_list, eps_list, eps_log, n_jobs, num_trial, delete_study):
+    def __init__(self, 
+                 file_path, 
+                 to_types, 
+                 storage, 
+                 filename, 
+                 sampler_name, 
+                 pruner_name,
+                 sql_name,
+                 init_plans_list,
+                 eps_list, 
+                 eps_log,
+                 n_jobs,
+                 num_trial,
+                 delete_study
+                 ):
+        
         self.file_path = file_path
         self.to_types = to_types
         self.storage = storage
