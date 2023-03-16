@@ -1,7 +1,20 @@
 import numpy as np
 from scipy.spatial import distance
 import ot
+import random
+import torch
 
+def fix_random_seed(seed = 42):
+    # Python random
+    random.seed(seed)
+    # Numpy
+    np.random.seed(seed)
+    # Pytorch
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.deterministic = True
+    torch.use_deterministic_algorithms = True
 
 def procrustes(embedding_1, embedding_2, Pi):
     """embedding_2をembedding_1に最も近づける回転行列Qを求める

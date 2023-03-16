@@ -15,8 +15,8 @@ import copy
 import os
 
 # %%
-from src.utils.backend import Backend
-from src.utils.init_matrix import InitMatrix
+from utils.backend import Backend
+from utils.init_matrix import InitMatrix
 
 # %%
 class GW_Alignment():
