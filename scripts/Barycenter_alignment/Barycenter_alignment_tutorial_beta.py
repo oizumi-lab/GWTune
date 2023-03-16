@@ -12,7 +12,7 @@ import sklearn
 import sys
 
 sys.path.append("../")
-from src.Barycenter_alignment import Barycenter_alignment
+from src.barycenter_alignment import Barycenter_alignment
 from src.GW_alignment import GW_alignment
 # %%
 # Parameters

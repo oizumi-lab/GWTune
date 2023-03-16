@@ -13,11 +13,10 @@ import warnings
 import copy
 # warnings.simplefilter("ignore")
 import os
-os.getcwd()
 
 # %%
-from src.utils.backend import Backend
-from src.utils.init_matrix import InitMatrix
+from utils.backend import Backend
+from utils.init_matrix import InitMatrix
 
 # %%
 class GW_Alignment():

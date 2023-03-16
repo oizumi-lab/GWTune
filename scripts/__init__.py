@@ -1,7 +1,5 @@
-import os, glob
-print("Success to import scripts!", os.getcwd())
+import os, sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '../scripts'))
 
-__all__ = [
-    os.path.split(os.path.splitext(file)[0])[1]
-    for file in glob.glob(os.path.join(os.path.dirname(__file__), '[a-zA-Z0-9]*'))
-]
+import Histogram_alignment
+import Barycenter_alignment

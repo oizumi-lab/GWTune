@@ -1,6 +1,5 @@
-from os.path import dirname, basename, isfile, join
-import os, glob
-print("Success to import src!", os.getcwd())
+import os, sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '../src'))
 
-import src.gw_alignment
-import src.utils
+import utils
+import gw_alignment
