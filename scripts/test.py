@@ -80,15 +80,4 @@ if __name__ == '__main__':
     device = 'cpu'
     to_types = 'torch'
     tgw.optimizer_test(filename, device, to_types)
-
-# %%
-def confirm_test():
-    confirmation = input("This code will delete the study named 'example'.\nDo you want to execute the code? (y/n)")
-    if confirmation == "y":
-        # コードを実行する
-        # ...
-        print("コードを実行しました。")
-    else:
-        print("コードを実行しませんでした。")
-
 # %%
