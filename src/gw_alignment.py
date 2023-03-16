@@ -142,6 +142,35 @@ class GW_Alignment():
             l.append(v)
         return  l
 
+    def iter_entropic_gw(self, init_mat_plan, device, eps, trial):
+        gw_loss = float('inf')
+        for i, seed in enumerate(np.random.randint(0, 100000, self.n_iter)):
+            # current_init_mat = self.init_mat_builder.make_initial_T(init_mat_plan, seed)
+            # current_gw, current_logv = self.entropic_gw(device, eps, T = current_init_mat, max_iter = self.max_iter)
+            c_gw, c_logv, c_gw_loss, c_init_mat, c_gw_success = self.gw_alignment_help(init_mat_plan, device, eps, seed)
+            c_gw_loss = self.nx.item(c_gw_loss)
+            if not c_gw_success: # gw alignmentが失敗したならinf
+                c_gw_loss = float('inf')
+
+            if c_gw_loss < gw_loss: # gw_lossの更新
+                gw_loss = c_gw_loss
+                gw = c_gw
+                init_mat = c_init_mat
+                logv = c_logv
+                best_seed = seed
+
+            trial.report(gw_loss, i) # 最小値を報告
+            if trial.should_prune():
+                raise optuna.TrialPruned(f"Trial was pruned at iteration {i} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
+        # trialが全て失敗したら
+        if gw_loss == float('inf'):
+            gw_loss = float('nan')
+            acc = float('nan')
+            raise optuna.TrialPruned(f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
+        # seedの保存
+        trial.set_user_attr('seed', int(best_seed))
+        return gw, logv, gw_loss, init_mat
+
     def __call__(self, trial, file_path, init_plans_list, eps_list, eps_log=True):
         '''
         0.  define the "gpu_queue" here. This will be used when the memory of dataset was too much large for a single GPU board, and so on.
@@ -186,32 +215,7 @@ class GW_Alignment():
                 raise optuna.TrialPruned(f"Failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
 
         elif init_mat_plan in ['random', 'permutation']:
-            gw_loss = float('inf')
-            for i, seed in enumerate(np.random.randint(0, 100000, self.n_iter)):
-                # current_init_mat = self.init_mat_builder.make_initial_T(init_mat_plan, seed)
-                # current_gw, current_logv = self.entropic_gw(device, eps, T = current_init_mat, max_iter = self.max_iter)
-                c_gw, c_logv, c_gw_loss, c_init_mat, c_gw_success = self.gw_alignment_help(init_mat_plan, device, eps, seed)
-                c_gw_loss = self.nx.item(c_gw_loss)
-                if not c_gw_success: # gw alignmentが失敗したならinf
-                    c_gw_loss = float('inf')
-
-                if c_gw_loss < gw_loss: # gw_lossの更新
-                    gw_loss = c_gw_loss
-                    gw = c_gw
-                    init_mat = c_init_mat
-                    logv = c_logv
-                    best_seed = seed
-
-                trial.report(gw_loss, i) # 最小値を報告
-                if trial.should_prune():
-                    raise optuna.TrialPruned(f"Trial was pruned at iteration {i} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
-            # trialが全て失敗したら
-            if gw_loss == float('inf'):
-                gw_loss = float('nan')
-                acc = float('nan')
-                raise optuna.TrialPruned(f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
-            # seedの保存
-            trial.set_user_attr('seed', int(best_seed))
+            gw, logv, gw_loss, init_mat = self.iter_entropic_gw(init_mat_plan, device, eps, trial)
         else:
             raise ValueError('Not defined initialize matrix.')
         '''
