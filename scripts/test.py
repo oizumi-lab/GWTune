@@ -36,19 +36,35 @@ class Test():
         q = ot.unif(len(model2))
         return model1, model2, p, q
 
+    def opt2(self, filename, device, to_types):
+        test_gw = GW_Alignment(self.model1, self.model2, self.p, self.q, max_iter = 50, device = device, to_types = to_types, gpu_queue = None)
+        return test_gw
+
+
+
     def optimizer_test(self, filename, device, to_types):
-        test_gw = GW_Alignment(self.model1, self.model2, self.p, self.q, device = device, to_types = to_types, filename = filename, gpu_queue = None)
+        test_gw = GW_Alignment(self.model1, self.model2, self.p, self.q, max_iter = 30, device = device, to_types = to_types, gpu_queue = None)
+
+        pruner_params = {'n_iter':5, 'n_startup_trials':1, 'n_warmup_steps':0}
+        test_gw.set_params(pruner_params)
 
         opt = gw_optimizer.Optimizer(test_gw.save_path)
 
-        study = opt.optimizer(test_gw, 
-                              method = 'optuna', 
-                              init_plans_list = ['diag'], 
-                              eps_list = [1e-4, 1e-2], 
-                              sampler_name = 'grid_search', 
-                              filename = filename, 
-                              n_jobs = 10, 
-                              num_trial = 50)
+        study = opt.optimizer(test_gw,
+                              to_types = test_gw.to_types,
+                              method = 'optuna',
+                              init_plans_list = ['diag'],
+                              eps_list = [1e-4, 1e-2],
+                              eps_log = True,
+                              sampler_name = 'random',
+                              pruner_name = 'median',
+                              filename = filename,
+                              sql_name = 'mysql',
+                              storage = "mysql+pymysql://root@localhost/TestGW_Methods",
+                              n_jobs = 10,
+                              num_trial = 10,
+                              delete_study = False,
+                              )
 
         return study
 
@@ -59,10 +75,10 @@ if __name__ == '__main__':
     path2 = '../data/model2.pt'
 
     tgw = Test(path1, path2)
+    # diagと['random', 'uniform']ではfilenameを分けてください
     filename = 'test'
-    device = 'cuda'
-    to_types = 'torch'
+    device = 'cpu'
+    to_types = 'numpy'
     tgw.optimizer_test(filename, device, to_types)
-
 
 # %%

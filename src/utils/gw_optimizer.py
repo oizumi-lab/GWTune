@@ -2,6 +2,7 @@
 import os
 import numpy as np
 import torch
+import pymysql
 import matplotlib.pyplot as plt
 import optuna
 from joblib import parallel_backend
@@ -15,32 +16,35 @@ class Optimizer:
 
     def optimizer(self,
                   dataset,
+                  to_types = 'torch',
                   method = 'optuna',
                   init_plans_list = ['diag'],
                   eps_list = [1e-4, 1e-2],
+                  eps_log = True,
                   sampler_name = 'random',
+                  pruner_name = 'median',
                   filename = 'test',
+                  sql_name = 'sqlite',
+                  storage = None,
                   n_jobs = 10,
-                  num_trial = 50):
-        """_summary_
+                  num_trial = 50,
+                  delete_study = False
+                  ):
+        # make file_path
+        file_path = self.save_path + '/' + filename
+        if not os.path.exists(file_path):
+            os.makedirs(file_path)
+        # make db path
+        if sql_name == 'sqlite':
+            storage = "sqlite:///" + file_path +  '/' + filename + '.db',
+        elif sql_name == 'mysql':
+            if storage == None:
+                raise ValueError('mysql path was not set.')
+        else:
+            raise ValueError('no implemented SQL.')
 
-        Args:
-            dataset (_type_): _description_
-            method (str, optional): _description_. Defaults to 'optuna'.
-            init_plans_list (list, optional): _description_. Defaults to ['diag'].
-            sampler_name (str, optional): _description_. Defaults to 'random'.
-            filename (str, optional): _description_. Defaults to 'test'.
-            n_jobs (int, optional): _description_. Defaults to 10.
-            num_trial (int, optional): _description_. Defaults to 50.
-
-        Raises:
-            ValueError: _description_
-
-        Returns:
-            _type_: _description_
-        """
         if method == 'optuna':
-            Opt = RunOptuna(self.save_path, filename, sampler_name, init_plans_list, eps_list, n_jobs, num_trial)
+            Opt = RunOptuna(file_path, to_types, storage, filename, sampler_name, pruner_name, sql_name, init_plans_list, eps_list, eps_log, n_jobs, num_trial, delete_study)
         else:
             raise ValueError('no implemented method.')
 
@@ -51,33 +55,48 @@ class Optimizer:
         return study
 
 class RunOptuna():
-    def __init__(self, save_path, filename, sampler_name, init_plans_list, eps_list, n_jobs, num_trial):
-        self.save_path = save_path
+    def __init__(self, file_path, to_types, storage, filename, sampler_name, pruner_name, sql_name, init_plans_list, eps_list, eps_log, n_jobs, num_trial, delete_study):
+        self.file_path = file_path
+        self.to_types = to_types
+        self.storage = storage
         self.filename = filename
         self.sampler_name = sampler_name
+        self.pruner_name = pruner_name
+        self.sql_name = sql_name
         self.init_plans_list = init_plans_list
         self.eps_list = eps_list
+        self.eps_log = eps_log
         self.n_jobs = n_jobs
         self.num_trial = num_trial
+        self.delete_study = delete_study
 
         self.initialize = ['uniform', 'random', 'permutation', 'diag'] # 実装済みの方法の名前を入れる。
         self.init_mat_types = self._choose_init_plans(self.init_plans_list) # リストを入力して、実行可能な方法のみをリストにして返す。
 
     def run_study(self, dataset):
-        if not os.path.exists(self.save_path + '/' + self.filename):
+
+        if self.delete_study:
+            try:
+                print('delete exist study!!')
+                optuna.delete_study(storage = self.storage, study_name = self.filename)
+            except:
+                pass
+
+        if os.path.exists(self.file_path):
             study = optuna.create_study(direction = "minimize",
                                         study_name = self.filename,
                                         sampler = self.choose_sampler(),
-                                        storage = "sqlite:///" + self.save_path + "/" + self.filename + '.db',
+                                        pruner = self.choose_pruner(dataset),
+                                        storage = self.storage,
                                         load_if_exists = True)
 
             with parallel_backend("multiprocessing", n_jobs = self.n_jobs):
-                study.optimize(lambda trial: dataset(trial, self.init_mat_types, self.eps_list), n_trials = self.num_trial, n_jobs = self.n_jobs)
+                study.optimize(lambda trial: dataset(trial, self.file_path, self.init_mat_types, self.eps_list, self.eps_log), n_trials = self.num_trial, n_jobs = self.n_jobs)
 
         else:
             study = optuna.create_study(direction = "minimize",
                                         study_name = self.filename,
-                                        storage = "sqlite:///" + self.save_path + "/"  + self.filename + '.db',
+                                        storage = self.storage,
                                         load_if_exists = True)
         return study
 
@@ -104,7 +123,10 @@ class RunOptuna():
             return [v for v in self.initialize if v in init_plans_list]
 
     def choose_sampler(self):
-
+        '''
+        2023/3/15 阿部
+        TPE Sampler追加
+        '''
         if self.sampler_name == 'random':
             sampler = optuna.samplers.RandomSampler(seed = 42)
 
@@ -117,10 +139,27 @@ class RunOptuna():
 
             sampler = optuna.samplers.GridSampler(search_space)
 
+        elif self.sampler_name.lower() == 'tpe':
+            sampler = optuna.samplers.TPESampler(constant_liar = True, seed = 42) # 分散最適化のときはTrueにするのが良いらしい(阿部)
+
         else:
             raise ValueError('not implemented sampler yet.')
 
         return sampler
+
+    def choose_pruner(self, dataset):
+        '''
+        2023/3/15 阿部
+        Median PrunerとHyperbandPrunerを追加
+        (RandomSampler, MedianPruner)か(TPESampler, HyperbandPruner)がbestらしい
+        '''
+        if self.pruner_name == 'median':
+            pruner = optuna.pruners.MedianPruner(n_startup_trials = dataset.n_startup_trials, n_warmup_steps = dataset.n_warmup_steps)
+        elif self.pruner_name == 'hyperband':
+            pruner = optuna.pruners.HyperbandPruner(min_resource = dataset.min_resource, max_resource = dataset.n_iter, reduction_factor = dataset.reduction_factor)
+        else:
+            raise ValueError('not implemented pruner yet.')
+        return pruner
 
     def load_graph(self, study):
         best_trial = study.best_trial
@@ -129,8 +168,11 @@ class RunOptuna():
         size = best_trial.user_attrs['size']
         number = best_trial.number
 
-        gw = torch.load(self.save_path + '/GW({} pictures, epsilon = {}, trial = {}).pt'.format(size, round(eps, 6), number))
-
+        if self.to_types == 'torch':
+            gw = torch.load(self.file_path +f'/gw_{best_trial.number}.pt')
+        elif self.to_types == 'numpy':
+            gw = np.load(self.file_path +f'/gw_{best_trial.number}.npy')
+        # gw = torch.load(self.file_path + '/GW({} pictures, epsilon = {}, trial = {}).pt'.format(size, round(eps, 6), number))
         self.plot_coupling(gw, eps, acc)
 
     def make_eval_graph(self, study):
@@ -150,8 +192,12 @@ class RunOptuna():
         mplstyle.use('fast')
         N = T.shape[0]
         plt.figure(figsize=(8,6))
-        sns.heatmap(T.to('cpu').numpy())
+        if self.to_types == 'torch':
+            T = T.to('cpu').numpy()
+        sns.heatmap(T)
 
         plt.title('GW results ({} pictures, eps={}, acc.= {})'.format(N, round(epsilon, 6), round(acc, 4)))
         plt.tight_layout()
         plt.show()
+
+# %%

@@ -20,17 +20,17 @@ class InitMatrix():
         elif initialize == 'permutation':
             ts = np.zeros(self.matrix_size)
             ts[0] = 1 / self.matrix_size
-            T = self.initialize_matrix(self.matrix_size, ts=ts)
+            T = self.initialize_matrix(ts=ts)
             return T
 
         elif initialize == 'any_permutation':
-            T = self.initialize_matrix(self.matrix_size)
+            T = self.initialize_matrix()
             return T
 
         elif initialize == 'beta':
             ts = np.random.beta(2, 5, self.matrix_size)
             ts = ts / (self.matrix_size * np.sum(ts))
-            T = self.initialize_matrix(self.matrix_size, ts=ts)
+            T = self.initialize_matrix(ts=ts)
             return T
 
         elif initialize == 'uniform':
@@ -72,7 +72,7 @@ class InitMatrix():
         Returns
             np.ndarray 初期値
         """
-        matrix = self.randOrderedMatrix(self.matrix_size)
+        matrix = self.randOrderedMatrix()
         if ts is None:
             ts = np.random.uniform(0, 1, self.matrix_size)
             ts = ts / (self.matrix_size * np.sum(ts))
@@ -97,9 +97,9 @@ class InitMatrix():
         T = T / self.matrix_size
         return T
 
-# %% 
+# %%
 if __name__ == '__main__':
     test_builder = InitMatrix(2000)
     t = test_builder.make_initial_T('diag')
-    
-# %% 
+
+# %%
