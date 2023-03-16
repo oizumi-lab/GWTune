@@ -37,8 +37,8 @@ class GW_Alignment():
         self.to_types = to_types
         self.gpu_queue = gpu_queue
 
-        be = Backend(self.device, self.to_types) # potのnxに書き換えるべき。
-        self.pred_dist, self.target_dist, self.p, self.q = be.change_data(pred_dist, target_dist, p, q)
+        self.backend = Backend(self.device, self.to_types)
+        self.pred_dist, self.target_dist, self.p, self.q = self.backend(pred_dist, target_dist, p, q) # 特殊メソッドのcallに変更した (2023.3.16 佐々木)
 
         self.size = len(self.pred_dist)
 
@@ -77,18 +77,25 @@ class GW_Alignment():
 
     def entropic_gw(self, device, epsilon, T = None, max_iter = 1000, tol = 1e-9, log = True, verbose = False, trial = None):
 
-        if self.to_types == 'torch':
-            C1, C2, p, q = self.pred_dist.to(device), self.target_dist.to(device), self.p.to(device), self.q.to(device)
-            T = torch.from_numpy(T).float().to(device)
-        else:
-            C1, C2, p, q = self.pred_dist, self.target_dist, self.p, self.q
-
-        nx = ot.backend.get_backend(C1, C2, p, q)
-
-        # add T as an input
-        if T is None:
-            T = nx.outer(p, q)
-
+        # if self.to_types == 'torch':
+        #     C1, C2, p, q = self.pred_dist.to(device), self.target_dist.to(device), self.p.to(device), self.q.to(device)
+        #     T = torch.from_numpy(T).float().to(device)
+        
+        # else:
+        #     C1, C2, p, q = self.pred_dist, self.target_dist, self.p, self.q
+        
+        # # add T as an input
+        # if T is None:
+        #     T = self.backend.nx.outer(p, q) # この状況を想定している場面がないので、消してもいいのでは？？ (2023.3.16 佐々木)
+        
+        '''
+        2023.3.16 佐々木
+        backendに実装した "change_device" で、全型を想定した変数のdevice切り替えを行う。
+        numpyに関しては、CPUの指定をしていないとエラーが返ってくるようにしているだけ。
+        torch, jaxに関しては、GPUボードの番号指定が、これでできる。
+        '''
+        C1, C2, p, q, T = self.backend.change_device(device, self.pred_dist, self.target_dist, self.p, self.q, T)
+         
         constC, hC1, hC2 = ot.gromov.init_matrix(C1, C2, p, q, loss_fun = "square_loss")
 
         # constC, hC1, hC2, nx = self.mat_gw(device)
@@ -106,9 +113,8 @@ class GW_Alignment():
             T = ot.bregman.sinkhorn(p, q, tens, epsilon, method = 'sinkhorn')
 
             if cpt % 10 == 0:
-                # we can speed up the process by checking for the error only all the 10th iterations
-                err_prev = copy.copy(err)
-                err = nx.norm(T - Tprev)
+                # err_prev = copy.copy(err)　#ここは使われていないようなので、一旦コメントアウトしました (2023.3.16 佐々木)
+                err = self.backend.nx.norm(T - Tprev)
                 if log:
                     log['err'].append(err)
                 if verbose:
@@ -124,41 +130,32 @@ class GW_Alignment():
         else:
             return T
 
-    def gw_alignment_help(self,init_mat_plan, device, eps, seed):
+    def gw_alignment_help(self, init_mat_plan, device, eps, seed):
         init_mat = self.init_mat_builder.make_initial_T(init_mat_plan, seed)
         gw, logv = self.entropic_gw(device, eps, T = init_mat, max_iter = self.max_iter)
         gw_loss = logv['gw_dist']
 
-        nx = ot.backend.get_backend(gw)
-        if nx.array_equal(gw, nx.zeros(gw.shape)):
+        if self.backend.nx.array_equal(gw, self.backend.nx.zeros(gw.shape)):
             gw_success = False
         else:
             gw_success = True
 
         return gw, logv, gw_loss, init_mat, gw_success
+    
+    def define_eps_range(self, trial, eps_list, eps_log):
+        """
+        epsの範囲を指定する関数。
+        Args:
+            trial (_type_): _description_
+            eps_list (_type_): _description_
+            eps_log (_type_): _description_
 
-    def exit_torch(self, *args):
-        l = []
-        for v in args:
-            if isinstance(v, torch.Tensor):
-                v = v.item()
-            l.append(v)
-        return  l
+        Raises:
+            ValueError: _description_
 
-    def __call__(self, trial, file_path, init_plans_list, eps_list, eps_log=True):
-        '''
-        0.  define the "gpu_queue" here. This will be used when the memory of dataset was too much large for a single GPU board, and so on.
-        '''
-
-        if self.gpu_queue is None:
-            device = self.device
-
-        else:
-            gpu_id = self.gpu_queue.get()
-            device = 'cuda:' + str(gpu_id)
-        '''
-        1.  define hyperparameter (eps, T)
-        '''
+        Returns:
+            _type_: _description_
+        """
         ep_lower, ep_upper = eps_list
 
         if len(eps_list) == 2:
@@ -168,20 +165,10 @@ class GW_Alignment():
             eps = trial.suggest_float("eps", ep_lower, ep_upper, ep_step)
         else:
             raise ValueError("The eps_list doesn't match.")
-
-        init_mat_plan = trial.suggest_categorical("initialize", init_plans_list) # 上記のリストから、1つの方法を取り出す(optunaがうまく選択してくれる)。
-        # init_matをdeviceに上げる作業はentropic_gw中で行うことにしました。(2023/3/14 阿部)
-
-        '''
-        randomの時にprunerを設定する場合は、if init_mat_plan == "random": pruner を、self.entropi_GWのなかにあるwhileループにいれたら良い。
-        '''
-        trial.set_user_attr('size', self.size)
-
-        '''
-        2.  Compute GW alignment with hyperparameters defined above.
-        '''
-        nx = ot.backend.get_backend(self.pred_dist)
-
+        
+        return trial, eps
+    
+    def compute_GW_with_init_plans(self, trial, eps, init_mat_plan, device):
         if init_mat_plan in ['uniform', 'diag']:
             gw, logv, gw_loss, init_mat, gw_success = self.gw_alignment_help(init_mat_plan, device, eps, seed=42)
             if not gw_success:
@@ -215,35 +202,58 @@ class GW_Alignment():
                 acc = float('nan')
                 raise optuna.TrialPruned(f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
             # seedの保存
-            trial.set_user_attr('seed',best_seed)
+            trial.set_user_attr('seed', best_seed)
+        
         else:
             raise ValueError('Not defined initialize matrix.')
+    
+    
+    def __call__(self, trial, file_path, init_plans_list, eps_list, eps_log=True):
+        '''
+        0.  define the "gpu_queue" here. 
+            This will be used when the memory of dataset was too much large for a single GPU board, and so on.
+        '''
+
+        if self.to_types != 'numpy':
+            if self.gpu_queue is None:
+                device = self.device
+
+            else:
+                gpu_id = self.gpu_queue.get()
+                device = 'cuda:' + str(gpu_id)
+        
+        else:
+            device = 'cpu'
+        
+        '''
+        1.  define hyperparameter (eps, T)
+        '''
+        
+        trial, eps = self.define_eps_range(trial, eps_list, eps_log)
+
+        init_mat_plan = trial.suggest_categorical("initialize", init_plans_list) # init_matをdeviceに上げる作業はentropic_gw中で行うことにしました。(2023/3/14 阿部)
+        
+        trial.set_user_attr('size', self.size)
+
+        '''
+        2.  Compute GW alignment with hyperparameters defined above.
+        '''
+
+        gw, init_mat, trial = self.compute_GW_with_init_plans(trial, eps, init_mat_plan, device)
+        
         '''
         3.  count the accuracy of alignment and save the results if computation was finished in the right way.
             If not, set the result of accuracy and gw_loss as float('nan'), respectively. This will be used as a handy marker as bad results to be removed in the evaluation analysis.
         '''
 
-        # if nx.array_equal(gw, nx.zeros(gw.shape)): # gwが0行列ならnanを返す
-        #     gw_loss = float('nan')
-        #     acc = float('nan')
-        #     raise optuna.TrialPruned("Failed.")
-        pred = nx.argmax(gw, 1)
-        correct = (pred == nx.arange(len(gw), type_as = gw)).sum()
+        pred = self.backend.nx.argmax(gw, 1)
+        correct = (pred == self.backend.nx.arange(len(gw), type_as = gw)).sum()
         acc = correct / len(gw)
 
-        # save data
-        if self.to_types == 'torch':
-            torch.save(gw, file_path + f'/gw_{trial.number}.pt')
-            torch.save(init_mat, file_path + f'/init_mat_{trial.number}.pt')
-
-        elif self.to_types == 'numpy':
-            np.save(file_path + f'/gw_{trial.number}', gw)
-            np.save(file_path + f'/init_mat_{trial.number}', init_mat)
-
-        gw_loss, acc = self.exit_torch(gw_loss, acc)
-        # jaxの保存方法を作成してください
-
+        self.backend.save_computed_results(gw, init_mat, file_path, trial.number)
+        gw_loss, acc = self.backend.get_item_from_torch_or_jax(gw_loss, acc)
         trial.set_user_attr('acc', acc)
+        
         '''
         4. delete unnecessary memory for next computation. If not, memory error would happen especially when using CUDA.
         '''
@@ -261,3 +271,5 @@ class GW_Alignment():
         return gw_loss
 
 # %%
+if __name__ == '__main__':
+    pass
