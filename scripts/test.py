@@ -68,13 +68,17 @@ class Test():
 
         opt = gw_optimizer.Optimizer(test_gw.save_path)
 
-        study = opt.optimizer(test_gw, 
-                              method = 'optuna', 
-                              init_plans_list = ['diag'], 
-                              eps_list = [1e-4, 1e-2], 
-                              sampler_name = 'grid_search', 
-                              filename = filename, 
-                              n_jobs = 10, 
+        study = opt.optimizer(test_gw,
+                              to_types = test_gw.to_types,
+                              method = 'optuna',
+                              init_plans_list = ['diag'],
+                              eps_list = [1e-4, 1e-2],
+                              eps_log = True,
+                              sampler_name = 'grid_search',
+                              pruner_name = 'median',
+                              sql_name = 'sqlite',
+                              filename = filename,
+                              n_jobs = 10,
                               num_trial = 50)
 
         return study

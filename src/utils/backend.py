@@ -7,14 +7,16 @@ import torch
 import random
 import ot
 
+
 # %%
 # JAXの環境変数。
 os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = 'false'
 jax.config.update("jax_enable_x64", True)
 
+#%%
+str_type_error = "All array should be from the same type/backend. Current types are : {}"
 
-# %%
-def fix_seed(seed=42):     
+def fix_seed(seed=42):
     # Python
     random.seed(seed)
     # Numpy
@@ -28,7 +30,67 @@ def fix_seed(seed=42):
     torch.use_deterministic_algorithms = True
 
 
-class Backend():
+def get_backend(*args):
+    """Returns the proper backend for a list of input arrays
+
+        Also raises TypeError if all arrays are not from the same backend
+    """
+    # check that some arrays given
+    if not len(args) > 0:
+        raise ValueError(" The function takes at least one parameter")
+    # check all same type
+    if not len(set(type(a) for a in args)) == 1:
+        raise ValueError(str_type_error.format([type(a) for a in args]))
+
+    if isinstance(args[0], np.ndarray):
+        return NumpyBackend()
+    elif isinstance(args[0], torch.Tensor):
+        return TorchBackend()
+    elif isinstance(args[0], jax.numpy.ndarray):
+        return JaxBackend()
+    # elif isinstance(args[0], cp_type):  # pragma: no cover
+    #     return CupyBackend()
+    # elif isinstance(args[0], tf_type):
+    #     return TensorflowBackend()
+    else:
+        raise ValueError("Unknown type of non implemented backend.")
+
+
+class Backend(ot.backend.Backend):
+
+    def save(self, file, a):
+        raise NotImplementedError()
+
+    def load(self, file):
+        raise NotImplementedError()
+
+class NumpyBackend(ot.backend.NumpyBackend, Backend):
+
+    def save(self, file, a):
+        np.save(file, a)
+
+    def load(self, file):
+        return np.load(file)
+
+class TorchBackend(ot.backend.TorchBackend, Backend):
+
+    def save(self, file, a):
+        torch.save(a, file)
+
+    def load(self, file):
+        return torch.load(file)
+
+class JaxBackend(ot.backend.JaxBackend, Backend):
+
+    def save(self, file, a):
+        jax.numpy.save(file, a)
+
+    def load(self, file):
+        return jax.numpy.load(file)
+
+
+
+class ChangeTypes():
     def __init__(self, device = 'cpu', to_types = 'torch'):
         """
         入力された変数の型を揃えてあげる。バラバラな場合でも、単一の型に変換できるはず。
@@ -37,7 +99,7 @@ class Backend():
         self.device = device
         self.to_types = to_types
         pass
-    
+
     def change_data(self, *args):
         """
         3つのデータ型(numpy, torch, jax)を変換したい型にして、変換後にCPUかGPUかの選択ができる(当然numpyはcpuのみ。jitとかで高速化できるけど)。
@@ -46,22 +108,22 @@ class Backend():
         Returns:
             output : 変換したい変数のリスト
         """
-        
+
         output = []
         for a in args:
             a = self._change_types(a)
             output.append(a)
-        
+
         if len(args) == 1:
             output = output[0]
-        
+
         return output
 
     def _change_types(self, args):
         """
         ここで、任意の3type(numpy, torch, jax)を変換したいtypeに変換する。
         変換後、CPU or GPUの選択ができる。
-        
+
         おそらく、今後、拡張が必要な気がする。GPUの番号指定を行えるようにする必要がある。
 
         Args:
@@ -72,23 +134,23 @@ class Backend():
         """
         if self.to_types == 'jax':
             if isinstance(args, torch.Tensor):
-                if args.is_cuda == True: args = args.to('cpu')    
+                if args.is_cuda == True: args = args.to('cpu')
                 args = jnp.asarray(args)
-            
+
             if isinstance(args, np.ndarray):
                 args = jnp.asarray(args)
-        
+
             if 'cuda' in self.device or 'gpu' in self.device: # ここ、のちに拡張工事が必要。GPUのボード番号の選択ができるようにしないといけない。
                 gpus = jax.devices("gpu")
                 return jax.device_put(args, gpus[0])
             else:
                 cpus = jax.devices("cpu")
                 return jax.device_put(args, cpus[0])
-        
+
         elif self.to_types == 'torch':
             if 'gpu' in self.device:
                 raise ValueError('torch uses "cuda" instead of "gpu".')
-            
+
             if isinstance(args, np.ndarray):
                 return torch.from_numpy(args).float().to(self.device)
 
@@ -111,22 +173,22 @@ class Backend():
 
             else:
                 return args
-        
+
         else:
             raise ValueError("Unknown type of non implemented here.")
-        
+
 
 # %%
 if __name__ == '__main__':
     test_numpy1 = np.arange(10)
     test_numpy2 = np.arange(10, 20)
-    
+
     # %%
     backend = Backend(device = 'cpu', to_types = 'jax')
     test_jax1, test_jax2 = backend.change_data(test_numpy1, test_numpy2)
     print(test_jax1, test_jax2)
     print(type(test_jax1), type(test_jax2))
-    
+
     # %%
     backend = Backend(device = 'cuda', to_types = 'torch')
     test_torch1 = backend.change_data(test_numpy1)
@@ -138,6 +200,6 @@ if __name__ == '__main__':
     tt_jax = jnp.array(tt)
     gpus = jax.devices('gpu')
     tt_jax = jax.device_put(tt_jax, gpus[0])
-   
+
 
 # %%
