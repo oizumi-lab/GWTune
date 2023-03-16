@@ -177,9 +177,8 @@ class RunOptuna():
 
     def make_eval_graph(self, study):
         df_test = study.trials_dataframe()
-        success_test = df_test[df_test['values_1'] != float('nan')]
-        success_test = success_test[success_test['values_0'] != float('nan')]
-
+        success_test = df_test[df_test['values_0'] != float('nan')]
+        
         plt.figure()
         plt.title('The evaluation of GW results for random pictures')
         plt.scatter(success_test['values_1'], np.log(success_test['values_0']), label = 'init diag plan ('+str(self.train_size)+')', c = 'C0')
