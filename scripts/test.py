@@ -37,16 +37,10 @@ class Test():
         q = ot.unif(len(model2))
         return model1, model2, p, q
 
-    def opt2(self, filename, device, to_types):
-        test_gw = GW_Alignment(self.model1, self.model2, self.p, self.q, max_iter = 50, device = device, to_types = to_types, gpu_queue = None)
-        return test_gw
-
-
-
     def optimizer_test(self, filename, device, to_types):
         test_gw = GW_Alignment(self.model1, self.model2, self.p, self.q, max_iter = 30, device = device, to_types = to_types, gpu_queue = None)
 
-        pruner_params = {'n_iter':5, 'n_startup_trials':1, 'n_warmup_steps':0}
+        pruner_params = {'n_iter':5, 'n_startup_trials':1, 'n_warmup_steps':0, 'min_resource':5, 'reduction_factor' : 2}
         test_gw.set_params(pruner_params)
 
         opt = gw_optimizer.Optimizer(test_gw.save_path)
@@ -94,7 +88,6 @@ if __name__ == '__main__':
     # diagと['random', 'uniform']ではfilenameを分けてください
     filename = 'test'
     device = 'cpu'
-    to_types = 'numpy'
+    to_types = 'torch'
     tgw.optimizer_test(filename, device, to_types)
-
 # %%

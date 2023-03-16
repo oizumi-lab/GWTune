@@ -76,29 +76,41 @@ class RunOptuna():
     def run_study(self, dataset):
 
         if self.delete_study:
-            try:
-                print('delete exist study!!')
-                optuna.delete_study(storage = self.storage, study_name = self.filename)
-            except:
-                pass
+            while True:
+                confirmation = input(f"This code will delete the study named '{self.filename}'.\nDo you want to execute the code? (y/n)")
+                if confirmation == 'y':
+                    try:
+                        optuna.delete_study(storage = self.storage, study_name = self.filename)
+                        print(f"delete the study '{self.filename}'!")
+                        break
+                    except:
+                        print(f"study '{self.filename}' does not exist.")
+                        break
+                elif confirmation == 'n':
+                    raise ValueError("If you don't want to delete study, use 'delete_study = False'.")
+                else:
+                    print("Invalid input. Please enter again.")
 
-        if os.path.exists(self.file_path):
-            study = optuna.create_study(direction = "minimize",
-                                        study_name = self.filename,
-                                        sampler = self.choose_sampler(),
-                                        pruner = self.choose_pruner(dataset),
-                                        storage = self.storage,
-                                        load_if_exists = True)
+        study = optuna.create_study(direction = "minimize",
+                                    study_name = self.filename,
+                                    sampler = self.choose_sampler(),
+                                    pruner = self.choose_pruner(dataset),
+                                    storage = self.storage,
+                                    load_if_exists = True)
 
-            with parallel_backend("multiprocessing", n_jobs = self.n_jobs):
-                study.optimize(lambda trial: dataset(trial, self.file_path, self.init_mat_types, self.eps_list, self.eps_log), n_trials = self.num_trial, n_jobs = self.n_jobs)
+        with parallel_backend("multiprocessing", n_jobs = self.n_jobs):
+            study.optimize(lambda trial: dataset(trial, self.file_path, self.init_mat_types, self.eps_list, self.eps_log), n_trials = self.num_trial, n_jobs = self.n_jobs)
 
-        else:
-            study = optuna.create_study(direction = "minimize",
+        return study
+
+
+    def get_study(self, dataset):
+        study = optuna.create_study(direction = "minimize",
                                         study_name = self.filename,
                                         storage = self.storage,
                                         load_if_exists = True)
         return study
+
 
     def _choose_init_plans(self, init_plans_list):
         """
@@ -140,7 +152,7 @@ class RunOptuna():
             sampler = optuna.samplers.GridSampler(search_space)
 
         elif self.sampler_name.lower() == 'tpe':
-            sampler = optuna.samplers.TPESampler(constant_liar = True, seed = 42) # 分散最適化のときはTrueにするのが良いらしい(阿部)
+            sampler = optuna.samplers.TPESampler(constant_liar = True, multivariate = True, seed = 42) # 分散最適化のときはTrueにするのが良いらしい(阿部)
 
         else:
             raise ValueError('not implemented sampler yet.')
@@ -155,8 +167,10 @@ class RunOptuna():
         '''
         if self.pruner_name == 'median':
             pruner = optuna.pruners.MedianPruner(n_startup_trials = dataset.n_startup_trials, n_warmup_steps = dataset.n_warmup_steps)
-        elif self.pruner_name == 'hyperband':
+        elif self.pruner_name.lower() == 'hyperband':
             pruner = optuna.pruners.HyperbandPruner(min_resource = dataset.min_resource, max_resource = dataset.n_iter, reduction_factor = dataset.reduction_factor)
+        elif self.pruner_name.lower() == 'nop':
+            pruner = optuna.pruners.NopPruner()
         else:
             raise ValueError('not implemented pruner yet.')
         return pruner
