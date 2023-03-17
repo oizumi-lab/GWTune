@@ -21,7 +21,7 @@ from utils.init_matrix import InitMatrix
 from utils.gw_optimizer import RunOptuna
 
 class GW_Alignment():
-    def __init__(self, pred_dist, target_dist, p, q, max_iter = 1000, device='cpu', to_types='torch', gpu_queue = None, save_path = None):
+    def __init__(self, pred_dist, target_dist, p, q, max_iter = 1000, device='cpu', to_types='torch', save_path = None, gpu_queue = None):
         """
         2023/3/6 大泉先生
 
@@ -334,9 +334,24 @@ if __name__ == '__main__':
                                 pruner = optuna.pruners.MedianPruner(),
                                 load_if_exists = False)
     
-    dataset = GW_Alignment(model1, model2, p, q, max_iter = 1000, device = 'cuda', save_path = unittest_save_path)
-           
-    study.optimize(lambda trial: dataset(trial, init_mat_types, eps_list), n_trials = 20, n_jobs = 10)
+    # dataset = GW_Alignment(model1, model2, p, q, max_iter = 1000, device = 'cuda', save_path = unittest_save_path)
+    # study.optimize(lambda trial: dataset(trial, init_mat_types, eps_list), n_trials = 20, n_jobs = 10)
+    
+    # %%    
+    from multiprocessing import Manager
+    from joblib import parallel_backend
+    
+    n_gpu = 4
+    with Manager() as manager:
+        gpu_queue = manager.Queue()
+
+        for i in range(n_gpu):
+            gpu_queue.put(i)    
+
+        dataset = GW_Alignment(model1, model2, p, q, max_iter = 1000, device = 'cuda', save_path = unittest_save_path, gpu_queue = gpu_queue)
+    
+        with parallel_backend("multiprocessing", n_jobs = n_gpu):
+            study.optimize(lambda trial: dataset(trial, init_mat_types, eps_list), n_trials = 20, n_jobs = n_gpu)
     
     # %%
     df = study.trials_dataframe()
