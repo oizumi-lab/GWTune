@@ -13,6 +13,7 @@ import warnings
 import copy
 # warnings.simplefilter("ignore")
 import os
+from tqdm.auto import tqdm
 
 # %%
 from utils.backend import Backend
@@ -38,12 +39,21 @@ class GW_Alignment():
         self.gpu_queue = gpu_queue
         self.size = len(p)
 
-        self.save_path = '../data/gw_alignment' if save_path is None else save_path
+        self.save_path = '../results/gw_alignment' if save_path is None else save_path
         if not os.path.exists(self.save_path):
             os.makedirs(self.save_path)
         
-        self.main_compute = MainGromovWasserstainComputation(pred_dist, target_dist, p, q, self.device, self.to_types)
+        self.main_compute = MainGromovWasserstainComputation(pred_dist, target_dist, p, q, self.device, self.to_types, max_iter = max_iter)
 
+    def set_params(self, vars): # この関数の使用目的が、optimizer側にあるなら、ここには定義しないほうがいいです。
+        '''
+        2023/3/14 阿部
+
+        インスタンス変数を外部から変更する関数
+        '''
+        for key, value in vars.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
         
     def define_eps_range(self, trial, eps_list, eps_log):
         """
@@ -138,12 +148,12 @@ class MainGromovWasserstainComputation():
         self.to_types = to_types
         self.size = len(p)
         
-        # hyperparameter
-        self.initialize = ['uniform', 'random', 'permutation', 'diag']
-        self.init_mat_builder = InitMatrix(self.size)
-        
         self.backend = Backend(device, to_types)
         self.pred_dist, self.target_dist, self.p, self.q = self.backend(pred_dist, target_dist, p, q) # 特殊メソッドのcallに変更した (2023.3.16 佐々木)
+        
+        # hyperparameter
+        self.initialize = ['uniform', 'random', 'permutation', 'diag']
+        self.init_mat_builder = InitMatrix(self.size, self.backend)
         
         # gw alignmentに関わるparameter
         self.max_iter = max_iter
@@ -159,15 +169,7 @@ class MainGromovWasserstainComputation():
 
         pass
     
-    def set_params(self, vars):
-        '''
-        2023/3/14 阿部
 
-        インスタンス変数を外部から変更する関数
-        '''
-        for key, value in vars.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
 
     def entropic_gw(self, device, epsilon, T, max_iter = 1000, tol = 1e-9, trial = None, log = True, verbose = False):
         '''
@@ -232,7 +234,7 @@ class MainGromovWasserstainComputation():
         gw, logv = self.entropic_gw(device, eps, init_mat, max_iter = max_iter, trial = trial)
         gw_loss = logv['gw_dist']
         
-        if self.backend.nx.array_equal(gw, self.backend.nx.zeros(gw.shape)):
+        if self.backend.check_zeros(gw):
             gw_loss = float('nan')
             acc = float('nan')
             
@@ -252,88 +254,83 @@ class MainGromovWasserstainComputation():
             raise optuna.TrialPruned(f"Trial was pruned at iteration {trial.number} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
     
     def save_best_results(self, trial, init_mat_plan, best_gw_loss, c_gw, c_logv, c_gw_loss, c_acc, c_init_mat, seed = 42):
-        if c_gw_loss < best_gw_loss: # gw_lossの更新
-            best_gw_loss = c_gw_loss
-            best_gw = c_gw
-            best_init_mat = c_init_mat
-            best_logv = c_logv
-            best_acc = c_acc
-            
-            if init_mat_plan in ['random', 'permutation']:
-                best_seed = seed
-                trial.set_user_attr('best_seed', best_seed)
+        '''
+        もうちょっと、うまく書けるとは思うけど、思いつかない・・・(2023.3.17 佐々木)
+        
+        '''
+        best_gw_loss = c_gw_loss
+        best_gw = c_gw
+        best_init_mat = c_init_mat
+        best_logv = c_logv
+        best_acc = c_acc
+        
+        if init_mat_plan in ['random', 'permutation']:
+            best_seed = seed
+            trial.set_user_attr('best_seed', best_seed)
 
         return best_gw, best_logv, best_gw_loss, best_acc, best_init_mat
     
     
     def compute_GW_with_init_plans(self, trial, eps, init_mat_plan, device):
-        best_gw_loss = float('inf')
+        """
+        2023.3.17 佐々木
+        uniform, diagでも、prunerを使うこともできるが、いまのところはコメントアウトしている。
+        どちらにも使えるようにする場合は、少しだけ手直しが必要。
+        """
         
         if init_mat_plan in ['uniform', 'diag']:
-            gw, logv, gw_loss, acc, init_mat = self.gw_alignment_computation(trial, init_mat_plan, eps, self.max_iter, device)
+            # best_gw_loss = float('inf')
+            gw, logv, gw_loss, acc, init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, trial)
             # self.check_pruner_should_work(trial, best_gw_loss, c_gw_loss, init_mat_plan, eps)
             # gw, logv, gw_loss, acc, init_mat = self.save_best_results(trial, init_mat_plan, best_gw_loss, c_gw, c_logv, c_gw_loss, c_acc, c_init_mat)
             
             return gw, logv, gw_loss, acc, init_mat
             
         elif init_mat_plan in ['random', 'permutation']:
-            for seed in np.random.randint(0, 100000, self.n_iter):
-                c_gw, c_logv, c_gw_loss, c_acc, c_init_mat = self.gw_alignment_computation(trial, init_mat_plan, eps, self.max_iter, device, seed = seed)
-                self.check_pruner_should_work(seed, best_gw_loss, c_gw_loss, init_mat_plan, eps, trial)
-                gw, logv, gw_loss, acc, init_mat = self.save_best_results(trial, init_mat_plan, best_gw_loss, c_gw, c_logv, c_gw_loss, c_acc, c_init_mat)
+            best_gw_loss = float('inf')
+            for seed in tqdm(np.random.randint(0, 100000, self.n_iter)):
+                c_gw, c_logv, c_gw_loss, c_acc, c_init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, trial, seed = seed)
+                self.check_pruner_should_work(trial, init_mat_plan, best_gw_loss, c_gw_loss, eps)
+                
+                if c_gw_loss < best_gw_loss: 
+                    best_gw, best_logv, best_gw_loss, best_acc, best_init_mat = self.save_best_results(trial, init_mat_plan, best_gw_loss, c_gw, c_logv, c_gw_loss, c_acc, c_init_mat)
             
-            return gw, logv, gw_loss, acc, init_mat
+            return best_gw, best_logv, best_gw_loss, best_acc, best_init_mat
         
         else:
             raise ValueError('Not defined initialize matrix.')
 
 
-# %%
-def load_optimizer(save_path, n_jobs = 10, num_trial = 50,
-                   to_types = 'torch', method = 'optuna', 
-                   init_plans_list = ['diag'], eps_list = [1e-4, 1e-2], eps_log = True, 
-                   sampler_name = 'random', pruner_name = 'median', 
-                   filename = 'test', sql_name = 'sqlite', storage = None,
-                   delete_study = False):
-    
-    """
-    (usage example)
-    >>> dataset = mydataset()
-    >>> opt = load_gw_optimizer(save_path)
-    >>> study = Opt.run_study(dataset)
-
-    Raises:
-        ValueError: _description_
-        ValueError: _description_
-        ValueError: _description_
-
-    Returns:
-        _type_: _description_
-    """
-    
-    # make file_path
-    file_path = save_path + '/' + filename
-    if not os.path.exists(file_path):
-        os.makedirs(file_path)
-    
-    # make db path
-    if sql_name == 'sqlite':
-        storage = "sqlite:///" + file_path +  '/' + filename + '.db',
-    
-    elif sql_name == 'mysql':
-        if storage == None:
-            raise ValueError('mysql path was not set.')
-    else:
-        raise ValueError('no implemented SQL.')
-
-    if method == 'optuna':
-        Opt = RunOptuna(file_path, to_types, storage, filename, sampler_name, pruner_name, sql_name, init_plans_list, eps_list, eps_log, n_jobs, num_trial, delete_study)
-    else:
-        raise ValueError('no implemented method.')
-
-    return Opt
 
 
 # %%
 if __name__ == '__main__':
-    pass
+    
+    os.chdir(os.path.dirname(__file__))
+    print(os.getcwd())
+    
+    path1 = '../data/model1.pt'
+    path2 = '../data/model2.pt'
+    unittest_save_path = '../results/unittest/gw_alignment'
+    
+    model1 = torch.load(path1)
+    model2 = torch.load(path2)
+    p = ot.unif(len(model1))
+    q = ot.unif(len(model2))
+    
+    init_mat_types = ['random'] 
+    eps_list = [1e-4, 1e-2]
+    eps_log = True
+    
+    study = optuna.create_study(direction = "minimize",
+                                sampler = optuna.samplers.RandomSampler(seed = 42),
+                                pruner = optuna.pruners.MedianPruner(),
+                                load_if_exists = False)
+    
+    dataset = GW_Alignment(model1, model2, p, q, device = 'cuda', save_path = unittest_save_path)
+           
+    study.optimize(lambda trial: dataset(trial, unittest_save_path, init_mat_types, eps_list), n_trials = 4, n_jobs = 4)
+
+
+# %%
+    

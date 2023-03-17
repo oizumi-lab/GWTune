@@ -10,6 +10,52 @@ import matplotlib.style as mplstyle
 import seaborn as sns
 
 
+# %%
+def load_optimizer(save_path, n_jobs = 10, num_trial = 50,
+                   to_types = 'torch', method = 'optuna', 
+                   init_plans_list = ['diag'], eps_list = [1e-4, 1e-2], eps_log = True, 
+                   sampler_name = 'random', pruner_name = 'median', 
+                   filename = 'test', sql_name = 'sqlite', storage = None,
+                   delete_study = False):
+    
+    """
+    (usage example)
+    >>> dataset = mydataset()
+    >>> opt = load_optimizer(save_path)
+    >>> study = Opt.run_study(dataset)
+
+    Raises:
+        ValueError: _description_
+        ValueError: _description_
+        ValueError: _description_
+
+    Returns:
+        _type_: _description_
+    """
+    
+    # make file_path
+    file_path = save_path + '/' + filename
+    if not os.path.exists(file_path):
+        os.makedirs(file_path)
+    
+    # make db path
+    if sql_name == 'sqlite':
+        storage = "sqlite:///" + file_path +  '/' + filename + '.db',
+    
+    elif sql_name == 'mysql':
+        if storage == None:
+            raise ValueError('mysql path was not set.')
+    else:
+        raise ValueError('no implemented SQL.')
+
+    if method == 'optuna':
+        Opt = RunOptuna(file_path, to_types, storage, filename, sampler_name, pruner_name, sql_name, init_plans_list, eps_list, eps_log, n_jobs, num_trial, delete_study)
+    else:
+        raise ValueError('no implemented method.')
+
+    return Opt
+
+
 class RunOptuna():
     def __init__(self, 
                  file_path, 

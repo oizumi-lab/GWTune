@@ -111,6 +111,11 @@ class Backend():
             raise ValueError("Unknown type of non implemented here.")
         
     def change_device(self, device, *args):
+        device_list = ('cpu', 'cuda', 'gpu')
+
+        if not device.startswith(device_list):
+            raise ValueError('no device is assigned to change')
+        
         output = []
         
         for a in args:
@@ -175,8 +180,23 @@ class Backend():
             # jaxの保存方法を作成してください 
             pass
         
-       
+    def check_zeros(self, args):
+        if isinstance(args, torch.Tensor):
+            flag = self.nx.array_equal(args, self.nx.zeros(args.shape).to(args.device))
         
+        elif isinstance(args, np.ndarray):
+            flag = self.nx.array_equal(args, self.nx.zeros(args.shape))
+        
+        elif isinstance(args, jax.numpy.ndarray):
+            pass
+            # まだよくわからない・・・(2023/3/17 佐々木)
+            # device_id = jax.devices(args.sharding)#[0].device_id
+            # check_data = self.nx.zeros(args.shape)
+            # check_data = jax.device_get(check_data, device_id)
+            # flag = self.nx.array_equal(args, check_data)
+            
+        
+        return flag
    
 
 # %%
@@ -186,17 +206,24 @@ if __name__ == '__main__':
     
     # %%
     backend = Backend(device = 'cuda:3', to_types = 'jax')
-    test_jax1, test_jax2 = backend.change_data(test_numpy1, test_numpy2)
+    test_jax1, test_jax2 = backend(test_numpy1, test_numpy2)
     print(test_jax1, test_jax2)
     print(type(test_jax1), type(test_jax2))
-    
-    test_jax1 = backend.change_device(test_jax1)
+    # %%
+    backend.check_zeros(test_jax1)
+    # %%
+    test_jax1 = backend.change_device('cpu', test_jax1)
     print(type(test_jax1))
+    
+    # %%
+    backend.check_zeros(test_jax1)
     # %%
     backend = Backend(device = 'cuda', to_types = 'torch')
     test_torch1 = backend.change_data(test_numpy1)
     print(test_torch1)
     print(type(test_torch1))
    
+
+# %%
 
 # %%
