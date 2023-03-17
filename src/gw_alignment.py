@@ -19,7 +19,6 @@ from utils.backend import Backend
 from utils.init_matrix import InitMatrix
 from utils.gw_optimizer import RunOptuna
 
-    
 class GW_Alignment():
     def __init__(self, pred_dist, target_dist, p, q, max_iter = 1000, device='cpu', to_types='torch', gpu_queue = None, save_path = None):
         """
@@ -45,18 +44,7 @@ class GW_Alignment():
         
         self.main_compute = MainGromovWasserstainComputation(pred_dist, target_dist, p, q, self.device, self.to_types)
 
-        # gw alignmentに関わるparameter
-        self.max_iter = max_iter
-
-        # pruner parameter
-        self.n_iter = 100
-        # MedianPruner
-        self.n_startup_trials = 5
-        self.n_warmup_steps = 5
-        # HyperbandPruner
-        self.min_resource = 5
-        self.reduction_factor = 2 # self.max_resource = self.n_iter
-
+        
     def define_eps_range(self, trial, eps_list, eps_log):
         """
         2023.3.16 佐々木 作成
@@ -116,16 +104,12 @@ class GW_Alignment():
         2.  Compute GW alignment with hyperparameters defined above.
         '''
 
-        gw, logv, init_mat, trial = self.main_compute.compute_GW_with_init_plans(trial, eps, init_mat_plan, device)
+        gw, logv, gw_loss, acc, init_mat = self.main_compute.compute_GW_with_init_plans(trial, eps, init_mat_plan, device)
         
         '''
         3.  count the accuracy of alignment and save the results if computation was finished in the right way.
             If not, set the result of accuracy and gw_loss as float('nan'), respectively. This will be used as a handy marker as bad results to be removed in the evaluation analysis.
         '''
-
-        pred = self.main_compute.backend.nx.argmax(gw, 1)
-        correct = (pred == self.main_compute.backend.nx.arange(len(gw), type_as = gw)).sum()
-        acc = correct / len(gw)
 
         self.main_compute.backend.save_computed_results(gw, init_mat, file_path, trial.number)
         gw_loss, acc = self.main_compute.backend.get_item_from_torch_or_jax(gw_loss, acc)
@@ -149,7 +133,7 @@ class GW_Alignment():
 
 
 class MainGromovWasserstainComputation():
-    def __init__(self, pred_dist, target_dist, p, q, device, to_types) -> None:
+    def __init__(self, pred_dist, target_dist, p, q, device, to_types, max_iter = 1000) -> None:
         self.device = device
         self.to_types = to_types
         self.size = len(p)
@@ -160,6 +144,19 @@ class MainGromovWasserstainComputation():
         
         self.backend = Backend(device, to_types)
         self.pred_dist, self.target_dist, self.p, self.q = self.backend(pred_dist, target_dist, p, q) # 特殊メソッドのcallに変更した (2023.3.16 佐々木)
+        
+        # gw alignmentに関わるparameter
+        self.max_iter = max_iter
+
+        # pruner parameter
+        self.n_iter = 100
+        # MedianPruner
+        self.n_startup_trials = 5
+        self.n_warmup_steps = 5
+        # HyperbandPruner
+        self.min_resource = 5
+        self.reduction_factor = 2 # self.max_resource = self.n_iter
+
         pass
     
     def set_params(self, vars):
@@ -172,7 +169,7 @@ class MainGromovWasserstainComputation():
             if hasattr(self, key):
                 setattr(self, key, value)
 
-    def entropic_gw(self, device, epsilon, T, trial = None, max_iter = 1000, tol = 1e-9, log = True, verbose = False):
+    def entropic_gw(self, device, epsilon, T, max_iter = 1000, tol = 1e-9, trial = None, log = True, verbose = False):
         '''
         2023.3.16 佐々木
         backendに実装した "change_device" で、全型を想定した変数のdevice切り替えを行う。
@@ -216,60 +213,83 @@ class MainGromovWasserstainComputation():
         else:
             return T
 
-    def gw_alignment_help(self, init_mat_plan, device, eps, seed):
+    def gw_alignment_computation(self, init_mat_plan, eps, max_iter, device, trial = None, seed = 42):
+        """
+        gw_alignmentの計算を行う。ここのメソッドは変更しない方がいいと思う。
+        外部で、gw_alignmentの計算結果だけを抽出したい時にも使えるため。
+
+        Args:
+            init_mat_plan (_type_): _description_
+            eps (_type_): _description_
+            max_iter (_type_): _description_
+            device (_type_): _description_
+            seed (int, optional): _description_. Defaults to 42.
+
+        Returns:
+            gw, logv, gw_loss, acc, init_mat
+        """
         init_mat = self.init_mat_builder.make_initial_T(init_mat_plan, seed)
-        gw, logv = self.entropic_gw(device, eps, T = init_mat, max_iter = self.max_iter)
+        gw, logv = self.entropic_gw(device, eps, init_mat, max_iter = max_iter, trial = trial)
         gw_loss = logv['gw_dist']
-
+        
         if self.backend.nx.array_equal(gw, self.backend.nx.zeros(gw.shape)):
-            gw_success = False
+            gw_loss = float('nan')
+            acc = float('nan')
+            
         else:
-            gw_success = True
+            pred = self.backend.nx.argmax(gw, 1)
+            correct = (pred == self.backend.nx.arange(len(gw), type_as = gw)).sum()
+            acc = correct / len(gw)
+        
+        return gw, logv, gw_loss, acc, init_mat
+    
+    def check_pruner_should_work(self, trial, init_mat_plan, best_gw_loss, current_gw_loss, eps):
+        if current_gw_loss < best_gw_loss: 
+            best_gw_loss = current_gw_loss
+        
+        trial.report(current_gw_loss, trial.number)
+        if trial.should_prune():
+            raise optuna.TrialPruned(f"Trial was pruned at iteration {trial.number} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
+    
+    def save_best_results(self, trial, init_mat_plan, best_gw_loss, c_gw, c_logv, c_gw_loss, c_acc, c_init_mat, seed = 42):
+        if c_gw_loss < best_gw_loss: # gw_lossの更新
+            best_gw_loss = c_gw_loss
+            best_gw = c_gw
+            best_init_mat = c_init_mat
+            best_logv = c_logv
+            best_acc = c_acc
+            
+            if init_mat_plan in ['random', 'permutation']:
+                best_seed = seed
+                trial.set_user_attr('best_seed', best_seed)
 
-        return gw, logv, gw_loss, init_mat, gw_success
+        return best_gw, best_logv, best_gw_loss, best_acc, best_init_mat
+    
     
     def compute_GW_with_init_plans(self, trial, eps, init_mat_plan, device):
+        best_gw_loss = float('inf')
+        
         if init_mat_plan in ['uniform', 'diag']:
-            gw, logv, gw_loss, init_mat, gw_success = self.gw_alignment_help(init_mat_plan, device, eps, seed=42)
-            if not gw_success:
-                gw_loss = float('nan')
-                acc = float('nan')
-                raise optuna.TrialPruned(f"Failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
-
+            gw, logv, gw_loss, acc, init_mat = self.gw_alignment_computation(trial, init_mat_plan, eps, self.max_iter, device)
+            # self.check_pruner_should_work(trial, best_gw_loss, c_gw_loss, init_mat_plan, eps)
+            # gw, logv, gw_loss, acc, init_mat = self.save_best_results(trial, init_mat_plan, best_gw_loss, c_gw, c_logv, c_gw_loss, c_acc, c_init_mat)
+            
+            return gw, logv, gw_loss, acc, init_mat
+            
         elif init_mat_plan in ['random', 'permutation']:
-            gw_loss = float('inf')
-            for i, seed in enumerate(np.random.randint(0, 100000, self.n_iter)):
-                # current_init_mat = self.init_mat_builder.make_initial_T(init_mat_plan, seed)
-                # current_gw, current_logv = self.entropic_gw(device, eps, T = current_init_mat, max_iter = self.max_iter)
-                c_gw, c_logv, c_gw_loss, c_init_mat, c_gw_success = self.gw_alignment_help(init_mat_plan, device, eps, seed)
-                c_gw_loss, = self.exit_torch(c_gw_loss)
-                if not c_gw_success: # gw alignmentが失敗したならinf
-                    c_gw_loss = float('inf')
-
-                if c_gw_loss < gw_loss: # gw_lossの更新
-                    gw_loss = c_gw_loss
-                    gw = c_gw
-                    init_mat = c_init_mat
-                    logv = c_logv
-                    best_seed = seed
-
-                trial.report(gw_loss, i) # 最小値を報告
-                if trial.should_prune():
-                    raise optuna.TrialPruned(f"Trial was pruned at iteration {i} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
-            # trialが全て失敗したら
-            if gw_loss == float('inf'):
-                gw_loss = float('nan')
-                acc = float('nan')
-                raise optuna.TrialPruned(f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
-            # seedの保存
-            trial.set_user_attr('seed', best_seed)
+            for seed in np.random.randint(0, 100000, self.n_iter):
+                c_gw, c_logv, c_gw_loss, c_acc, c_init_mat = self.gw_alignment_computation(trial, init_mat_plan, eps, self.max_iter, device, seed = seed)
+                self.check_pruner_should_work(seed, best_gw_loss, c_gw_loss, init_mat_plan, eps, trial)
+                gw, logv, gw_loss, acc, init_mat = self.save_best_results(trial, init_mat_plan, best_gw_loss, c_gw, c_logv, c_gw_loss, c_acc, c_init_mat)
+            
+            return gw, logv, gw_loss, acc, init_mat
         
         else:
             raise ValueError('Not defined initialize matrix.')
 
 
-
-def load_gw_optimizer(save_path, n_jobs = 10, num_trial = 50,
+# %%
+def load_optimizer(save_path, n_jobs = 10, num_trial = 50,
                    to_types = 'torch', method = 'optuna', 
                    init_plans_list = ['diag'], eps_list = [1e-4, 1e-2], eps_log = True, 
                    sampler_name = 'random', pruner_name = 'median', 
