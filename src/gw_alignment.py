@@ -45,7 +45,7 @@ class GW_Alignment():
         
         self.main_compute = MainGromovWasserstainComputation(pred_dist, target_dist, p, q, self.device, self.to_types, max_iter = max_iter)
 
-    def set_params(self, vars): # この関数の使用目的が、optimizer側にあるなら、ここには定義しないほうがいいです。
+    def set_params(self, vars): # この関数の使用目的がoptimizer側にあるので、ここには定義しないほうがいいです。
         '''
         2023/3/14 阿部
 
@@ -83,7 +83,7 @@ class GW_Alignment():
         
         return trial, eps
 
-    def __call__(self, trial, file_path, init_plans_list, eps_list, eps_log=True):
+    def __call__(self, trial, init_plans_list, eps_list, eps_log=True):
         '''
         0.  define the "gpu_queue" here. 
             This will be used when the memory of dataset was too much large for a single GPU board, and so on.
@@ -109,6 +109,11 @@ class GW_Alignment():
         init_mat_plan = trial.suggest_categorical("initialize", init_plans_list) # init_matをdeviceに上げる作業はentropic_gw中で行うことにしました。(2023/3/14 阿部)
         
         trial.set_user_attr('size', self.size)
+        
+        file_path = self.save_path + '/' + init_mat_plan
+        
+        if not os.path.exists(file_path):
+            os.makedirs(file_path, exist_ok = True)
 
         '''
         2.  Compute GW alignment with hyperparameters defined above.
@@ -166,10 +171,6 @@ class MainGromovWasserstainComputation():
         # HyperbandPruner
         self.min_resource = 5
         self.reduction_factor = 2 # self.max_resource = self.n_iter
-
-        pass
-    
-
 
     def entropic_gw(self, device, epsilon, T, max_iter = 1000, tol = 1e-9, trial = None, log = True, verbose = False):
         '''
@@ -245,18 +246,17 @@ class MainGromovWasserstainComputation():
         
         return gw, logv, gw_loss, acc, init_mat
     
-    def check_pruner_should_work(self, trial, init_mat_plan, best_gw_loss, current_gw_loss, eps):
+    def check_pruner_should_work(self, num_iter, trial, init_mat_plan, best_gw_loss, current_gw_loss, eps):
         if current_gw_loss < best_gw_loss: 
             best_gw_loss = current_gw_loss
         
-        trial.report(current_gw_loss, trial.number)
+        trial.report(current_gw_loss, num_iter)
         if trial.should_prune():
-            raise optuna.TrialPruned(f"Trial was pruned at iteration {trial.number} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
+            raise optuna.TrialPruned(f"Trial was pruned at iteration {num_iter} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
     
     def save_best_results(self, trial, init_mat_plan, best_gw_loss, c_gw, c_logv, c_gw_loss, c_acc, c_init_mat, seed = 42):
         '''
         もうちょっと、うまく書けるとは思うけど、思いつかない・・・(2023.3.17 佐々木)
-        
         '''
         best_gw_loss = c_gw_loss
         best_gw = c_gw
@@ -281,24 +281,32 @@ class MainGromovWasserstainComputation():
         if init_mat_plan in ['uniform', 'diag']:
             # best_gw_loss = float('inf')
             gw, logv, gw_loss, acc, init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, trial)
-            # self.check_pruner_should_work(trial, best_gw_loss, c_gw_loss, init_mat_plan, eps)
+            # self.check_pruner_should_work(trial.number, trial, best_gw_loss, c_gw_loss, init_mat_plan, eps)
             # gw, logv, gw_loss, acc, init_mat = self.save_best_results(trial, init_mat_plan, best_gw_loss, c_gw, c_logv, c_gw_loss, c_acc, c_init_mat)
             
             return gw, logv, gw_loss, acc, init_mat
             
         elif init_mat_plan in ['random', 'permutation']:
             best_gw_loss = float('inf')
-            for seed in tqdm(np.random.randint(0, 100000, self.n_iter)):
+            for i, seed in enumerate(tqdm(np.random.randint(0, 100000, self.n_iter))):
                 c_gw, c_logv, c_gw_loss, c_acc, c_init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, trial, seed = seed)
-                self.check_pruner_should_work(trial, init_mat_plan, best_gw_loss, c_gw_loss, eps)
+                self.check_pruner_should_work(i, trial, init_mat_plan, best_gw_loss, c_gw_loss, eps)
                 
                 if c_gw_loss < best_gw_loss: 
                     best_gw, best_logv, best_gw_loss, best_acc, best_init_mat = self.save_best_results(trial, init_mat_plan, best_gw_loss, c_gw, c_logv, c_gw_loss, c_acc, c_init_mat)
+
+                # if i % 10 == 0:
+                #     print(i, c_gw_loss, best_gw_loss)
+                    
+            if best_gw_loss == float('inf'):
+                return c_gw, c_logv, c_gw_loss, c_acc, c_init_mat
             
-            return best_gw, best_logv, best_gw_loss, best_acc, best_init_mat
+            else:
+                return best_gw, best_logv, best_gw_loss, best_acc, best_init_mat
+                
         
-        else:
-            raise ValueError('Not defined initialize matrix.')
+        # else:
+        #     raise ValueError('Not defined initialize matrix.')
 
 
 
@@ -307,7 +315,6 @@ class MainGromovWasserstainComputation():
 if __name__ == '__main__':
     
     os.chdir(os.path.dirname(__file__))
-    print(os.getcwd())
     
     path1 = '../data/model1.pt'
     path2 = '../data/model2.pt'
@@ -327,10 +334,12 @@ if __name__ == '__main__':
                                 pruner = optuna.pruners.MedianPruner(),
                                 load_if_exists = False)
     
-    dataset = GW_Alignment(model1, model2, p, q, device = 'cuda', save_path = unittest_save_path)
+    dataset = GW_Alignment(model1, model2, p, q, max_iter = 1000, device = 'cuda', save_path = unittest_save_path)
            
-    study.optimize(lambda trial: dataset(trial, unittest_save_path, init_mat_types, eps_list), n_trials = 4, n_jobs = 4)
-
-
+    study.optimize(lambda trial: dataset(trial, init_mat_types, eps_list), n_trials = 20, n_jobs = 10)
+    
+    # %%
+    df = study.trials_dataframe()
+    print(df)
 # %%
     
