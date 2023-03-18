@@ -288,6 +288,8 @@ class MainGromovWasserstainComputation():
                 self._check_pruner_should_work(c_gw_loss, trial, init_mat_plan, eps, num_iter = i, gpu_id = gpu_id)
                     
             if best_gw_loss == float('inf'):
+                if self.gpu_queue is not None:
+                    self.gpu_queue.put(gpu_id)
                 raise optuna.TrialPruned(f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
             
             else:
