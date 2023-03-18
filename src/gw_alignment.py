@@ -119,7 +119,7 @@ class GW_Alignment():
         2.  Compute GW alignment with hyperparameters defined above.
         '''
 
-        gw, logv, gw_loss, acc, init_mat = self.main_compute.compute_GW_with_init_plans(trial, eps, init_mat_plan, device)
+        gw, logv, gw_loss, acc, init_mat, trial = self.main_compute.compute_GW_with_init_plans(trial, eps, init_mat_plan, device)
         
         '''
         3.  count the accuracy of alignment and save the results if computation was finished in the right way.
@@ -127,8 +127,6 @@ class GW_Alignment():
         '''
 
         self.main_compute.backend.save_computed_results(gw, init_mat, file_path, trial.number)
-        gw_loss, acc = self.main_compute.backend.get_item_from_torch_or_jax(gw_loss, acc)
-        trial.set_user_attr('acc', acc)
         
         '''
         4. delete unnecessary memory for next computation. If not, memory error would happen especially when using CUDA.
@@ -180,7 +178,7 @@ class MainGromovWasserstainComputation():
         torch, jaxに関しては、GPUボードの番号指定が、これでできる。
         # # add T as an input
         # if T is None:
-        #     T = self.backend.nx.outer(p, q) # この状況を想定している場面がないので、消してもいいのでは？？ (2023.3.16 佐々木)
+        #     T = self.backend.nx.outer(p, q) # このif文の状況を想定している場面がないので、消してもいいのでは？？ (2023.3.16 佐々木)
         '''
         C1, C2, p, q, T = self.backend.change_device(device, self.pred_dist, self.target_dist, self.p, self.q, T)
          
@@ -216,21 +214,32 @@ class MainGromovWasserstainComputation():
         else:
             return T
 
-    def gw_alignment_computation(self, init_mat_plan, eps, max_iter, device, trial = None, seed = 42):
+    def gw_alignment_computation(self, init_mat_plan, eps, max_iter, device, trial = None, num_iter = None, seed = 42):
         """
-        gw_alignmentの計算を行う。ここのメソッドは変更しない方がいいと思う。
-        外部で、gw_alignmentの計算結果だけを抽出したい時にも使えるため。
+        gw_alignmentの計算を行う。
 
         Args:
             init_mat_plan (_type_): _description_
             eps (_type_): _description_
             max_iter (_type_): _description_
             device (_type_): _description_
+            trial (_type_, optional): _description_. Defaults to None.
+            num_iter (int, forループのiter): randomやpermutationの時のforループの回数を受け取る. Defaults to None.
             seed (int, optional): _description_. Defaults to 42.
 
+        Raises:
+            optuna.TrialPruned: _description_
+
         Returns:
-            gw, logv, gw_loss, acc, init_mat
+            _type_: _description_
         """
+        
+        '''
+        2023.3.17 佐々木
+        gw_alignmentの計算を行う。ここのメソッドは変更しない方がいいと思う。
+        外部で、gw_alignmentの計算結果だけを抽出したい時にも使えるため。
+        '''
+        
         init_mat = self.init_mat_builder.make_initial_T(init_mat_plan, seed)
         gw, logv = self.entropic_gw(device, eps, init_mat, max_iter = max_iter, trial = trial)
         gw_loss = logv['gw_dist']
@@ -244,32 +253,16 @@ class MainGromovWasserstainComputation():
             correct = (pred == self.backend.nx.arange(len(gw), type_as = gw)).sum()
             acc = correct / len(gw)
         
-        return gw, logv, gw_loss, acc, init_mat
-    
-    def check_pruner_should_work(self, num_iter, trial, init_mat_plan, best_gw_loss, current_gw_loss, eps):
-        if current_gw_loss < best_gw_loss: 
-            best_gw_loss = current_gw_loss
+        if trial is not None:
+            gw_loss, acc = self.backend.get_item_from_torch_or_jax(gw_loss, acc)
+            trial.set_user_attr('acc', acc)
+            trial.set_user_attr('num_iter', num_iter)
+            trial.report(gw_loss, num_iter)
+            
+            if trial.should_prune():
+                raise optuna.TrialPruned(f"Trial was pruned at iteration {trial.number}, {num_iter} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
         
-        trial.report(current_gw_loss, num_iter)
-        if trial.should_prune():
-            raise optuna.TrialPruned(f"Trial was pruned at iteration {num_iter} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
-    
-    def save_best_results(self, trial, init_mat_plan, best_gw_loss, c_gw, c_logv, c_gw_loss, c_acc, c_init_mat, seed = 42):
-        '''
-        もうちょっと、うまく書けるとは思うけど、思いつかない・・・(2023.3.17 佐々木)
-        '''
-        best_gw_loss = c_gw_loss
-        best_gw = c_gw
-        best_init_mat = c_init_mat
-        best_logv = c_logv
-        best_acc = c_acc
-        
-        if init_mat_plan in ['random', 'permutation']:
-            best_seed = seed
-            trial.set_user_attr('best_seed', best_seed)
-
-        return best_gw, best_logv, best_gw_loss, best_acc, best_init_mat
-    
+        return gw, logv, gw_loss, acc, init_mat, trial
     
     def compute_GW_with_init_plans(self, trial, eps, init_mat_plan, device):
         """
@@ -280,29 +273,32 @@ class MainGromovWasserstainComputation():
         
         if init_mat_plan in ['uniform', 'diag']:
             # best_gw_loss = float('inf')
-            gw, logv, gw_loss, acc, init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, trial)
-            # self.check_pruner_should_work(trial.number, trial, best_gw_loss, c_gw_loss, init_mat_plan, eps)
-            # gw, logv, gw_loss, acc, init_mat = self.save_best_results(trial, init_mat_plan, best_gw_loss, c_gw, c_logv, c_gw_loss, c_acc, c_init_mat)
+            gw, logv, gw_loss, acc, init_mat, trial = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, trial = trial)
+            # gw, logv, gw_loss, acc, init_mat = self.save_best_results(trial, init_mat_plan, best_gw_loss, gw, logv, gw_loss, acc, init_mat)
             
-            return gw, logv, gw_loss, acc, init_mat
+            return gw, logv, gw_loss, acc, init_mat, trial
             
         elif init_mat_plan in ['random', 'permutation']:
             best_gw_loss = float('inf')
             for i, seed in enumerate(tqdm(np.random.randint(0, 100000, self.n_iter))):
-                c_gw, c_logv, c_gw_loss, c_acc, c_init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, trial, seed = seed)
-                self.check_pruner_should_work(i, trial, init_mat_plan, best_gw_loss, c_gw_loss, eps)
+                c_gw, c_logv, c_gw_loss, c_acc, c_init_mat, trial = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, trial = trial, num_iter = i, seed = seed)
                 
-                if c_gw_loss < best_gw_loss: 
-                    best_gw, best_logv, best_gw_loss, best_acc, best_init_mat = self.save_best_results(trial, init_mat_plan, best_gw_loss, c_gw, c_logv, c_gw_loss, c_acc, c_init_mat)
-
+                if c_gw_loss < best_gw_loss:
+                    # 以下のコードはuniform, diagでも使い回せる内容なので、うまく書き直したい。(2023.3.18, 佐々木)
+                    best_gw, best_logv, best_gw_loss, best_acc, best_init_mat = c_gw, c_logv, c_gw_loss, c_acc, c_init_mat
+                    
+                    if init_mat_plan in ['random', 'permutation']: 
+                        best_seed = seed
+                        trial.set_user_attr('best_seed', int(best_seed)) # ここはint型に変換しないと、謎のエラーが出る (2023.3.18 佐々木)。
+                    
                 # if i % 10 == 0:
                 #     print(i, c_gw_loss, best_gw_loss)
                     
             if best_gw_loss == float('inf'):
-                return c_gw, c_logv, c_gw_loss, c_acc, c_init_mat
+                return c_gw, c_logv, c_gw_loss, c_acc, c_init_mat, trial
             
             else:
-                return best_gw, best_logv, best_gw_loss, best_acc, best_init_mat
+                return best_gw, best_logv, best_gw_loss, best_acc, best_init_mat, trial
                 
         
         # else:
@@ -346,15 +342,21 @@ if __name__ == '__main__':
         dataset = GW_Alignment(model1, model2, p, q, max_iter = 1000, device = 'cuda', save_path = unittest_save_path, gpu_queue = gpu_queue)
 
         study = optuna.create_study(direction = "minimize",
-                                sampler = optuna.samplers.TPESampler(seed = 42),
-                                pruner = optuna.pruners.MedianPruner(),
-                                storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db', #この辺のパス設定は一度議論した方がいいかも。
-                                load_if_exists = True)
+                                    study_name = "test",
+                                    sampler = optuna.samplers.TPESampler(seed = 42),
+                                    pruner = optuna.pruners.MedianPruner(),
+                                    storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db', #この辺のパス設定は一度議論した方がいいかも。
+                                    load_if_exists = True)
 
         with parallel_backend("multiprocessing", n_jobs = n_gpu):
             study.optimize(lambda trial: dataset(trial, init_mat_types, eps_list), n_trials = 20, n_jobs = n_gpu)
     
     # %%
+    # study = optuna.create_study(direction = "minimize",
+    #                             study_name = "test",
+    #                             storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db', #この辺のパス設定は一度議論した方がいいかも。
+    #                             load_if_exists = True)
+    
     df = study.trials_dataframe()
     print(df)
 # %%

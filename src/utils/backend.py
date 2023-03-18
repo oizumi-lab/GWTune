@@ -164,6 +164,10 @@ class Backend():
             if isinstance(v, torch.Tensor) or isinstance(args, jax.numpy.ndarray):
                 v = v.item()
             l.append(v)
+        
+        if len(l) == 1:
+            l = l[0]
+            
         return  l
 
     def save_computed_results(self, gw, init_mat, file_path, number):
