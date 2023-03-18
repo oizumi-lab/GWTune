@@ -21,7 +21,7 @@ from utils.init_matrix import InitMatrix
 from utils.gw_optimizer import RunOptuna
 
 class GW_Alignment():
-    def __init__(self, pred_dist, target_dist, p, q, max_iter = 1000, device='cpu', to_types='torch', save_path = None, gpu_queue = None):
+    def __init__(self, pred_dist, target_dist, p, q, max_iter = 1000, device='cpu', to_types='torch', main_save_path = None, gpu_queue = None):
         """
         2023/3/6 大泉先生
 
@@ -39,11 +39,11 @@ class GW_Alignment():
         self.gpu_queue = gpu_queue
         self.size = len(p)
 
-        self.save_path = '../results/gw_alignment' if save_path is None else save_path
-        if not os.path.exists(self.save_path):
-            os.makedirs(self.save_path)
+        self.main_save_path = '../results/gw_alignment' if main_save_path is None else main_save_path
+        if not os.path.exists(self.main_save_path):
+            os.makedirs(self.main_save_path)
         
-        self.main_compute = MainGromovWasserstainComputation(pred_dist, target_dist, p, q, self.device, self.to_types, max_iter = max_iter)
+        self.main_compute = MainGromovWasserstainComputation(pred_dist, target_dist, p, q, self.device, self.to_types, max_iter = max_iter, gpu_queue = gpu_queue)
 
     def set_params(self, vars): # この関数の使用目的がoptimizer側にあるので、ここには定義しないほうがいいです。
         '''
@@ -110,7 +110,7 @@ class GW_Alignment():
         
         trial.set_user_attr('size', self.size)
         
-        file_path = self.save_path + '/' + init_mat_plan
+        file_path = self.main_save_path + '/' + init_mat_plan # ここのパス設定はoptimizer.py側でも使う可能性があるので、変更の可能性あり。
         
         if not os.path.exists(file_path):
             os.makedirs(file_path, exist_ok = True)
@@ -119,7 +119,7 @@ class GW_Alignment():
         2.  Compute GW alignment with hyperparameters defined above.
         '''
 
-        gw, logv, gw_loss, acc, init_mat, trial = self.main_compute.compute_GW_with_init_plans(trial, eps, init_mat_plan, device)
+        gw, logv, gw_loss, acc, init_mat, trial = self.main_compute.compute_GW_with_init_plans(trial, eps, init_mat_plan, device, gpu_id = gpu_id)
         
         '''
         3.  count the accuracy of alignment and save the results if computation was finished in the right way.
@@ -146,7 +146,7 @@ class GW_Alignment():
 
 
 class MainGromovWasserstainComputation():
-    def __init__(self, pred_dist, target_dist, p, q, device, to_types, max_iter = 1000) -> None:
+    def __init__(self, pred_dist, target_dist, p, q, device, to_types, max_iter = 1000, gpu_queue = None) -> None:
         self.device = device
         self.to_types = to_types
         self.size = len(p)
@@ -168,7 +168,10 @@ class MainGromovWasserstainComputation():
         self.n_warmup_steps = 5
         # HyperbandPruner
         self.min_resource = 5
-        self.reduction_factor = 2 # self.max_resource = self.n_iter
+        self.reduction_factor = 2
+        
+        # Multi-GPUの時に使う。
+        self.gpu_queue = gpu_queue
 
     def entropic_gw(self, device, epsilon, T, max_iter = 1000, tol = 1e-9, trial = None, log = True, verbose = False):
         '''
@@ -214,7 +217,7 @@ class MainGromovWasserstainComputation():
         else:
             return T
 
-    def gw_alignment_computation(self, init_mat_plan, eps, max_iter, device, trial = None, num_iter = None, seed = 42):
+    def gw_alignment_computation(self, init_mat_plan, eps, max_iter, device, trial = None, num_iter = None, seed = 42, gpu_id = None):
         """
         gw_alignmentの計算を行う。
 
@@ -237,7 +240,7 @@ class MainGromovWasserstainComputation():
         '''
         2023.3.17 佐々木
         gw_alignmentの計算を行う。ここのメソッドは変更しない方がいいと思う。
-        外部で、gw_alignmentの計算結果だけを抽出したい時にも使えるため。
+        外部で、特定のhyper parametersでのgw_alignmentの計算結果だけを抽出したい時にも使えるため。
         '''
         
         init_mat = self.init_mat_builder.make_initial_T(init_mat_plan, seed)
@@ -260,11 +263,14 @@ class MainGromovWasserstainComputation():
             trial.report(gw_loss, num_iter)
             
             if trial.should_prune():
+                if self.gpu_queue is not None:
+                    self.gpu_queue.put(gpu_id)
+                
                 raise optuna.TrialPruned(f"Trial was pruned at iteration {trial.number}, {num_iter} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
         
         return gw, logv, gw_loss, acc, init_mat, trial
     
-    def compute_GW_with_init_plans(self, trial, eps, init_mat_plan, device):
+    def compute_GW_with_init_plans(self, trial, eps, init_mat_plan, device, gpu_id = None):
         """
         2023.3.17 佐々木
         uniform, diagでも、prunerを使うこともできるが、いまのところはコメントアウトしている。
@@ -273,7 +279,7 @@ class MainGromovWasserstainComputation():
         
         if init_mat_plan in ['uniform', 'diag']:
             # best_gw_loss = float('inf')
-            gw, logv, gw_loss, acc, init_mat, trial = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, trial = trial)
+            gw, logv, gw_loss, acc, init_mat, trial = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, trial = trial, gpu_id = gpu_id)
             # gw, logv, gw_loss, acc, init_mat = self.save_best_results(trial, init_mat_plan, best_gw_loss, gw, logv, gw_loss, acc, init_mat)
             
             return gw, logv, gw_loss, acc, init_mat, trial
@@ -281,7 +287,7 @@ class MainGromovWasserstainComputation():
         elif init_mat_plan in ['random', 'permutation']:
             best_gw_loss = float('inf')
             for i, seed in enumerate(tqdm(np.random.randint(0, 100000, self.n_iter))):
-                c_gw, c_logv, c_gw_loss, c_acc, c_init_mat, trial = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, trial = trial, num_iter = i, seed = seed)
+                c_gw, c_logv, c_gw_loss, c_acc, c_init_mat, trial = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, trial = trial, num_iter = i, seed = seed, gpu_id = gpu_id)
                 
                 if c_gw_loss < best_gw_loss:
                     # 以下のコードはuniform, diagでも使い回せる内容なので、うまく書き直したい。(2023.3.18, 佐々木)
@@ -328,7 +334,8 @@ if __name__ == '__main__':
     # dataset = GW_Alignment(model1, model2, p, q, max_iter = 1000, device = 'cuda', save_path = unittest_save_path)
     # study.optimize(lambda trial: dataset(trial, init_mat_types, eps_list), n_trials = 20, n_jobs = 10)
     
-    # %%    
+    # %%
+    # 以下はMulti-GPUで計算を回す場合。こちらの方が非常に早い。
     from multiprocessing import Manager
     from joblib import parallel_backend
     
