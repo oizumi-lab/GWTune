@@ -186,7 +186,10 @@ class Backend():
         
     def check_zeros(self, args):
         if isinstance(args, torch.Tensor):
-            flag = self.nx.array_equal(args, self.nx.zeros(args.shape).to(args.device))
+            if torch.count_nonzero(args).item() == 0:
+                flag = True
+            else:
+                flag = False
         
         elif isinstance(args, np.ndarray):
             flag = self.nx.array_equal(args, self.nx.zeros(args.shape))

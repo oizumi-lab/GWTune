@@ -217,26 +217,7 @@ class MainGromovWasserstainComputation():
         else:
             return T
 
-    def gw_alignment_computation(self, init_mat_plan, eps, max_iter, device, trial = None, num_iter = None, seed = 42, gpu_id = None):
-        """
-        gw_alignmentの計算を行う。
-
-        Args:
-            init_mat_plan (_type_): _description_
-            eps (_type_): _description_
-            max_iter (_type_): _description_
-            device (_type_): _description_
-            trial (_type_, optional): _description_. Defaults to None.
-            num_iter (int, forループのiter): randomやpermutationの時のforループの回数を受け取る. Defaults to None.
-            seed (int, optional): _description_. Defaults to 42.
-
-        Raises:
-            optuna.TrialPruned: _description_
-
-        Returns:
-            _type_: _description_
-        """
-        
+    def gw_alignment_computation(self, init_mat_plan, eps, max_iter, device, trial = None, seed = 42):
         '''
         2023.3.17 佐々木
         gw_alignmentの計算を行う。ここのメソッドは変更しない方がいいと思う。
@@ -256,59 +237,65 @@ class MainGromovWasserstainComputation():
             correct = (pred == self.backend.nx.arange(len(gw), type_as = gw)).sum()
             acc = correct / len(gw)
         
-        if trial is not None:
-            gw_loss, acc = self.backend.get_item_from_torch_or_jax(gw_loss, acc)
-            trial.set_user_attr('acc', acc)
-            trial.set_user_attr('num_iter', num_iter)
-            trial.report(gw_loss, num_iter)
-            
-            if trial.should_prune():
-                if self.gpu_queue is not None:
-                    self.gpu_queue.put(gpu_id)
-                
-                raise optuna.TrialPruned(f"Trial was pruned at iteration {trial.number}, {num_iter} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
+        return gw, logv, gw_loss, acc, init_mat
+    
+    def _save_results(self, gw_loss, acc, trial, init_mat_plan, num_iter = None, seed = None):
         
-        return gw, logv, gw_loss, acc, init_mat, trial
+        gw_loss, acc = self.backend.get_item_from_torch_or_jax(gw_loss, acc)
+        
+        if init_mat_plan in ['random', 'permutation']:
+            trial.set_user_attr('best_acc', acc)
+            trial.set_user_attr('num_iter', num_iter)
+            trial.set_user_attr('best_seed', int(seed)) # ここはint型に変換しないと、謎のエラーが出る (2023.3.18 佐々木)。
+        else:
+            trial.set_user_attr('acc', acc)
+        
+        return trial
+    
+    def _check_pruner_should_work(self, gw_loss, trial, init_mat_plan, eps, num_iter = None, gpu_id = None):
+        if num_iter is None:
+            num_iter = trial.number
+            
+        trial.report(gw_loss, num_iter)
+        
+        if trial.should_prune():
+            if self.gpu_queue is not None:
+                self.gpu_queue.put(gpu_id)
+            raise optuna.TrialPruned(f"Trial was pruned at iteration {trial.number} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
     
     def compute_GW_with_init_plans(self, trial, eps, init_mat_plan, device, gpu_id = None):
         """
         2023.3.17 佐々木
         uniform, diagでも、prunerを使うこともできるが、いまのところはコメントアウトしている。
-        どちらにも使えるようにする場合は、少しだけ手直しが必要。
+        どちらにも使えるようにする場合は、ある程度の手直しが必要。
         """
         
         if init_mat_plan in ['uniform', 'diag']:
-            # best_gw_loss = float('inf')
-            gw, logv, gw_loss, acc, init_mat, trial = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, trial = trial, gpu_id = gpu_id)
-            # gw, logv, gw_loss, acc, init_mat = self.save_best_results(trial, init_mat_plan, best_gw_loss, gw, logv, gw_loss, acc, init_mat)
-            
+            gw, logv, gw_loss, acc, init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device)
+            trial = self._save_results(gw_loss, acc, trial, init_mat_plan)
+            self._check_pruner_should_work(gw_loss, trial, init_mat_plan, eps, gpu_id = gpu_id)
             return gw, logv, gw_loss, acc, init_mat, trial
             
         elif init_mat_plan in ['random', 'permutation']:
             best_gw_loss = float('inf')
             for i, seed in enumerate(tqdm(np.random.randint(0, 100000, self.n_iter))):
-                c_gw, c_logv, c_gw_loss, c_acc, c_init_mat, trial = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, trial = trial, num_iter = i, seed = seed, gpu_id = gpu_id)
+                c_gw, c_logv, c_gw_loss, c_acc, c_init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, seed = seed)
                 
                 if c_gw_loss < best_gw_loss:
-                    # 以下のコードはuniform, diagでも使い回せる内容なので、うまく書き直したい。(2023.3.18, 佐々木)
                     best_gw, best_logv, best_gw_loss, best_acc, best_init_mat = c_gw, c_logv, c_gw_loss, c_acc, c_init_mat
-                    
-                    if init_mat_plan in ['random', 'permutation']: 
-                        best_seed = seed
-                        trial.set_user_attr('best_seed', int(best_seed)) # ここはint型に変換しないと、謎のエラーが出る (2023.3.18 佐々木)。
-                    
-                # if i % 10 == 0:
-                #     print(i, c_gw_loss, best_gw_loss)
+                    trial = self._save_results(best_gw_loss, best_acc, trial, init_mat_plan, num_iter = i, seed = seed)
+                
+                self._check_pruner_should_work(c_gw_loss, trial, init_mat_plan, eps, num_iter = i, gpu_id = gpu_id)
                     
             if best_gw_loss == float('inf'):
-                return c_gw, c_logv, c_gw_loss, c_acc, c_init_mat, trial
+                raise optuna.TrialPruned(f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
             
             else:
                 return best_gw, best_logv, best_gw_loss, best_acc, best_init_mat, trial
                 
         
-        # else:
-        #     raise ValueError('Not defined initialize matrix.')
+        else:
+            raise ValueError('Not defined initialize matrix.')
 
 
 
@@ -346,7 +333,7 @@ if __name__ == '__main__':
         for i in range(n_gpu):
             gpu_queue.put(i)
             
-        dataset = GW_Alignment(model1, model2, p, q, max_iter = 1000, device = 'cuda', save_path = unittest_save_path, gpu_queue = gpu_queue)
+        dataset = GW_Alignment(model1, model2, p, q, max_iter = 1000, device = 'cuda', main_save_path = unittest_save_path, gpu_queue = gpu_queue)
 
         study = optuna.create_study(direction = "minimize",
                                     study_name = "test",
