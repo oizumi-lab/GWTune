@@ -95,7 +95,7 @@ class GW_Alignment():
 
             else:
                 gpu_id = self.gpu_queue.get()
-                device = 'cuda:' + str(gpu_id)
+                device = 'cuda:' + str(gpu_id % 4)
         
         else:
             device = 'cpu'
@@ -329,11 +329,6 @@ if __name__ == '__main__':
     eps_list = [1e-4, 1e-2]
     eps_log = True
     
-    study = optuna.create_study(direction = "minimize",
-                                sampler = optuna.samplers.RandomSampler(seed = 42),
-                                pruner = optuna.pruners.MedianPruner(),
-                                load_if_exists = False)
-    
     # dataset = GW_Alignment(model1, model2, p, q, max_iter = 1000, device = 'cuda', save_path = unittest_save_path)
     # study.optimize(lambda trial: dataset(trial, init_mat_types, eps_list), n_trials = 20, n_jobs = 10)
     
@@ -344,12 +339,18 @@ if __name__ == '__main__':
     n_gpu = 4
     with Manager() as manager:
         gpu_queue = manager.Queue()
-
+        
         for i in range(n_gpu):
-            gpu_queue.put(i)    
-
+            gpu_queue.put(i)
+            
         dataset = GW_Alignment(model1, model2, p, q, max_iter = 1000, device = 'cuda', save_path = unittest_save_path, gpu_queue = gpu_queue)
-    
+
+        study = optuna.create_study(direction = "minimize",
+                                sampler = optuna.samplers.TPESampler(seed = 42),
+                                pruner = optuna.pruners.MedianPruner(),
+                                storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db', #この辺のパス設定は一度議論した方がいいかも。
+                                load_if_exists = True)
+
         with parallel_backend("multiprocessing", n_jobs = n_gpu):
             study.optimize(lambda trial: dataset(trial, init_mat_types, eps_list), n_trials = 20, n_jobs = n_gpu)
     
