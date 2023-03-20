@@ -245,7 +245,7 @@ class MainGromovWasserstainComputation():
         
         if init_mat_plan in ['random', 'permutation']:
             trial.set_user_attr('best_acc', acc)
-            trial.set_user_attr('num_iter', num_iter)
+            trial.set_user_attr('best_iter', num_iter)
             trial.set_user_attr('best_seed', int(seed)) # ここはint型に変換しないと、謎のエラーが出る (2023.3.18 佐々木)。
         else:
             trial.set_user_attr('acc', acc)
@@ -288,9 +288,11 @@ class MainGromovWasserstainComputation():
                 self._check_pruner_should_work(c_gw_loss, trial, init_mat_plan, eps, num_iter = i, gpu_id = gpu_id)
                     
             if best_gw_loss == float('inf'):
-                if self.gpu_queue is not None:
-                    self.gpu_queue.put(gpu_id)
-                raise optuna.TrialPruned(f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
+                # if self.gpu_queue is not None:
+                #     self.gpu_queue.put(gpu_id)
+                # raise optuna.TrialPruned(f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
+                
+                return c_gw, c_logv, c_gw_loss, c_acc, c_init_mat, trial
             
             else:
                 return best_gw, best_logv, best_gw_loss, best_acc, best_init_mat, trial
@@ -355,5 +357,7 @@ if __name__ == '__main__':
     
     df = study.trials_dataframe()
     print(df)
-# %%
+    # %%
+    df.dropna()
     
+# %%
