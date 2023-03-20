@@ -17,12 +17,12 @@ import warnings
 import scipy as sp
 warnings.simplefilter("ignore")
 # optuna.logging.set_verbosity(optuna.logging.WARNING)
-
+# nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
 from backend import Backend
 
 # %%
 class Adjust_Distribution():
-    def __init__(self, model1, model2, adjust_path, fix_method = 'pred', device = 'cpu', to_types = 'torch', gpu_queue = None):
+    def __init__(self, model1, model2, adjust_path, fix_method = 'target', device = 'cpu', to_types = 'torch', gpu_queue = None):
         self.adjust_path = adjust_path
         self.size = len(model1)
         self.device = device
@@ -38,40 +38,37 @@ class Adjust_Distribution():
         if not os.path.exists(self.adjust_path):
             os.makedirs(self.adjust_path)
     
-    def make_limit(self):
-        if self.fix_method == 'target':
-            m1 = self.model2.detach().clone()
-            m1 = m1.fill_diagonal_(float('nan'))
-            
-            lim_min = m1[~torch.isnan(m1)].min()
-            lim_max = m1[~torch.isnan(m1)].max()
+    def _extract_min_and_max(self, data):
+        data = data.detach().clone()
+        data = data.fill_diagonal_(float('nan'))
+        
+        lim_min = data[~torch.isnan(data)].min()
+        lim_max = data[~torch.isnan(data)].max()
+        
+        return lim_min.item(), lim_max.item()
 
+    def make_limit(self):
+        if self.fix_method == 'pred':
+            lim_min, lim_max = self._extract_min_and_max(self.model1)
 
         elif self.fix_method == 'target':
-            m2 = self.model2.detach().clone()
-            m2 = m2.fill_diagonal_(float('nan'))
+            lim_min, lim_max = self._extract_min_and_max(self.model2)
             
-            lim_min = m2[~torch.isnan(m2)].min()
-            lim_max = m2[~torch.isnan(m2)].max()
-        
         elif self.fix_method == 'both':
-            m1 = self.model1.detach().clone()
-            m2 = self.model2.detach().clone()
+            lim_min1, lim_max1 = self._extract_min_and_max(self.model1)
+            lim_min2, lim_max2 = self._extract_min_and_max(self.model2)
             
-            m1 = m1.fill_diagonal_(float('nan'))
-            m2 = m2.fill_diagonal_(float('nan'))
-            
-            lim_min = min(m1[~torch.isnan(m1)].min(), m2[~torch.isnan(m2)].min())
-            lim_max = max(m1[~torch.isnan(m1)].max(), m2[~torch.isnan(m2)].max())
+            lim_min = min(lim_min1, lim_min2)
+            lim_max = max(lim_max1, lim_max2)
         
         else:
             raise ValueError('Please choose the fix method')
 
-        return lim_max.item(), lim_min.item()
+        return lim_min, lim_max
     
     def make_histogram(self, data):
     
-        lim_max, lim_min = self.make_limit()
+        lim_min, lim_max = self.make_limit()
         bin = 100
         
         hist = torch.histc(data, bins = bin, min = lim_min, max = lim_max)
@@ -99,62 +96,6 @@ class Adjust_Distribution():
         
         return hist
     
-    def __call__(self, trial):
-        
-        if self.gpu_queue is None:
-            gpu_id = None
-            de = self.device
-        else:
-            gpu_id = self.gpu_queue.get()
-            de = 'cuda:' + str(gpu_id % 4) 
-        
-        if self.to_types == 'numpy':
-            assert self.gpu_queue is None
-        
-        self.model1, self.model2 = self.backend.change_device(de, self.model1, self.model2)
-        
-        alpha = trial.suggest_float("alpha", 1e-6, 1e1, log = True)
-        lam = trial.suggest_float("lam", 1e-6, 1e1, log = True)
-        
-        if self.fix_method == 'pred':
-            model1_norm = self.model_normalize(self.model1, lam, alpha) 
-            model2_norm = self.model_normalize(self.model2, 1.0, 1.0)
-        
-        elif self.fix_method == 'target':
-            model1_norm = self.model_normalize(self.model1, 1.0, 1.0) 
-            model2_norm = self.model_normalize(self.model2, lam, alpha)
-        
-        elif self.fix_method == 'both':
-            alpha1 = trial.suggest_float("alpha1", 1e-6, 1e1, log = True)
-            lam1   = trial.suggest_float("lam1", 1e-6, 1e1, log = True)
-            
-            alpha2 = trial.suggest_float("alpha2", 1e-6, 1e1, log = True)
-            lam2   = trial.suggest_float("lam2", 1e-6, 1e1, log = True)
-            
-            model1_norm = self.model_normalize(self.model1, lam1, alpha1) 
-            model2_norm = self.model_normalize(self.model2, lam2, alpha2)
-        
-        else:
-            raise ValueError('Please choose the fix method')
-        
-        
-        ot_cost = self.L2_wasserstain(model1_norm, model2_norm)
-        
-        if res == 0:
-            res = float('nan')
-        
-        trial.report(res, trial.number)
-        
-        if trial.should_prune():
-            if self.gpu_queue is not None:
-                self.gpu_queue.put(gpu_id)
-            raise optuna.TrialPruned(f"Trial was pruned at iteration {trial.number}")
-        
-        if self.gpu_queue is not None:
-            self.gpu_queue.put(gpu_id)
-        
-        return ot_cost
-        
     def model_normalize(self, data, lam, alpha):
         data = alpha * ((torch.pow(1 + data, lam) - 1) / lam)
         return data
@@ -173,8 +114,8 @@ class Adjust_Distribution():
         h1_prob = hist1 / hist1.sum()
         h2_prob = hist2 / hist2.sum()
     
-        ind1 = self.backend.nx.arange(len(hist1), type_as = hist1)
-        ind2 = self.backend.nx.arange(len(hist2), type_as = hist2)
+        ind1 = self.backend.nx.arange(len(hist1), type_as = hist1).float()
+        ind2 = self.backend.nx.arange(len(hist2), type_as = hist2).float()
         
         cost_matrix = torch.cdist(ind1.unsqueeze(dim=1), ind2.unsqueeze(dim=1), p = 1).to(hist1.device)
         
@@ -183,8 +124,87 @@ class Adjust_Distribution():
         
         return res
     
+    def __call__(self, trial):
+        
+        if self.gpu_queue is None:
+            gpu_id = None
+            de = self.device
+        else:
+            gpu_id = self.gpu_queue.get()
+            de = 'cuda:' + str(gpu_id % 4) 
+        
+        if self.to_types == 'numpy':
+            assert self.gpu_queue is None
+            assert de == 'cpu'
+        
+        self.model1, self.model2 = self.backend.change_device(de, self.model1, self.model2)
+        
+        alpha = trial.suggest_float("alpha", 1e-6, 1e1, log = True)
+        lam = trial.suggest_float("lam", 1e-6, 1e1, log = True)
+        
+        if self.fix_method == 'pred':
+            model1_norm = self.model_normalize(self.model1, 1.0, 1.0) 
+            model2_norm = self.model_normalize(self.model2, lam, alpha)
+        
+        elif self.fix_method == 'target':
+            model1_norm = self.model_normalize(self.model1, lam, alpha) 
+            model2_norm = self.model_normalize(self.model2, 1.0, 1.0)
+            
+        elif self.fix_method == 'both':
+            alpha1 = trial.suggest_float("alpha1", 1e-6, 1e1, log = True)
+            lam1   = trial.suggest_float("lam1", 1e-6, 1e1, log = True)
+            
+            alpha2 = trial.suggest_float("alpha2", 1e-6, 1e1, log = True)
+            lam2   = trial.suggest_float("lam2", 1e-6, 1e1, log = True)
+            
+            model1_norm = self.model_normalize(self.model1, lam1, alpha1) 
+            model2_norm = self.model_normalize(self.model2, lam2, alpha2)
+        
+        else:
+            raise ValueError('Please choose the fix method')
+        
+        
+        ot_cost = self.L2_wasserstain(model1_norm, model2_norm)
+        
+        if ot_cost == 0:
+            ot_cost = float('nan')
+        
+        trial.report(ot_cost, trial.number)
+        
+        if trial.should_prune():
+            if self.gpu_queue is not None:
+                self.gpu_queue.put(gpu_id)
+            raise optuna.TrialPruned(f"Trial was pruned at iteration {trial.number}")
+        
+        if self.gpu_queue is not None:
+            self.gpu_queue.put(gpu_id)
+        
+        return ot_cost
+    
     def best_parameters(self, study):
-        a1, lam1, a2, lam2 = 0
+        best_trial = study.best_trial
+        
+        if self.fix_method == 'pred':
+            a1 = 1
+            lam1 = 1
+            
+            a2 = best_trial.params["alpha"]
+            lam2 = best_trial.params["lam"]
+        
+        elif self.fix_method == 'target':
+            a1 = best_trial.params["alpha"]
+            lam1 = best_trial.params["lam"]
+            
+            a2 = 1
+            lam2 = 1
+        
+        elif self.fix_method == 'both':
+            a1 = best_trial.params["alpha1"]
+            lam1 = best_trial.params["lam1"]
+            
+            a2 = best_trial.params["alpha2"]
+            lam2 = best_trial.params["lam2"]
+        
         return a1, lam1, a2, lam2
     
     def make_graph(self, study):
@@ -192,7 +212,7 @@ class Adjust_Distribution():
         a1, lam1, a2, lam2 = self.best_parameters(study)
         model1_norm = self.model_normalize(self.model1, lam1, a1) 
         model2_norm = self.model_normalize(self.model2, lam2, a2)
-    
+        
         plt.figure()
         plt.subplot(121)
 
@@ -215,7 +235,7 @@ class Adjust_Distribution():
         plt.tight_layout()
         plt.show()
         
-        lim_max, lim_min = self.make_limit()
+        lim_min, lim_max = self.make_limit()
         # bins = 100
         
         # hist1 = torch.histc(model1_norm, bins = bins, min = lim_min, max = lim_max)
@@ -241,19 +261,6 @@ class Adjust_Distribution():
                               model2_norm[~torch.isnan(model2_norm)].to('cpu').numpy())
     
         print('peason\'s r (without diag element) =', corr[0])
-
-    def make_eval_graph(self, study):
-        df_test = study.trials_dataframe()
-        success_test = df_test[df_test['values_1'] != -1]
-        success_test = success_test[success_test['values_0'] > 1e-7]
-        
-        plt.figure()
-        plt.title('The evaluation of GW results for random pictures')
-        plt.scatter(success_test['values_1'], np.log(success_test['values_0']), label = 'init diag plan ('+str(self.train_size)+')', c = 'C0')
-        plt.xlabel('accuracy')
-        plt.ylabel('log(GWD)')
-        plt.legend()
-        plt.show()
     
     def eval_study(self, study):
         optuna.visualization.plot_optimization_history(study).show()
@@ -262,22 +269,27 @@ class Adjust_Distribution():
 
 # %%
 if __name__ == '__main__':
-    import optuna
-    
     os.chdir(os.path.dirname(__file__))
-    model1 = torch.load('../../data/model1.pt')#.to('cuda')
-    model2 = torch.load('../../data/model2.pt')#.to('cuda')
+    model1 = torch.load('../../data/model1.pt').to('cuda')
+    model2 = torch.load('../../data/model2.pt').to('cuda')
     unittest_save_path = '../../results/unittest/adjust_histogram'
-    tt = Adjust_Distribution(model1, model2, unittest_save_path)
-    
     fix_method = 'pred'
+    
+    # %%
+    tt = Adjust_Distribution(model1, model2, unittest_save_path, fix_method = fix_method)
+    
+    # %%
 
     study = optuna.create_study(direction = "minimize",
                                 study_name = "test",
                                 sampler = optuna.samplers.TPESampler(seed = 42),
                                 pruner = optuna.pruners.MedianPruner(),
-                                storage = 'sqlite:///' + unittest_save_path + '/test.db', #この辺のパス設定は一度議論した方がいいかも。
+                                storage = 'sqlite:///' + unittest_save_path + '/test.db',
                                 load_if_exists = True)
 
-    study.optimize(lambda trial: tt(trial, fix_method), n_trials = 20, n_jobs = 10)
+    study.optimize(tt, n_trials = 1000, n_jobs = 4)
     
+    # %%
+    tt.make_graph(study)
+    tt.eval_study(study)
+    # %%
