@@ -15,7 +15,7 @@ import copy
 import os
 
 # %%
-from utils.backend import Backend
+from utils.backend import make_backend
 from utils.init_matrix import InitMatrix
 
 # %%
@@ -37,8 +37,10 @@ class GW_Alignment():
         self.to_types = to_types
         self.gpu_queue = gpu_queue
 
-        be = Backend(self.device, self.to_types) # potのnxに書き換えるべき。
-        self.pred_dist, self.target_dist, self.p, self.q = be.change_data(pred_dist, target_dist, p, q)
+        self.nx = make_backend(self.to_types)
+        self.pred_dist, self.target_dist, self.p, self.q = self.nx.change_data(pred_dist, target_dist, p, q)
+        # be = Backend(self.device, self.to_types) # potのnxに書き換えるべき。
+        # self.pred_dist, self.target_dist, self.p, self.q = be.change_data(pred_dist, target_dist, p, q)
 
         self.size = len(self.pred_dist)
 
@@ -76,18 +78,14 @@ class GW_Alignment():
                 setattr(self, key, value)
 
     def entropic_gw(self, device, epsilon, T = None, max_iter = 1000, tol = 1e-9, log = True, verbose = False, trial = None):
+        C1, C2, p, q = self.nx.to(self.pred_dist, device), self.nx.to(self.target_dist, device), self.nx.to(self.p, device), self.nx.to(self.q, device)
 
-        if self.to_types == 'torch':
-            C1, C2, p, q = self.pred_dist.to(device), self.target_dist.to(device), self.p.to(device), self.q.to(device)
-            T = torch.from_numpy(T).float().to(device)
-        else:
-            C1, C2, p, q = self.pred_dist, self.target_dist, self.p, self.q
-
-        nx = ot.backend.get_backend(C1, C2, p, q)
+        T = self.nx.from_numpy(T)
+        T = self.nx.to(T, device, dtype = 'float')
 
         # add T as an input
         if T is None:
-            T = nx.outer(p, q)
+            T = self.nx.outer(p, q)
 
         constC, hC1, hC2 = ot.gromov.init_matrix(C1, C2, p, q, loss_fun = "square_loss")
 
@@ -108,7 +106,7 @@ class GW_Alignment():
             if cpt % 10 == 0:
                 # we can speed up the process by checking for the error only all the 10th iterations
                 err_prev = copy.copy(err)
-                err = nx.norm(T - Tprev)
+                err = self.nx.norm(T - Tprev)
                 if log:
                     log['err'].append(err)
                 if verbose:
@@ -129,8 +127,7 @@ class GW_Alignment():
         gw, logv = self.entropic_gw(device, eps, T = init_mat, max_iter = self.max_iter)
         gw_loss = logv['gw_dist']
 
-        nx = ot.backend.get_backend(gw)
-        if nx.array_equal(gw, nx.zeros(gw.shape)):
+        if self.nx.array_equal(gw, self.nx.zeros(gw.shape)):
             gw_success = False
         else:
             gw_success = True
@@ -144,6 +141,35 @@ class GW_Alignment():
                 v = v.item()
             l.append(v)
         return  l
+
+    def iter_entropic_gw(self, init_mat_plan, device, eps, trial):
+        gw_loss = float('inf')
+        for i, seed in enumerate(np.random.randint(0, 100000, self.n_iter)):
+            # current_init_mat = self.init_mat_builder.make_initial_T(init_mat_plan, seed)
+            # current_gw, current_logv = self.entropic_gw(device, eps, T = current_init_mat, max_iter = self.max_iter)
+            c_gw, c_logv, c_gw_loss, c_init_mat, c_gw_success = self.gw_alignment_help(init_mat_plan, device, eps, seed)
+            c_gw_loss = self.nx.item(c_gw_loss)
+            if not c_gw_success: # gw alignmentが失敗したならinf
+                c_gw_loss = float('inf')
+
+            if c_gw_loss < gw_loss: # gw_lossの更新
+                gw_loss = c_gw_loss
+                gw = c_gw
+                init_mat = c_init_mat
+                logv = c_logv
+                best_seed = seed
+
+            trial.report(gw_loss, i) # 最小値を報告
+            if trial.should_prune():
+                raise optuna.TrialPruned(f"Trial was pruned at iteration {i} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
+        # trialが全て失敗したら
+        if gw_loss == float('inf'):
+            gw_loss = float('nan')
+            acc = float('nan')
+            raise optuna.TrialPruned(f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
+        # seedの保存
+        trial.set_user_attr('seed', int(best_seed))
+        return gw, logv, gw_loss, init_mat
 
     def __call__(self, trial, file_path, init_plans_list, eps_list, eps_log=True):
         '''
@@ -180,42 +206,16 @@ class GW_Alignment():
         '''
         2.  Compute GW alignment with hyperparameters defined above.
         '''
-        nx = ot.backend.get_backend(self.pred_dist)
-
         if init_mat_plan in ['uniform', 'diag']:
             gw, logv, gw_loss, init_mat, gw_success = self.gw_alignment_help(init_mat_plan, device, eps, seed=42)
+            gw_loss = self.nx.item(gw_loss)
             if not gw_success:
                 gw_loss = float('nan')
                 acc = float('nan')
                 raise optuna.TrialPruned(f"Failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
 
         elif init_mat_plan in ['random', 'permutation']:
-            gw_loss = float('inf')
-            for i, seed in enumerate(np.random.randint(0, 100000, self.n_iter)):
-                # current_init_mat = self.init_mat_builder.make_initial_T(init_mat_plan, seed)
-                # current_gw, current_logv = self.entropic_gw(device, eps, T = current_init_mat, max_iter = self.max_iter)
-                c_gw, c_logv, c_gw_loss, c_init_mat, c_gw_success = self.gw_alignment_help(init_mat_plan, device, eps, seed)
-                c_gw_loss, = self.exit_torch(c_gw_loss)
-                if not c_gw_success: # gw alignmentが失敗したならinf
-                    c_gw_loss = float('inf')
-
-                if c_gw_loss < gw_loss: # gw_lossの更新
-                    gw_loss = c_gw_loss
-                    gw = c_gw
-                    init_mat = c_init_mat
-                    logv = c_logv
-                    best_seed = seed
-
-                trial.report(gw_loss, i) # 最小値を報告
-                if trial.should_prune():
-                    raise optuna.TrialPruned(f"Trial was pruned at iteration {i} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
-            # trialが全て失敗したら
-            if gw_loss == float('inf'):
-                gw_loss = float('nan')
-                acc = float('nan')
-                raise optuna.TrialPruned(f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
-            # seedの保存
-            trial.set_user_attr('seed',best_seed)
+            gw, logv, gw_loss, init_mat = self.iter_entropic_gw(init_mat_plan, device, eps, trial)
         else:
             raise ValueError('Not defined initialize matrix.')
         '''
@@ -227,20 +227,15 @@ class GW_Alignment():
         #     gw_loss = float('nan')
         #     acc = float('nan')
         #     raise optuna.TrialPruned("Failed.")
-        pred = nx.argmax(gw, 1)
-        correct = (pred == nx.arange(len(gw), type_as = gw)).sum()
+        pred = self.nx.argmax(gw, 1)
+        correct = (pred == self.nx.arange(len(gw), type_as = gw)).sum()
         acc = correct / len(gw)
 
         # save data
-        if self.to_types == 'torch':
-            torch.save(gw, file_path + f'/gw_{trial.number}.pt')
-            torch.save(init_mat, file_path + f'/init_mat_{trial.number}.pt')
+        self.nx.save(file_path + f'/gw_{trial.number}', gw)
+        self.nx.save(file_path + f'/init_mat_{trial.number}', init_mat)
 
-        elif self.to_types == 'numpy':
-            np.save(file_path + f'/gw_{trial.number}', gw)
-            np.save(file_path + f'/init_mat_{trial.number}', init_mat)
-
-        gw_loss, acc = self.exit_torch(gw_loss, acc)
+        acc = self.nx.item(acc)
         # jaxの保存方法を作成してください
 
         trial.set_user_attr('acc', acc)
