@@ -13,8 +13,7 @@ import matplotlib.pyplot as plt
 # nvidia-smi --query-compute-apps=timestamp,pid,name,used_memory --format=csv # GPUをだれが使用しているのかを確認できるコマンド。
 
 # %%
-from src.gw_alignment import GW_Alignment
-from src.utils import gw_optimizer
+from src.gw_alignment import GW_Alignment, load_optimizer
 
 # %%
 class Test():
@@ -38,46 +37,38 @@ class Test():
         return model1, model2, p, q
 
     def optimizer_test(self, filename, device, to_types):
-        test_gw = GW_Alignment(self.model1, self.model2, self.p, self.q, max_iter = 30, device = device, to_types = to_types, gpu_queue = None)
+        
+        save_path = '../results/gw_alignment/' + filename
+        
+        test_gw = GW_Alignment(self.model1, self.model2, self.p, self.q, max_iter = 1000, device = device, to_types = to_types, gpu_queue = None, save_path = save_path)
 
         pruner_params = {'n_iter':5, 'n_startup_trials':1, 'n_warmup_steps':0, 'min_resource':5, 'reduction_factor' : 2}
         test_gw.set_params(pruner_params)
 
-        opt = gw_optimizer.Optimizer(test_gw.save_path)
+        opt = load_optimizer(test_gw.save_path, n_jobs = 10, num_trial = 50,
+                             to_types = 'torch', method = 'optuna',
+                             init_plans_list = ['diag'], eps_list = [1e-4, 1e-2], eps_log = True, 
+                             sampler_name = 'random', pruner_name = 'median', 
+                             filename = 'test', sql_name = 'sqlite', storage = None,
+                             delete_study = False)
 
-        study = opt.optimizer(test_gw,
-                              to_types = test_gw.to_types,
-                              method = 'optuna',
-                              init_plans_list = ['diag'],
-                              eps_list = [1e-4, 1e-2],
-                              eps_log = True,
-                              sampler_name = 'random',
-                              pruner_name = 'median',
-                              filename = filename,
-                              sql_name = 'mysql',
-                              storage = "mysql+pymysql://root@localhost/TestGW_Methods",
-                              n_jobs = 10,
-                              num_trial = 10,
-                              delete_study = False,
-                              )
+        study = opt.run_study(test_gw)
 
         return study
 
-    def adjustment_test(self, filename, device, to_types):
-        test_gw = GW_Alignment(self.model1, self.model2, self.p, self.q, device = device, to_types = to_types, filename = filename, gpu_queue = None)
+    # def adjustment_test(self, filename, device, to_types):
+    #     test_gw = GW_Alignment(self.model1, self.model2, self.p, self.q, device = device, to_types = to_types, filename = filename, gpu_queue = None)
 
-        opt = gw_optimizer.Optimizer(test_gw.save_path)
+    #     study = opt.optimizer(test_gw, 
+    #                           method = 'optuna', 
+    #                           init_plans_list = ['diag'], 
+    #                           eps_list = [1e-4, 1e-2], 
+    #                           sampler_name = 'grid_search', 
+    #                           filename = filename, 
+    #                           n_jobs = 10, 
+    #                           num_trial = 50)
 
-        study = opt.optimizer(test_gw, 
-                              method = 'optuna', 
-                              init_plans_list = ['diag'], 
-                              eps_list = [1e-4, 1e-2], 
-                              sampler_name = 'grid_search', 
-                              filename = filename, 
-                              n_jobs = 10, 
-                              num_trial = 50)
-
-        return study
+    #     return study
 
 # %%
 if __name__ == '__main__':
@@ -86,8 +77,8 @@ if __name__ == '__main__':
 
     tgw = Test(path1, path2)
     # diagと['random', 'uniform']ではfilenameを分けてください
-    filename = 'test'
-    device = 'cpu'
+    filename = 'test, diag'
+    device = 'cuda'
     to_types = 'torch'
     tgw.optimizer_test(filename, device, to_types)
 # %%
