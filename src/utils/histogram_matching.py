@@ -137,11 +137,12 @@ class HistogramMatching:
             alpha1 = trial.suggest_float("alpha1", 1e-2, 1e1, log=True)
             alpha2 = trial.suggest_float("alpha2", 1, 1, log=True)
 
-        x_data, y_data = self.model_normalize(
-            self.x_sorted, alpha1, lam1
-        ), self.model_normalize(self.y_sorted, alpha2, lam2)
+        x_data = self.model_normalize(self.x_sorted, alpha1, lam1)
+        y_data = self.model_normalize(self.y_sorted, alpha2, lam2)
 
-        l = ot.emd2_1d(x_data, y_data)
+        l = ot.emd2_1d(x_data, y_data) # これは正しい関数ではないはずです。　(画像データで試すと、対角行列を初期値にした場合でもうまくいかなくなります)。
+                                       # emd_test.pyに実験をしていますが、この関数はhistogram間のemdではなく、通常の一次元データに対する最適輸送解です。
+                                       # POTのライブラリの説明にも、ot.emd2がヒストグラム間のマッチングになります。
         return l
 
     def run_yeojohnson_study(
