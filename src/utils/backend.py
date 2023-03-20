@@ -53,7 +53,7 @@ class Backend():
             a = self._change_device(a, self.device)
             output.append(a)
             
-        self.nx = ot.backend.get_backend(*output)
+        self.nx = ot.backend.get_backend(*output) #ここでtorchをcpuにしていても、GPUにデータが載ってしまうバグがある。
         
         if len(args) == 1:
             output = output[0]
