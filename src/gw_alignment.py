@@ -39,7 +39,11 @@ class GW_Alignment():
         self.gpu_queue = gpu_queue
         self.size = len(p)
 
-        self.main_save_path = '../results/gw_alignment' if main_save_path is None else main_save_path
+        if main_save_path is None:
+            self.main_save_path = '../results/gw_alignment'
+        else: 
+            self.main_save_path = main_save_path
+         
         if not os.path.exists(self.main_save_path):
             os.makedirs(self.main_save_path)
         
@@ -88,17 +92,16 @@ class GW_Alignment():
         0.  define the "gpu_queue" here. 
             This will be used when the memory of dataset was too much large for a single GPU board, and so on.
         '''
-
-        if self.to_types != 'numpy':
-            if self.gpu_queue is None:
-                device = self.device
-
-            else:
-                gpu_id = self.gpu_queue.get()
-                device = 'cuda:' + str(gpu_id % 4)
-        
+        if self.gpu_queue is None:
+            gpu_id = None
+            device = self.device
+    
         else:
-            device = 'cpu'
+            gpu_id = self.gpu_queue.get()
+            device = 'cuda:' + str(gpu_id % 4)
+                
+        if self.to_types == 'numpy':
+            assert device == 'cpu' 
         
         '''
         1.  define hyperparameter (eps, T)
