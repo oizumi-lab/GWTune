@@ -17,6 +17,7 @@ import seaborn as sns
 import matplotlib.style as mplstyle
 from tqdm.auto import tqdm
 #nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
+
 # %%
 from utils.backend import Backend
 from utils.init_matrix import InitMatrix
