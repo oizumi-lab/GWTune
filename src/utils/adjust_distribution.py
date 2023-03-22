@@ -113,14 +113,16 @@ class Adjust_Distribution():
         
         h1_prob = hist1 / hist1.sum()
         h2_prob = hist2 / hist2.sum()
-    
-        ind1 = self.backend.nx.arange(len(hist1), type_as = hist1).float()
-        ind2 = self.backend.nx.arange(len(hist2), type_as = hist2).float()
         
-        cost_matrix = torch.cdist(ind1.unsqueeze(dim=1), ind2.unsqueeze(dim=1), p = 1).to(hist1.device)
+        # sinkhornを動かすコマンド。
+        dist = ot.dist(h1_prob.unsqueeze(dim=1), h2_prob.unsqueeze(dim=1))
+        res = ot.sinkhorn2(h1_prob, h2_prob, dist, reg = 1)
         
-        res = ot.emd2(h1_prob, h2_prob, cost_matrix, center_dual = False)
-        # res = ot.sinkhorn2(h1_prob, h2_prob, cost_matrix, reg = 1)
+        # 以下は、EMDを動かす際のコマンド。
+        # ind1 = self.backend.nx.arange(len(hist1), type_as = hist1).float()
+        # ind2 = self.backend.nx.arange(len(hist2), type_as = hist2).float()
+        # cost_matrix = torch.cdist(ind1.unsqueeze(dim=1), ind2.unsqueeze(dim=1), p = 1).to(hist1.device)
+        # res = ot.emd2(h1_prob, h2_prob, cost_matrix, center_dual = False)
         
         return res
     
@@ -139,14 +141,18 @@ class Adjust_Distribution():
         
         self.model1, self.model2 = self.backend.change_device(de, self.model1, self.model2)
         
-        alpha = trial.suggest_float("alpha", 1e-6, 1e1, log = True)
-        lam = trial.suggest_float("lam", 1e-6, 1e1, log = True)
         
         if self.fix_method == 'pred':
+            alpha = trial.suggest_float("alpha", 1e-6, 1e1, log = True)
+            lam = trial.suggest_float("lam", 1e-6, 1e1, log = True)
+        
             model1_norm = self.model_normalize(self.model1, 1.0, 1.0) 
             model2_norm = self.model_normalize(self.model2, lam, alpha)
         
         elif self.fix_method == 'target':
+            alpha = trial.suggest_float("alpha", 1e-6, 1e1, log = True)
+            lam = trial.suggest_float("lam", 1e-6, 1e1, log = True)
+            
             model1_norm = self.model_normalize(self.model1, lam, alpha) 
             model2_norm = self.model_normalize(self.model2, 1.0, 1.0)
             
@@ -221,7 +227,7 @@ class Adjust_Distribution():
         
         model_numpy2 = model2_norm.to('cpu').numpy()
         # np.fill_diagonal(model_numpy2, np.nan)
-        mappable = ScalarMappable(cmap=plt.cm.jet, norm = colors.Normalize(vmin=0, vmax=1))
+        mappable = ScalarMappable(cmap=plt.cm.jet, norm = colors.Normalize(vmin = 0, vmax = 1))
         
         plt.title('model1 (a:{:.3g}, lam:{:.3g})'.format(a1, lam1))
         plt.imshow(model_numpy1, cmap=plt.cm.jet)
@@ -270,24 +276,23 @@ class Adjust_Distribution():
 # %%
 if __name__ == '__main__':
     os.chdir(os.path.dirname(__file__))
-    model1 = torch.load('../../data/model1.pt').to('cuda')
-    model2 = torch.load('../../data/model2.pt').to('cuda')
+    model1 = torch.load('../../data/model1.pt')
+    model2 = torch.load('../../data/model2.pt')
     unittest_save_path = '../../results/unittest/adjust_histogram'
-    fix_method = 'pred'
+    fix_method = 'both'
     
     # %%
-    tt = Adjust_Distribution(model1, model2, unittest_save_path, fix_method = fix_method)
-    
+    tt = Adjust_Distribution(model1, model2, unittest_save_path, fix_method = fix_method, device = 'cuda') 
     # %%
 
-    study = optuna.create_study(direction = "minimize",
-                                study_name = "test",
+    study = optuna.create_study(direction = 'minimize',
+                                study_name = 'unit_test('+fix_method+')',
                                 sampler = optuna.samplers.TPESampler(seed = 42),
                                 pruner = optuna.pruners.MedianPruner(),
-                                storage = 'sqlite:///' + unittest_save_path + '/test.db',
+                                storage = 'sqlite:///' + unittest_save_path + '/unit_test('+fix_method+').db',
                                 load_if_exists = True)
 
-    study.optimize(tt, n_trials = 1000, n_jobs = 4)
+    study.optimize(tt, n_trials = 2000, n_jobs = 4)
     
     # %%
     tt.make_graph(study)
