@@ -32,8 +32,8 @@ class Adjust_Distribution():
         
         self.gpu_queue = gpu_queue
         
-        # self.backend = Backend(device, to_types)
-        self.model1, self.model2 = model1, model2 #self.backend(model1, model2)
+        self.backend = Backend(device, to_types)
+        self.model1, self.model2 = self.backend(model1, model2)
     
         if not os.path.exists(self.adjust_path):
             os.makedirs(self.adjust_path)
@@ -139,7 +139,7 @@ class Adjust_Distribution():
             assert self.gpu_queue is None
             assert de == 'cpu'
         
-        self.model1, self.model2 = self.model1.to(de), self.model2.to(de) #self.backend.change_device(de, self.model1, self.model2)
+        self.model1, self.model2 = self.backend.change_device(de, self.model1, self.model2)
         
         if self.fix_method == 'pred':
             alpha = trial.suggest_float("alpha", 1e-6, 1e1, log = True)
@@ -283,7 +283,7 @@ if __name__ == '__main__':
     # %%
     study = optuna.create_study(direction = 'minimize',
                                 study_name = 'unit_test('+fix_method+')',
-                                sampler = optuna.samplers.TPESampler(seed = 42),
+                                sampler = optuna.samplers.RandomSampler(seed = 42),
                                 pruner = optuna.pruners.MedianPruner(),
                                 storage = 'sqlite:///' + unittest_save_path + '/unit_test('+fix_method+').db',
                                 load_if_exists = True)
