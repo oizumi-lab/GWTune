@@ -177,13 +177,11 @@ class Adjust_Distribution():
         
         trial.report(ot_cost, trial.number)
         
-        if trial.should_prune():
-            if self.gpu_queue is not None:
-                self.gpu_queue.put(gpu_id)
-            raise optuna.TrialPruned(f"Trial was pruned at iteration {trial.number}")
-        
         if self.gpu_queue is not None:
             self.gpu_queue.put(gpu_id)
+        
+        if trial.should_prune():    
+            raise optuna.TrialPruned(f"Trial was pruned at iteration {trial.number}")
         
         return ot_cost
     
@@ -292,9 +290,34 @@ if __name__ == '__main__':
                                 storage = 'sqlite:///' + unittest_save_path + '/unit_test('+fix_method+').db',
                                 load_if_exists = True)
 
-    study.optimize(tt, n_trials = 2000, n_jobs = 4)
+    with parallel_backend("multiprocessing"):
+        study.optimize(tt, n_trials = 2000, n_jobs = -1)
     
     # %%
     tt.make_graph(study)
     tt.eval_study(study)
+
+
     # %%
+    # 並列化をほかの方法で行う場合
+    # 以下の方法で並列化を行うことはできなかった。有名なバグが発生してしまう。
+    # https://discuss.pytorch.org/t/typeerror-cant-pickle-torch-dtype-objects-while-using-multiprocessing/18215
+    # 
+    # import multiprocessing as mp
+    # mp.set_start_method('spawn')
+    # def multi_run(dataset):
+    #     study.optimize(dataset, n_trials = 2000, n_jobs = 1)
+    
+    # n_jobs = 4
+    # processes = []
+    
+    # for i in range(n_jobs):
+    #     p = mp.Process(target = multi_run, args = (tt,))
+    #     p.start()
+    #     processes.append(p)
+
+    # for p in processes:
+    #     p.join()
+    
+   
+# %%
