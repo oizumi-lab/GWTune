@@ -26,8 +26,8 @@ os.makedirs(unittest_save_path, exist_ok=True)
 study = optuna.create_study(sampler=sampler,
                             storage = 'sqlite:///' + unittest_save_path + '/test_multi.db',
                             load_if_exists = True)
-
-
+    
+# %%
 n_jobs = 4
 def multi_run(dataset):
     study.optimize(dataset, n_trials = 10)
