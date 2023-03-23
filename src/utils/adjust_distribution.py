@@ -290,8 +290,7 @@ if __name__ == '__main__':
                                 storage = 'sqlite:///' + unittest_save_path + '/unit_test('+fix_method+').db',
                                 load_if_exists = True)
 
-    with parallel_backend("multiprocessing"):
-        study.optimize(tt, n_trials = 2000, n_jobs = -1)
+    study.optimize(tt, n_trials = 2000, n_jobs = 1)
     
     # %%
     tt.make_graph(study)
