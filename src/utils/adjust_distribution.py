@@ -141,7 +141,6 @@ class Adjust_Distribution():
         
         self.model1, self.model2 = self.backend.change_device(de, self.model1, self.model2)
         
-        
         if self.fix_method == 'pred':
             alpha = trial.suggest_float("alpha", 1e-6, 1e1, log = True)
             lam = trial.suggest_float("lam", 1e-6, 1e1, log = True)
@@ -282,41 +281,17 @@ if __name__ == '__main__':
     # %%
     tt = Adjust_Distribution(model1, model2, unittest_save_path, fix_method = fix_method, device = 'cuda') 
     # %%
-
     study = optuna.create_study(direction = 'minimize',
                                 study_name = 'unit_test('+fix_method+')',
-                                sampler = optuna.samplers.TPESampler(seed = 42),
+                                sampler = optuna.samplers.RandomSampler(seed = 42),
                                 pruner = optuna.pruners.MedianPruner(),
                                 storage = 'sqlite:///' + unittest_save_path + '/unit_test('+fix_method+').db',
                                 load_if_exists = True)
 
-    study.optimize(tt, n_trials = 2000, n_jobs = 1)
+    study.optimize(tt, n_trials = 1500)
     
     # %%
     tt.make_graph(study)
     tt.eval_study(study)
-
-
-    # %%
-    # 並列化をほかの方法で行う場合
-    # 以下の方法で並列化を行うことはできなかった。有名なバグが発生してしまう。
-    # https://discuss.pytorch.org/t/typeerror-cant-pickle-torch-dtype-objects-while-using-multiprocessing/18215
-    # 
-    # import multiprocessing as mp
-    # mp.set_start_method('spawn')
-    # def multi_run(dataset):
-    #     study.optimize(dataset, n_trials = 2000, n_jobs = 1)
-    
-    # n_jobs = 4
-    # processes = []
-    
-    # for i in range(n_jobs):
-    #     p = mp.Process(target = multi_run, args = (tt,))
-    #     p.start()
-    #     processes.append(p)
-
-    # for p in processes:
-    #     p.join()
-    
    
 # %%
