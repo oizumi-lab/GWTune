@@ -3,7 +3,7 @@ import sys
 sys.path.append("../../")
 
 from GW_alignment_abe import my_entropic_gromov_wasserstein, Entropic_GW
-from utils.gw_functions_abe import initialize_matrix
+from utils.histogram_matching import initialize_matrix
 
 import numpy as np
 import ot
