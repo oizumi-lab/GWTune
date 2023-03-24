@@ -5,8 +5,8 @@ import multiprocessing as mp
 import torch 
 import ot
 
-tensor_a = torch.randn(10)#.to('cuda')
-tensor_b = torch.randn(10)#.to('cuda')
+tensor_a = torch.randn(10).to('cuda')
+tensor_b = torch.randn(10).to('cuda')
 
 def objective(trial):
     x = trial.suggest_float("x", 1e-2, 1, log = True)
