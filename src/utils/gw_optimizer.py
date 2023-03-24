@@ -250,11 +250,3 @@ class RunOptuna():
         plt.show()
 
 # %%
-class Myclass:
-    def __init__(self) -> None:
-        self.variable = 0
-        pass
-
-    def set_variable(self, new_value):
-        self.variable = new_value
-# %%
