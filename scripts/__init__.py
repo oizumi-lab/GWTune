@@ -1,2 +1,5 @@
-print("Success to import scripts!")
-path_data = '../data/'
+import os, sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '../scripts'))
+
+import Histogram_alignment
+import Barycenter_alignment

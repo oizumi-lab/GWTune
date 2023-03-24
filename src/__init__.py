@@ -1,4 +1,5 @@
-print("Success to import src!")
+import os, sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '../src'))
 
-from src.utils import backend, gw_optimizer
-from src import gw_alignment
+import utils
+import gw_alignment

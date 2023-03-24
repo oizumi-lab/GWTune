@@ -4,8 +4,9 @@ import ot
 
 # %%
 class InitMatrix():
-    def __init__(self, matrix_size):
+    def __init__(self, matrix_size, backend):
         self.matrix_size = matrix_size
+        self.backend = backend
         pass
 
     def make_initial_T(self, initialize, seed = 42):
@@ -14,35 +15,32 @@ class InitMatrix():
         """
         np.random.seed(seed) # numpyの乱数を固定する。seed値の変更も可能。
         if initialize == 'random':
-            T = self.make_random_initplan()
-            return T
+            T = self.make_random_init_plan()
 
         elif initialize == 'permutation':
             ts = np.zeros(self.matrix_size)
             ts[0] = 1 / self.matrix_size
-            T = self.initialize_matrix(self.matrix_size, ts=ts)
-            return T
-
+            T = self.initialize_matrix(ts=ts)
+    
         elif initialize == 'any_permutation':
-            T = self.initialize_matrix(self.matrix_size)
-            return T
+            T = self.initialize_matrix()
 
         elif initialize == 'beta':
             ts = np.random.beta(2, 5, self.matrix_size)
             ts = ts / (self.matrix_size * np.sum(ts))
-            T = self.initialize_matrix(self.matrix_size, ts=ts)
-            return T
+            T = self.initialize_matrix(ts=ts)
 
         elif initialize == 'uniform':
             T = np.outer(ot.unif(self.matrix_size), ot.unif(self.matrix_size))
-            return T
 
         elif initialize == 'diag':
             T = np.diag(ot.unif(self.matrix_size))
-            return T
 
         else:
             raise ValueError('Not defined initialize matrix.')
+        
+        T = self.backend(T)       
+        return T
 
     def randOrderedMatrix(self):
         """
@@ -72,7 +70,7 @@ class InitMatrix():
         Returns
             np.ndarray 初期値
         """
-        matrix = self.randOrderedMatrix(self.matrix_size)
+        matrix = self.randOrderedMatrix()
         if ts is None:
             ts = np.random.uniform(0, 1, self.matrix_size)
             ts = ts / (self.matrix_size * np.sum(ts))
@@ -80,7 +78,7 @@ class InitMatrix():
         T = np.array([ts[idx] for idx in matrix])
         return T
 
-    def make_random_initplan(self):
+    def make_random_init_plan(self):
         """
         大泉先生が作ったもの。
         """
@@ -97,9 +95,9 @@ class InitMatrix():
         T = T / self.matrix_size
         return T
 
-# %% 
+# %%
 if __name__ == '__main__':
     test_builder = InitMatrix(2000)
     t = test_builder.make_initial_T('diag')
-    
-# %% 
+
+# %%
