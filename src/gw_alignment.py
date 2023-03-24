@@ -80,12 +80,14 @@ class GW_Alignment():
     def entropic_gw(self, device, epsilon, T = None, max_iter = 1000, tol = 1e-9, log = True, verbose = False, trial = None):
         C1, C2, p, q = self.nx.to(self.pred_dist, device), self.nx.to(self.target_dist, device), self.nx.to(self.p, device), self.nx.to(self.q, device)
 
+                # add T as an input
+        if T is None:
+            T = self.nx.outer(p, q)
+
         T = self.nx.from_numpy(T)
         T = self.nx.to(T, device, dtype = 'float')
 
-        # add T as an input
-        if T is None:
-            T = self.nx.outer(p, q)
+
 
         constC, hC1, hC2 = ot.gromov.init_matrix(C1, C2, p, q, loss_fun = "square_loss")
 
