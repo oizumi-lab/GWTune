@@ -12,12 +12,12 @@ import seaborn as sns
 
 # %%
 def load_optimizer(save_path, n_jobs = 10, num_trial = 50,
-                   to_types = 'torch', method = 'optuna', 
-                   init_plans_list = ['diag'], eps_list = [1e-4, 1e-2], eps_log = True, 
-                   sampler_name = 'random', pruner_name = 'median', 
+                   to_types = 'torch', method = 'optuna',
+                   init_plans_list = ['diag'], eps_list = [1e-4, 1e-2], eps_log = True,
+                   sampler_name = 'random', pruner_name = 'median',
                    filename = 'test', sql_name = 'sqlite', storage = None,
                    delete_study = False):
-    
+
     """
     (usage example)
     >>> dataset = mydataset()
@@ -32,16 +32,16 @@ def load_optimizer(save_path, n_jobs = 10, num_trial = 50,
     Returns:
         _type_: _description_
     """
-    
+
     # make file_path
-    file_path = save_path + '/' + filename
+    file_path = save_path
     if not os.path.exists(file_path):
         os.makedirs(file_path)
-    
+
     # make db path
     if sql_name == 'sqlite':
         storage = "sqlite:///" + file_path +  '/' + filename + '.db',
-    
+
     elif sql_name == 'mysql':
         if storage == None:
             raise ValueError('mysql path was not set.')
@@ -57,22 +57,22 @@ def load_optimizer(save_path, n_jobs = 10, num_trial = 50,
 
 
 class RunOptuna():
-    def __init__(self, 
-                 file_path, 
-                 to_types, 
-                 storage, 
-                 filename, 
-                 sampler_name, 
+    def __init__(self,
+                 file_path,
+                 to_types,
+                 storage,
+                 filename,
+                 sampler_name,
                  pruner_name,
                  sql_name,
                  init_plans_list,
-                 eps_list, 
+                 eps_list,
                  eps_log,
                  n_jobs,
                  num_trial,
                  delete_study
                  ):
-        
+
         self.file_path = file_path
         self.to_types = to_types
         self.storage = storage
@@ -89,6 +89,22 @@ class RunOptuna():
 
         self.initialize = ['uniform', 'random', 'permutation', 'diag'] # 実装済みの方法の名前を入れる。
         self.init_mat_types = self._choose_init_plans(self.init_plans_list) # リストを入力して、実行可能な方法のみをリストにして返す。
+
+        # MedianPruner
+        self.n_startup_trials = 5
+        self.n_warmup_steps = 5
+        # HyperbandPruner
+        self.min_resource = 5
+        self.reduction_factor = 2
+
+    def set_params(self, vars_dic: dict) -> None:
+        '''
+        2023/3/14 阿部
+        インスタンス変数を外部から変更する関数
+        '''
+        for key, value in vars_dic.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
 
     def run_study(self, dataset):
 
@@ -183,9 +199,9 @@ class RunOptuna():
         (RandomSampler, MedianPruner)か(TPESampler, HyperbandPruner)がbestらしい
         '''
         if self.pruner_name == 'median':
-            pruner = optuna.pruners.MedianPruner(n_startup_trials = dataset.n_startup_trials, n_warmup_steps = dataset.n_warmup_steps)
+            pruner = optuna.pruners.MedianPruner(n_startup_trials = self.n_startup_trials, n_warmup_steps = self.n_warmup_steps)
         elif self.pruner_name.lower() == 'hyperband':
-            pruner = optuna.pruners.HyperbandPruner(min_resource = dataset.min_resource, max_resource = dataset.n_iter, reduction_factor = dataset.reduction_factor)
+            pruner = optuna.pruners.HyperbandPruner(min_resource = self.min_resource, max_resource = dataset.n_iter, reduction_factor = self.reduction_factor)
         elif self.pruner_name.lower() == 'nop':
             pruner = optuna.pruners.NopPruner()
         else:
@@ -230,4 +246,12 @@ class RunOptuna():
         plt.tight_layout()
         plt.show()
 
+# %%
+class Myclass:
+    def __init__(self) -> None:
+        self.variable = 0
+        pass
+
+    def set_variable(self, new_value):
+        self.variable = new_value
 # %%

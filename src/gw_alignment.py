@@ -16,12 +16,12 @@ import os
 from tqdm.auto import tqdm
 
 # %%
-from utils.backend import make_backend
+from utils.backend import Backend
 from utils.init_matrix import InitMatrix
 from utils.gw_optimizer import RunOptuna
 
 class GW_Alignment():
-    def __init__(self, pred_dist, target_dist, p, q, max_iter = 1000, device='cpu', to_types='torch', main_save_path = None, gpu_queue = None):
+    def __init__(self, pred_dist, target_dist, p, q, save_path, max_iter = 1000, n_iter = 100, device='cpu', to_types='torch', gpu_queue = None):
         """
         2023/3/6 大泉先生
 
@@ -39,21 +39,11 @@ class GW_Alignment():
         self.gpu_queue = gpu_queue
         self.size = len(p)
 
-        self.main_save_path = '../results/gw_alignment' if main_save_path is None else main_save_path
-        if not os.path.exists(self.main_save_path):
-            os.makedirs(self.main_save_path)
+        self.save_path = save_path
+        if not os.path.exists(self.save_path):
+            os.makedirs(self.save_path)
 
-        self.main_compute = MainGromovWasserstainComputation(pred_dist, target_dist, p, q, self.device, self.to_types, max_iter = max_iter, gpu_queue = gpu_queue)
-
-    def set_params(self, vars): # この関数の使用目的がoptimizer側にあるので、ここには定義しないほうがいいです。
-        '''
-        2023/3/14 阿部
-
-        インスタンス変数を外部から変更する関数
-        '''
-        for key, value in vars.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
+        self.main_compute = MainGromovWasserstainComputation(pred_dist, target_dist, p, q, self.device, self.to_types, max_iter = max_iter, n_iter = n_iter, gpu_queue = gpu_queue)
 
     def define_eps_range(self, trial, eps_list, eps_log):
         """
@@ -110,7 +100,7 @@ class GW_Alignment():
 
         trial.set_user_attr('size', self.size)
 
-        file_path = self.main_save_path + '/' + init_mat_plan # ここのパス設定はoptimizer.py側でも使う可能性があるので、変更の可能性あり。
+        file_path = self.save_path + '/' + init_mat_plan # ここのパス設定はoptimizer.py側でも使う可能性があるので、変更の可能性あり。
 
         if not os.path.exists(file_path):
             os.makedirs(file_path, exist_ok = True)
@@ -146,7 +136,7 @@ class GW_Alignment():
 
 
 class MainGromovWasserstainComputation():
-    def __init__(self, pred_dist, target_dist, p, q, device, to_types, max_iter = 1000, gpu_queue = None) -> None:
+    def __init__(self, pred_dist, target_dist, p, q, device, to_types, max_iter = 1000, n_iter = 100, gpu_queue = None) -> None:
         self.device = device
         self.to_types = to_types
         self.size = len(p)
@@ -161,14 +151,8 @@ class MainGromovWasserstainComputation():
         # gw alignmentに関わるparameter
         self.max_iter = max_iter
 
-        # pruner parameter
-        self.n_iter = 100
-        # MedianPruner
-        self.n_startup_trials = 5
-        self.n_warmup_steps = 5
-        # HyperbandPruner
-        self.min_resource = 5
-        self.reduction_factor = 2
+        # 初期値のiteration回数, かつ hyperbandのparameter
+        self.n_iter = n_iter
 
         # Multi-GPUの時に使う。
         self.gpu_queue = gpu_queue
@@ -267,12 +251,15 @@ class MainGromovWasserstainComputation():
         2023.3.17 佐々木
         uniform, diagでも、prunerを使うこともできるが、いまのところはコメントアウトしている。
         どちらにも使えるようにする場合は、ある程度の手直しが必要。
+
+        2023.3.24 阿部
+        uniform, diagではprunerは使いません
         """
 
         if init_mat_plan in ['uniform', 'diag']:
             gw, logv, gw_loss, acc, init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device)
             trial = self._save_results(gw_loss, acc, trial, init_mat_plan)
-            self._check_pruner_should_work(gw_loss, trial, init_mat_plan, eps, gpu_id = gpu_id)
+            # self._check_pruner_should_work(gw_loss, trial, init_mat_plan, eps, gpu_id = gpu_id)
             return gw, logv, gw_loss, acc, init_mat, trial
 
         elif init_mat_plan in ['random', 'permutation']:
@@ -299,8 +286,6 @@ class MainGromovWasserstainComputation():
             raise ValueError('Not defined initialize matrix.')
 
 
-
-
 # %%
 if __name__ == '__main__':
 
@@ -319,7 +304,7 @@ if __name__ == '__main__':
     eps_list = [1e-4, 1e-2]
     eps_log = True
 
-    # dataset = GW_Alignment(model1, model2, p, q, max_iter = 1000, device = 'cuda', save_path = unittest_save_path)
+    dataset = GW_Alignment(model1, model2, p, q, max_iter = 1000, device = 'cuda', main_save_path = unittest_save_path)
     # study.optimize(lambda trial: dataset(trial, init_mat_types, eps_list), n_trials = 20, n_jobs = 10)
 
     # %%

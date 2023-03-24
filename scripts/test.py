@@ -41,7 +41,7 @@ class Test():
 
         save_path = '../results/gw_alignment/' + filename
 
-        test_gw = GW_Alignment(self.model1, self.model2, self.p, self.q, max_iter = 1000, device = device, to_types = to_types, gpu_queue = None, save_path = save_path)
+        test_gw = GW_Alignment(self.model1, self.model2, self.p, self.q, save_path, max_iter = 1000, n_iter = 100, device = device, to_types = to_types, gpu_queue = None)
 
         pruner_params = {'n_iter':5, 'n_startup_trials':1, 'n_warmup_steps':0, 'min_resource':5, 'reduction_factor' : 2}
         test_gw.set_params(pruner_params)
@@ -52,7 +52,7 @@ class Test():
                              sampler_name = 'random', pruner_name = 'median',
                              filename = 'test', sql_name = 'sqlite', storage = None,
                              delete_study = False)
-
+        opt.set_params({'n_startup_trials': 5, 'n_warmup_steps': 5})
         study = opt.run_study(test_gw)
 
         return study
