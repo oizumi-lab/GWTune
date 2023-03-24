@@ -34,13 +34,12 @@ def load_optimizer(save_path, n_jobs = 10, num_trial = 50,
     """
 
     # make file_path
-    file_path = save_path
-    if not os.path.exists(file_path):
-        os.makedirs(file_path)
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
 
     # make db path
     if sql_name == 'sqlite':
-        storage = "sqlite:///" + file_path +  '/' + filename + '.db',
+        storage = "sqlite:///" + save_path +  '/' + filename + '.db',
 
     elif sql_name == 'mysql':
         if storage == None:
@@ -49,7 +48,7 @@ def load_optimizer(save_path, n_jobs = 10, num_trial = 50,
         raise ValueError('no implemented SQL.')
 
     if method == 'optuna':
-        Opt = RunOptuna(file_path, to_types, storage, filename, sampler_name, pruner_name, sql_name, init_plans_list, eps_list, eps_log, n_jobs, num_trial, delete_study)
+        Opt = RunOptuna(save_path, to_types, storage, filename, sampler_name, pruner_name, sql_name, init_plans_list, eps_list, eps_log, n_jobs, num_trial, delete_study)
     else:
         raise ValueError('no implemented method.')
 
@@ -58,7 +57,7 @@ def load_optimizer(save_path, n_jobs = 10, num_trial = 50,
 
 class RunOptuna():
     def __init__(self,
-                 file_path,
+                 save_path,
                  to_types,
                  storage,
                  filename,
@@ -73,7 +72,7 @@ class RunOptuna():
                  delete_study
                  ):
 
-        self.file_path = file_path
+        self.save_path = save_path
         self.to_types = to_types
         self.storage = storage
         self.filename = filename
@@ -106,23 +105,27 @@ class RunOptuna():
             if hasattr(self, key):
                 setattr(self, key, value)
 
+    def _confirm_delete(self) -> None:
+        while True:
+            confirmation = input(f"This code will delete the study named '{self.filename}'.\nDo you want to execute the code? (y/n)")
+            if confirmation == 'y':
+                try:
+                    optuna.delete_study(storage = self.storage, study_name = self.filename)
+                    print(f"delete the study '{self.filename}'!")
+                    break
+                except:
+                    print(f"study '{self.filename}' does not exist.")
+                    break
+            elif confirmation == 'n':
+                raise ValueError("If you don't want to delete study, use 'delete_study = False'.")
+            else:
+                print("Invalid input. Please enter again.")
+        pass
+
     def run_study(self, dataset):
 
         if self.delete_study:
-            while True:
-                confirmation = input(f"This code will delete the study named '{self.filename}'.\nDo you want to execute the code? (y/n)")
-                if confirmation == 'y':
-                    try:
-                        optuna.delete_study(storage = self.storage, study_name = self.filename)
-                        print(f"delete the study '{self.filename}'!")
-                        break
-                    except:
-                        print(f"study '{self.filename}' does not exist.")
-                        break
-                elif confirmation == 'n':
-                    raise ValueError("If you don't want to delete study, use 'delete_study = False'.")
-                else:
-                    print("Invalid input. Please enter again.")
+            self._confirm_delete()
 
         study = optuna.create_study(direction = "minimize",
                                     study_name = self.filename,
@@ -132,7 +135,7 @@ class RunOptuna():
                                     load_if_exists = True)
 
         with parallel_backend("multiprocessing", n_jobs = self.n_jobs):
-            study.optimize(lambda trial: dataset(trial, self.file_path, self.init_mat_types, self.eps_list, self.eps_log), n_trials = self.num_trial, n_jobs = self.n_jobs)
+            study.optimize(lambda trial: dataset(trial, self.init_mat_types, self.eps_list, self.eps_log), n_trials = self.num_trial, n_jobs = self.n_jobs)
 
         return study
 
@@ -216,9 +219,9 @@ class RunOptuna():
         number = best_trial.number
 
         if self.to_types == 'torch':
-            gw = torch.load(self.file_path +f'/gw_{best_trial.number}.pt')
+            gw = torch.load(self.save_path +f'/gw_{best_trial.number}.pt')
         elif self.to_types == 'numpy':
-            gw = np.load(self.file_path +f'/gw_{best_trial.number}.npy')
+            gw = np.load(self.save_path +f'/gw_{best_trial.number}.npy')
         # gw = torch.load(self.file_path + '/GW({} pictures, epsilon = {}, trial = {}).pt'.format(size, round(eps, 6), number))
         self.plot_coupling(gw, eps, acc)
 

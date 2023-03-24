@@ -81,6 +81,7 @@ class GW_Alignment():
 
         if self.to_types != 'numpy':
             if self.gpu_queue is None:
+                gpu_id = None
                 device = self.device
 
             else:
@@ -88,6 +89,7 @@ class GW_Alignment():
                 device = 'cuda:' + str(gpu_id % 4)
 
         else:
+            gpu_id = None
             device = 'cpu'
 
         '''
@@ -251,15 +253,14 @@ class MainGromovWasserstainComputation():
         2023.3.17 佐々木
         uniform, diagでも、prunerを使うこともできるが、いまのところはコメントアウトしている。
         どちらにも使えるようにする場合は、ある程度の手直しが必要。
-
-        2023.3.24 阿部
-        uniform, diagではprunerは使いません
         """
 
         if init_mat_plan in ['uniform', 'diag']:
             gw, logv, gw_loss, acc, init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device)
             trial = self._save_results(gw_loss, acc, trial, init_mat_plan)
-            # self._check_pruner_should_work(gw_loss, trial, init_mat_plan, eps, gpu_id = gpu_id)
+            if gw_loss == float('nan'):
+                raise optuna.TrialPruned(f"Trial was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
+
             return gw, logv, gw_loss, acc, init_mat, trial
 
         elif init_mat_plan in ['random', 'permutation']:

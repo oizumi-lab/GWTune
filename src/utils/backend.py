@@ -66,6 +66,17 @@ class Backend():
     def load(self, file):
         raise NotImplementedError()
 
+    def _change_types(self, args):
+        '''
+        ここで、任意の3type(numpy, torch, jax)を変換したいtypeに変換する。
+        変換後、CPU or GPUの選択ができる。
+
+        おそらく、今後、拡張が必要な気がする。GPUの番号指定を行えるようにする必要がある。
+        Args:
+            to_types (_type_):
+        Returns:
+            args :
+        '''
         if self.to_types == 'jax':
             if isinstance(args, torch.Tensor):
                 return jnp.asarray(args.to('cpu'))
