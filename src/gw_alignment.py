@@ -9,6 +9,7 @@ import ot
 import matplotlib.pyplot as plt
 import optuna
 from joblib import parallel_backend
+from scipy.spatial import distance
 import warnings
 import copy
 # warnings.simplefilter("ignore")
@@ -353,12 +354,19 @@ if __name__ == '__main__':
     
     os.chdir(os.path.dirname(__file__))
     
-    path1 = '../data/model1.pt'
-    path2 = '../data/model2.pt'
+    #path1 = '../data/model1.pt'
+    #path2 = '../data/model2.pt'
+    path1 = '../data/embedding_group_1.npy'
+    path2 = '../data/embedding_group_2.npy'
     unittest_save_path = '../results/unittest/gw_alignment'
     
-    model1 = torch.load(path1)
-    model2 = torch.load(path2)
+    #model1 = torch.load(path1)
+    #model2 = torch.load(path2)
+    emb1 = np.load(path1)[0]
+    emb2 = np.load(path2)[0]
+    model1 = distance.cdist(emb1, emb1, "cosine")
+    model2 = distance.cdist(emb2, emb2, "cosine")
+    
     p = ot.unif(len(model1))
     q = ot.unif(len(model2))
     
