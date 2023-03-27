@@ -39,7 +39,7 @@ def load_optimizer(save_path, n_jobs = 10, num_trial = 50,
 
     # make db path
     if sql_name == 'sqlite':
-        storage = "sqlite:///" + save_path +  '/' + filename + '.db',
+        storage = "sqlite:///" + save_path +  '/' + filename + '.db'
 
     elif sql_name == 'mysql':
         if storage == None:
@@ -178,7 +178,7 @@ class RunOptuna():
         if self.sampler_name == 'random':
             sampler = optuna.samplers.RandomSampler(seed = 42)
 
-        elif self.sampler_name == 'grid_search':
+        elif self.sampler_name == 'grid':
 
             search_space = {
                 "eps": np.logspace(-4, -2),

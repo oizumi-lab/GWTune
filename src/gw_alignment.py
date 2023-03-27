@@ -46,6 +46,8 @@ class GW_Alignment():
         if not os.path.exists(self.save_path):
             os.makedirs(self.save_path)
 
+        self.n_iter = n_iter
+
         self.main_compute = MainGromovWasserstainComputation(pred_dist, target_dist, p, q, self.device, self.to_types, max_iter = max_iter, n_iter = n_iter, gpu_queue = gpu_queue)
 
     def define_eps_range(self, trial, eps_list, eps_log):
@@ -110,7 +112,6 @@ class GW_Alignment():
         '''
         2.  Compute GW alignment with hyperparameters defined above.
         '''
-
         gw, logv, gw_loss, acc, init_mat, trial = self.main_compute.compute_GW_with_init_plans(trial, eps, init_mat_plan, device, gpu_id = gpu_id)
 
         '''
@@ -296,14 +297,13 @@ class MainGromovWasserstainComputation():
         if init_mat_plan in ['uniform', 'diag']:
             gw, logv, gw_loss, acc, init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device)
             trial = self._save_results(gw_loss, acc, trial, init_mat_plan)
-            if gw_loss == float('nan'):
-                raise optuna.TrialPruned(f"Trial was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
-
+            if self.backend.nx.isnan(gw_loss):
+                raise optuna.TrialPruned(f"Failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
             return gw, logv, gw_loss, acc, init_mat, trial
 
         elif init_mat_plan in ['random', 'permutation']:
             best_gw_loss = float('inf')
-            for i, seed in enumerate(tqdm(np.random.randint(0, 100000, self.n_iter))):
+            for i, seed in enumerate(np.random.randint(0, 100000, self.n_iter)):
                 c_gw, c_logv, c_gw_loss, c_acc, c_init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, seed = seed)
 
                 if c_gw_loss < best_gw_loss:
