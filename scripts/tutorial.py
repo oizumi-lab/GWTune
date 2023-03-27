@@ -1,5 +1,9 @@
 #%%
 import os, sys, gc
+# ここがないと、srcのimportが通らなかったです。(2023.3.28 佐々木)
+# ただ、jupyterで動かすのか、debuggerで動かすのかで、必要かどうかは変わる。
+sys.path.append(os.path.join(os.path.dirname(__file__), '../')) 
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -13,16 +17,14 @@ import matplotlib.pyplot as plt
 import optuna
 from joblib import parallel_backend
 import warnings
-import copy
 # warnings.simplefilter("ignore")
-import os
 import seaborn as sns
 import matplotlib.style as mplstyle
 from tqdm.auto import tqdm
 
 from src.gw_alignment import GW_Alignment
-from src.utils.gw_optimizer import load_optimizer, RunOptuna
-%load_ext autoreload
+from src.utils.gw_optimizer import load_optimizer
+# %load_ext autoreload
 
 #%%
 # データダウンロード
@@ -39,12 +41,14 @@ q = ot.unif(len(model2))
 # ├── results
 #     ├── gw_alignment
 #         ├── {filename}(これがstudy_nameにもなる)
-#             ├── {filename}.db
+#             ├── {filename}.db # この.dbはここではなくて、各条件ごとのフォルダーの想定でした (2023.3.28 佐々木)
 #             ├── diag
 #             ├── uniform
 #             └── random
 #                 ├── gw_{trial_number}.pt
 #                 ├── init_mat_{trial_number}.pt
+#                 └── {filename}.db # sqliteでの挙動なら、ここがわかりやすいかと。MySQLなら阿部さんの方がいいのだろうか・・・ (2023.3.28 佐々木)
+
 
 filename = 'test'
 save_path = '../results/gw_alignment/' + filename
@@ -60,7 +64,7 @@ storage = "sqlite:///" + save_path +  '/' + filename + '.db'
 # storage = 'mysql+pymysql://root:olabGPU61@localhost/GW_MethodsTest'
 # GW_MethodsTest
 # チューニング対象のハイパーパラメーターの探索範囲を指定
-init_plans_list = ['uniform', 'random', 'permutation']
+init_plans_list = ['uniform', 'random']#, 'permutation']
 eps_list = [1e-4, 1e-2]
 eps_log = True
 
