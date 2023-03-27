@@ -13,15 +13,18 @@ import warnings
 import copy
 # warnings.simplefilter("ignore")
 import os
+import seaborn as sns
+import matplotlib.style as mplstyle
 from tqdm.auto import tqdm
+#nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
 
 # %%
-from utils.backend import make_backend
+from utils.backend import Backend
 from utils.init_matrix import InitMatrix
 from utils.gw_optimizer import RunOptuna
 
 class GW_Alignment():
-    def __init__(self, pred_dist, target_dist, p, q, max_iter = 1000, device='cpu', to_types='torch', main_save_path = None, gpu_queue = None):
+    def __init__(self, pred_dist, target_dist, p, q, save_path, max_iter = 1000, n_iter = 100, device='cpu', to_types='torch', gpu_queue = None):
         """
         2023/3/6 大泉先生
 
@@ -39,21 +42,11 @@ class GW_Alignment():
         self.gpu_queue = gpu_queue
         self.size = len(p)
 
-        self.main_save_path = '../results/gw_alignment' if main_save_path is None else main_save_path
-        if not os.path.exists(self.main_save_path):
-            os.makedirs(self.main_save_path)
+        self.save_path = save_path
+        if not os.path.exists(self.save_path):
+            os.makedirs(self.save_path)
 
-        self.main_compute = MainGromovWasserstainComputation(pred_dist, target_dist, p, q, self.device, self.to_types, max_iter = max_iter, gpu_queue = gpu_queue)
-
-    def set_params(self, vars): # この関数の使用目的がoptimizer側にあるので、ここには定義しないほうがいいです。
-        '''
-        2023/3/14 阿部
-
-        インスタンス変数を外部から変更する関数
-        '''
-        for key, value in vars.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
+        self.main_compute = MainGromovWasserstainComputation(pred_dist, target_dist, p, q, self.device, self.to_types, max_iter = max_iter, n_iter = n_iter, gpu_queue = gpu_queue)
 
     def define_eps_range(self, trial, eps_list, eps_log):
         """
@@ -88,17 +81,16 @@ class GW_Alignment():
         0.  define the "gpu_queue" here.
             This will be used when the memory of dataset was too much large for a single GPU board, and so on.
         '''
-
-        if self.to_types != 'numpy':
-            if self.gpu_queue is None:
-                device = self.device
-
-            else:
-                gpu_id = self.gpu_queue.get()
-                device = 'cuda:' + str(gpu_id % 4)
+        if self.gpu_queue is None:
+            gpu_id = None
+            device = self.device
 
         else:
-            device = 'cpu'
+            gpu_id = self.gpu_queue.get()
+            device = 'cuda:' + str(gpu_id % 4)
+
+        if self.to_types == 'numpy':
+            assert device == 'cpu'
 
         '''
         1.  define hyperparameter (eps, T)
@@ -110,7 +102,7 @@ class GW_Alignment():
 
         trial.set_user_attr('size', self.size)
 
-        file_path = self.main_save_path + '/' + init_mat_plan # ここのパス設定はoptimizer.py側でも使う可能性があるので、変更の可能性あり。
+        file_path = self.save_path + '/' + init_mat_plan # ここのパス設定はoptimizer.py側でも使う可能性があるので、変更の可能性あり。
 
         if not os.path.exists(file_path):
             os.makedirs(file_path, exist_ok = True)
@@ -144,9 +136,47 @@ class GW_Alignment():
 
         return gw_loss
 
+    def load_graph(self, study):
+        best_trial = study.best_trial
+        eps = best_trial.params['eps']
+        acc = best_trial.user_attrs['acc']
+        size = best_trial.user_attrs['size']
+        number = best_trial.number
+
+        if self.to_types == 'torch':
+            gw = torch.load(self.file_path +f'/gw_{best_trial.number}.pt')
+        elif self.to_types == 'numpy':
+            gw = np.load(self.file_path +f'/gw_{best_trial.number}.npy')
+        # gw = torch.load(self.file_path + '/GW({} pictures, epsilon = {}, trial = {}).pt'.format(size, round(eps, 6), number))
+        self.plot_coupling(gw, eps, acc)
+
+    def make_eval_graph(self, study):
+        df_test = study.trials_dataframe()
+        success_test = df_test[df_test['values_0'] != float('nan')]
+
+        plt.figure()
+        plt.title('The evaluation of GW results for random pictures')
+        plt.scatter(success_test['values_1'], np.log(success_test['values_0']), label = 'init diag plan ('+str(self.train_size)+')', c = 'C0')
+        plt.xlabel('accuracy')
+        plt.ylabel('log(GWD)')
+        plt.legend()
+        plt.show()
+
+    def plot_coupling(self, T, epsilon, acc):
+        mplstyle.use('fast')
+        N = T.shape[0]
+        plt.figure(figsize=(8,6))
+        if self.to_types == 'torch':
+            T = T.to('cpu').numpy()
+        sns.heatmap(T)
+
+        plt.title('GW results ({} pictures, eps={}, acc.= {})'.format(N, round(epsilon, 6), round(acc, 4)))
+        plt.tight_layout()
+        plt.show()
+
 
 class MainGromovWasserstainComputation():
-    def __init__(self, pred_dist, target_dist, p, q, device, to_types, max_iter = 1000, gpu_queue = None) -> None:
+    def __init__(self, pred_dist, target_dist, p, q, device, to_types, max_iter = 1000, n_iter = 100, gpu_queue = None) -> None:
         self.device = device
         self.to_types = to_types
         self.size = len(p)
@@ -161,14 +191,8 @@ class MainGromovWasserstainComputation():
         # gw alignmentに関わるparameter
         self.max_iter = max_iter
 
-        # pruner parameter
-        self.n_iter = 100
-        # MedianPruner
-        self.n_startup_trials = 5
-        self.n_warmup_steps = 5
-        # HyperbandPruner
-        self.min_resource = 5
-        self.reduction_factor = 2
+        # 初期値のiteration回数, かつ hyperbandのparameter
+        self.n_iter = n_iter
 
         # Multi-GPUの時に使う。
         self.gpu_queue = gpu_queue
@@ -184,7 +208,6 @@ class MainGromovWasserstainComputation():
         #     T = self.backend.nx.outer(p, q) # このif文の状況を想定している場面がないので、消してもいいのでは？？ (2023.3.16 佐々木)
         '''
         C1, C2, p, q, T = self.backend.change_device(device, self.pred_dist, self.target_dist, self.p, self.q, T)
-
         constC, hC1, hC2 = ot.gromov.init_matrix(C1, C2, p, q, loss_fun = "square_loss")
 
         cpt = 0
@@ -245,7 +268,7 @@ class MainGromovWasserstainComputation():
 
         if init_mat_plan in ['random', 'permutation']:
             trial.set_user_attr('best_acc', acc)
-            trial.set_user_attr('num_iter', num_iter)
+            trial.set_user_attr('best_iter', num_iter)
             trial.set_user_attr('best_seed', int(seed)) # ここはint型に変換しないと、謎のエラーが出る (2023.3.18 佐々木)。
         else:
             trial.set_user_attr('acc', acc)
@@ -273,7 +296,9 @@ class MainGromovWasserstainComputation():
         if init_mat_plan in ['uniform', 'diag']:
             gw, logv, gw_loss, acc, init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device)
             trial = self._save_results(gw_loss, acc, trial, init_mat_plan)
-            self._check_pruner_should_work(gw_loss, trial, init_mat_plan, eps, gpu_id = gpu_id)
+            if gw_loss == float('nan'):
+                raise optuna.TrialPruned(f"Trial was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
+
             return gw, logv, gw_loss, acc, init_mat, trial
 
         elif init_mat_plan in ['random', 'permutation']:
@@ -295,11 +320,8 @@ class MainGromovWasserstainComputation():
             else:
                 return best_gw, best_logv, best_gw_loss, best_acc, best_init_mat, trial
 
-
         else:
             raise ValueError('Not defined initialize matrix.')
-
-
 
 
 # %%
@@ -320,7 +342,7 @@ if __name__ == '__main__':
     eps_list = [1e-4, 1e-2]
     eps_log = True
 
-    # dataset = GW_Alignment(model1, model2, p, q, max_iter = 1000, device = 'cuda', save_path = unittest_save_path)
+    dataset = GW_Alignment(model1, model2, p, q, max_iter = 1000, device = 'cuda', main_save_path = unittest_save_path)
     # study.optimize(lambda trial: dataset(trial, init_mat_types, eps_list), n_trials = 20, n_jobs = 10)
 
     # %%
@@ -355,4 +377,7 @@ if __name__ == '__main__':
 
     df = study.trials_dataframe()
     print(df)
+    # %%
+    df.dropna()
+
 # %%

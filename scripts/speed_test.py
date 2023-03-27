@@ -82,7 +82,7 @@ class SpeedTest():
     def time_test(self, epsilon, device, to_types):
         be = Backend(device, to_types)
         pred_dist, target_dist, p, q = self.load_sample_data()
-        self.pred_dist, self.target_dist, self.p, self.q = be.change_data(pred_dist, target_dist, p, q)
+        self.pred_dist, self.target_dist, self.p, self.q = be(pred_dist, target_dist, p, q)
         
         print('Computation Test : dtype = {}, device = {}.'.format(type(self.p), device))
 
@@ -114,11 +114,12 @@ class SpeedTest():
     def comparison(self):
         epsilon = 6e-4
 
+        torch_gpu_log, torch_gpu_end = self.time_test(epsilon, device='cuda', to_types='torch')
+        jax_gpu_log, jax_gpu_end = self.time_test(epsilon, device='gpu', to_types='jax')
+         
         numpy_cpu_log, numpy_cpu_end = self.time_test(epsilon, device='cpu', to_types='numpy')
         torch_cpu_log, torch_cpu_end = self.time_test(epsilon, device='cpu', to_types='torch')
-        torch_gpu_log, torch_gpu_end = self.time_test(epsilon, device='cuda', to_types='torch')
         jax_cpu_log, jax_cpu_end = self.time_test(epsilon, device='cpu', to_types='jax')
-        jax_gpu_log, jax_gpu_end = self.time_test(epsilon, device='gpu', to_types='jax')
 
         time_list = [numpy_cpu_end, torch_cpu_end, torch_gpu_end, jax_cpu_end, jax_gpu_end]
         log_list = [numpy_cpu_log, torch_cpu_log, torch_gpu_log, jax_cpu_log, jax_gpu_log]
