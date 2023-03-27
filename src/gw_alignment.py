@@ -277,15 +277,15 @@ class MainGromovWasserstainComputation():
         return trial
 
     def _check_pruner_should_work(self, gw_loss, trial, init_mat_plan, eps, num_iter = None, gpu_id = None):
-        if num_iter is None:
-            num_iter = trial.number
-
         trial.report(gw_loss, num_iter)
 
         if trial.should_prune():
-            if self.gpu_queue is not None:
-                self.gpu_queue.put(gpu_id)
-            raise optuna.TrialPruned(f"Trial was pruned at iteration {trial.number} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
+            self._gpu_queue_put(gpu_id)
+            raise optuna.TrialPruned(f"Trial was pruned at iteration {num_iter} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
+
+    def _gpu_queue_put(self, gpu_id: int) -> None:
+        if self.gpu_queue is not None:
+            self.gpu_queue.put(gpu_id)
 
     def compute_GW_with_init_plans(self, trial, eps, init_mat_plan, device, gpu_id = None):
         """
@@ -297,13 +297,14 @@ class MainGromovWasserstainComputation():
         if init_mat_plan in ['uniform', 'diag']:
             gw, logv, gw_loss, acc, init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device)
             trial = self._save_results(gw_loss, acc, trial, init_mat_plan)
-            if self.backend.nx.isnan(gw_loss):
+            if self.backend.check_zeros(gw):
+                self._gpu_queue_put(gpu_id)
                 raise optuna.TrialPruned(f"Failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
             return gw, logv, gw_loss, acc, init_mat, trial
 
         elif init_mat_plan in ['random', 'permutation']:
             best_gw_loss = float('inf')
-            for i, seed in enumerate(np.random.randint(0, 100000, self.n_iter)):
+            for i, seed in tqdm(enumerate(np.random.randint(0, 100000, self.n_iter))):
                 c_gw, c_logv, c_gw_loss, c_acc, c_init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, seed = seed)
 
                 if c_gw_loss < best_gw_loss:
@@ -313,8 +314,7 @@ class MainGromovWasserstainComputation():
                 self._check_pruner_should_work(c_gw_loss, trial, init_mat_plan, eps, num_iter = i, gpu_id = gpu_id)
 
             if best_gw_loss == float('inf'):
-                if self.gpu_queue is not None:
-                    self.gpu_queue.put(gpu_id)
+                self._gpu_queue_put(gpu_id)
                 raise optuna.TrialPruned(f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
 
             else:
@@ -342,7 +342,7 @@ if __name__ == '__main__':
     eps_list = [1e-4, 1e-2]
     eps_log = True
 
-    dataset = GW_Alignment(model1, model2, p, q, max_iter = 1000, device = 'cuda', main_save_path = unittest_save_path)
+    dataset = GW_Alignment(model1, model2, p, q, max_iter = 1000, n_iter = 100, device = 'cuda', save_path = unittest_save_path)
     # study.optimize(lambda trial: dataset(trial, init_mat_types, eps_list), n_trials = 20, n_jobs = 10)
 
     # %%
@@ -350,14 +350,14 @@ if __name__ == '__main__':
     from multiprocessing import Manager
     from joblib import parallel_backend
 
-    n_gpu = 4
+    n_gpu = 1
     with Manager() as manager:
         gpu_queue = manager.Queue()
 
         for i in range(n_gpu):
             gpu_queue.put(i)
 
-        dataset = GW_Alignment(model1, model2, p, q, max_iter = 1000, device = 'cuda', main_save_path = unittest_save_path, gpu_queue = gpu_queue)
+        dataset = GW_Alignment(model1, model2, p, q, unittest_save_path, max_iter = 1000, n_iter = 100, device = 'cuda', gpu_queue = gpu_queue)
 
         study = optuna.create_study(direction = "minimize",
                                     study_name = "test",

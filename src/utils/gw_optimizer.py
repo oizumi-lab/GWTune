@@ -14,7 +14,7 @@ import seaborn as sns
 def load_optimizer(save_path, n_jobs = 10, num_trial = 50,
                    to_types = 'torch', method = 'optuna',
                    init_plans_list = ['diag'], eps_list = [1e-4, 1e-2], eps_log = True,
-                   sampler_name = 'random', pruner_name = 'median',
+                   sampler_name = 'random', pruner_name = 'median', pruner_params = None,
                    filename = 'test', sql_name = 'sqlite', storage = None,
                    delete_study = False):
 
@@ -48,7 +48,7 @@ def load_optimizer(save_path, n_jobs = 10, num_trial = 50,
         raise ValueError('no implemented SQL.')
 
     if method == 'optuna':
-        Opt = RunOptuna(save_path, to_types, storage, filename, sampler_name, pruner_name, sql_name, init_plans_list, eps_list, eps_log, n_jobs, num_trial, delete_study)
+        Opt = RunOptuna(save_path, to_types, storage, filename, sampler_name, pruner_name, pruner_params, sql_name, init_plans_list, eps_list, eps_log, n_jobs, num_trial, delete_study)
     else:
         raise ValueError('no implemented method.')
 
@@ -63,6 +63,7 @@ class RunOptuna():
                  filename,
                  sampler_name,
                  pruner_name,
+                 pruner_params,
                  sql_name,
                  init_plans_list,
                  eps_list,
@@ -78,6 +79,7 @@ class RunOptuna():
         self.filename = filename
         self.sampler_name = sampler_name
         self.pruner_name = pruner_name
+        self.pruner_params = pruner_params
         self.sql_name = sql_name
         self.init_plans_list = init_plans_list
         self.eps_list = eps_list
@@ -96,14 +98,18 @@ class RunOptuna():
         self.min_resource = 5
         self.reduction_factor = 2
 
-    def set_params(self, vars_dic: dict) -> None:
+        if pruner_params is not None:
+            self._set_params(pruner_params)
+
+    def _set_params(self, vars_dic: dict) -> None:
         '''
         2023/3/14 阿部
-        インスタンス変数を外部から変更する関数
         '''
         for key, value in vars_dic.items():
             if hasattr(self, key):
                 setattr(self, key, value)
+            else:
+                print(f'{key} is not a parameter of the pruner.')
 
     def _confirm_delete(self) -> None:
         while True:
@@ -210,43 +216,3 @@ class RunOptuna():
         else:
             raise ValueError('not implemented pruner yet.')
         return pruner
-
-    def load_graph(self, study):
-        best_trial = study.best_trial
-        eps = best_trial.params['eps']
-        acc = best_trial.user_attrs['acc']
-        size = best_trial.user_attrs['size']
-        number = best_trial.number
-
-        if self.to_types == 'torch':
-            gw = torch.load(self.save_path +f'/gw_{best_trial.number}.pt')
-        elif self.to_types == 'numpy':
-            gw = np.load(self.save_path +f'/gw_{best_trial.number}.npy')
-        # gw = torch.load(self.file_path + '/GW({} pictures, epsilon = {}, trial = {}).pt'.format(size, round(eps, 6), number))
-        self.plot_coupling(gw, eps, acc)
-
-    def make_eval_graph(self, study):
-        df_test = study.trials_dataframe()
-        success_test = df_test[df_test['values_0'] != float('nan')]
-
-        plt.figure()
-        plt.title('The evaluation of GW results for random pictures')
-        plt.scatter(success_test['values_1'], np.log(success_test['values_0']), label = 'init diag plan ('+str(self.train_size)+')', c = 'C0')
-        plt.xlabel('accuracy')
-        plt.ylabel('log(GWD)')
-        plt.legend()
-        plt.show()
-
-    def plot_coupling(self, T, epsilon, acc):
-        mplstyle.use('fast')
-        N = T.shape[0]
-        plt.figure(figsize=(8,6))
-        if self.to_types == 'torch':
-            T = T.to('cpu').numpy()
-        sns.heatmap(T)
-
-        plt.title('GW results ({} pictures, eps={}, acc.= {})'.format(N, round(epsilon, 6), round(acc, 4)))
-        plt.tight_layout()
-        plt.show()
-
-# %%
