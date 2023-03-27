@@ -12,12 +12,12 @@ import seaborn as sns
 
 # %%
 def load_optimizer(save_path, n_jobs = 10, num_trial = 50,
-                   to_types = 'torch', method = 'optuna', 
-                   init_plans_list = ['diag'], eps_list = [1e-4, 1e-2], eps_log = True, 
-                   sampler_name = 'random', pruner_name = 'median', 
+                   to_types = 'torch', method = 'optuna',
+                   init_plans_list = ['diag'], eps_list = [1e-4, 1e-2], eps_log = True,
+                   sampler_name = 'random', pruner_name = 'median', pruner_params = None,
                    filename = 'test', sql_name = 'sqlite', storage = None,
                    delete_study = False):
-    
+
     """
     (usage example)
     >>> dataset = mydataset()
@@ -32,16 +32,15 @@ def load_optimizer(save_path, n_jobs = 10, num_trial = 50,
     Returns:
         _type_: _description_
     """
-    
+
     # make file_path
-    file_path = save_path + '/' + filename
-    if not os.path.exists(file_path):
-        os.makedirs(file_path)
-    
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
     # make db path
     if sql_name == 'sqlite':
-        storage = "sqlite:///" + file_path +  '/' + filename + '.db',
-    
+        storage = "sqlite:///" + save_path +  '/' + filename + '.db'
+
     elif sql_name == 'mysql':
         if storage == None:
             raise ValueError('mysql path was not set.')
@@ -49,7 +48,7 @@ def load_optimizer(save_path, n_jobs = 10, num_trial = 50,
         raise ValueError('no implemented SQL.')
 
     if method == 'optuna':
-        Opt = RunOptuna(file_path, to_types, storage, filename, sampler_name, pruner_name, sql_name, init_plans_list, eps_list, eps_log, n_jobs, num_trial, delete_study)
+        Opt = RunOptuna(save_path, to_types, storage, filename, sampler_name, pruner_name, pruner_params, sql_name, init_plans_list, eps_list, eps_log, n_jobs, num_trial, delete_study)
     else:
         raise ValueError('no implemented method.')
 
@@ -57,28 +56,30 @@ def load_optimizer(save_path, n_jobs = 10, num_trial = 50,
 
 
 class RunOptuna():
-    def __init__(self, 
-                 file_path, 
-                 to_types, 
-                 storage, 
-                 filename, 
-                 sampler_name, 
+    def __init__(self,
+                 save_path,
+                 to_types,
+                 storage,
+                 filename,
+                 sampler_name,
                  pruner_name,
+                 pruner_params,
                  sql_name,
                  init_plans_list,
-                 eps_list, 
+                 eps_list,
                  eps_log,
                  n_jobs,
                  num_trial,
                  delete_study
                  ):
-        
-        self.file_path = file_path
+
+        self.save_path = save_path
         self.to_types = to_types
         self.storage = storage
         self.filename = filename
         self.sampler_name = sampler_name
         self.pruner_name = pruner_name
+        self.pruner_params = pruner_params
         self.sql_name = sql_name
         self.init_plans_list = init_plans_list
         self.eps_list = eps_list
@@ -90,23 +91,47 @@ class RunOptuna():
         self.initialize = ['uniform', 'random', 'permutation', 'diag'] # 実装済みの方法の名前を入れる。
         self.init_mat_types = self._choose_init_plans(self.init_plans_list) # リストを入力して、実行可能な方法のみをリストにして返す。
 
+        # MedianPruner
+        self.n_startup_trials = 5
+        self.n_warmup_steps = 5
+        # HyperbandPruner
+        self.min_resource = 5
+        self.reduction_factor = 2
+
+        if pruner_params is not None:
+            self._set_params(pruner_params)
+
+    def _set_params(self, vars_dic: dict) -> None:
+        '''
+        2023/3/14 阿部
+        '''
+        for key, value in vars_dic.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+            else:
+                print(f'{key} is not a parameter of the pruner.')
+
+    def _confirm_delete(self) -> None:
+        while True:
+            confirmation = input(f"This code will delete the study named '{self.filename}'.\nDo you want to execute the code? (y/n)")
+            if confirmation == 'y':
+                try:
+                    optuna.delete_study(storage = self.storage, study_name = self.filename)
+                    print(f"delete the study '{self.filename}'!")
+                    break
+                except:
+                    print(f"study '{self.filename}' does not exist.")
+                    break
+            elif confirmation == 'n':
+                raise ValueError("If you don't want to delete study, use 'delete_study = False'.")
+            else:
+                print("Invalid input. Please enter again.")
+        pass
+
     def run_study(self, dataset):
 
         if self.delete_study:
-            while True:
-                confirmation = input(f"This code will delete the study named '{self.filename}'.\nDo you want to execute the code? (y/n)")
-                if confirmation == 'y':
-                    try:
-                        optuna.delete_study(storage = self.storage, study_name = self.filename)
-                        print(f"delete the study '{self.filename}'!")
-                        break
-                    except:
-                        print(f"study '{self.filename}' does not exist.")
-                        break
-                elif confirmation == 'n':
-                    raise ValueError("If you don't want to delete study, use 'delete_study = False'.")
-                else:
-                    print("Invalid input. Please enter again.")
+            self._confirm_delete()
 
         study = optuna.create_study(direction = "minimize",
                                     study_name = self.filename,
@@ -116,7 +141,7 @@ class RunOptuna():
                                     load_if_exists = True)
 
         with parallel_backend("multiprocessing", n_jobs = self.n_jobs):
-            study.optimize(lambda trial: dataset(trial, self.file_path, self.init_mat_types, self.eps_list, self.eps_log), n_trials = self.num_trial, n_jobs = self.n_jobs)
+            study.optimize(lambda trial: dataset(trial, self.init_mat_types, self.eps_list, self.eps_log), n_trials = self.num_trial, n_jobs = self.n_jobs)
 
         return study
 
@@ -159,7 +184,7 @@ class RunOptuna():
         if self.sampler_name == 'random':
             sampler = optuna.samplers.RandomSampler(seed = 42)
 
-        elif self.sampler_name == 'grid_search':
+        elif self.sampler_name == 'grid':
 
             search_space = {
                 "eps": np.logspace(-4, -2),
@@ -183,14 +208,11 @@ class RunOptuna():
         (RandomSampler, MedianPruner)か(TPESampler, HyperbandPruner)がbestらしい
         '''
         if self.pruner_name == 'median':
-            pruner = optuna.pruners.MedianPruner(n_startup_trials = dataset.n_startup_trials, n_warmup_steps = dataset.n_warmup_steps)
+            pruner = optuna.pruners.MedianPruner(n_startup_trials = self.n_startup_trials, n_warmup_steps = self.n_warmup_steps)
         elif self.pruner_name.lower() == 'hyperband':
-            pruner = optuna.pruners.HyperbandPruner(min_resource = dataset.min_resource, max_resource = dataset.n_iter, reduction_factor = dataset.reduction_factor)
+            pruner = optuna.pruners.HyperbandPruner(min_resource = self.min_resource, max_resource = dataset.n_iter, reduction_factor = self.reduction_factor)
         elif self.pruner_name.lower() == 'nop':
             pruner = optuna.pruners.NopPruner()
         else:
             raise ValueError('not implemented pruner yet.')
         return pruner
-
-    
-# %%
