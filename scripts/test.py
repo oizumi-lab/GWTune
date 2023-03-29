@@ -46,7 +46,7 @@ class Test():
         save_path = self.main_save_path + '/' + filename
         adjust_filename = filename + '_adjust'
         
-        adjust = self.adjustment_test(save_path)
+        adjust = self.adjustment_test(save_path, fix_method = 'both')
         opt_adjust = self.optimizer(adjust_filename, save_path, num_trial = 200)
         
         study_adjust = opt_adjust.run_adjust_study(adjust)
