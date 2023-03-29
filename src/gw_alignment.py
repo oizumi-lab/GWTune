@@ -19,8 +19,9 @@ from tqdm.auto import tqdm
 # %%
 from utils.backend import Backend
 from utils.init_matrix import InitMatrix
-from utils.gw_optimizer import RunOptuna
+from utils.gw_optimizer import load_optimizer
 
+# %%
 class GW_Alignment():
     def __init__(self, pred_dist, target_dist, p, q, save_path, max_iter = 1000, n_iter = 100, device='cpu', to_types='torch', gpu_queue = None):
         """
@@ -138,14 +139,15 @@ class GW_Alignment():
     def load_graph(self, study):
         best_trial = study.best_trial
         eps = best_trial.params['eps']
+        init_plan = best_trial.params['initialize']
         acc = best_trial.user_attrs['acc']
         size = best_trial.user_attrs['size']
         number = best_trial.number
 
         if self.to_types == 'torch':
-            gw = torch.load(self.file_path +f'/gw_{best_trial.number}.pt')
+            gw = torch.load(self.save_path + '/' + init_plan + f'/gw_{best_trial.number}.pt')
         elif self.to_types == 'numpy':
-            gw = np.load(self.file_path +f'/gw_{best_trial.number}.npy')
+            gw = np.load(self.save_path + '/' + init_plan + f'/gw_{best_trial.number}.npy')
         # gw = torch.load(self.file_path + '/GW({} pictures, epsilon = {}, trial = {}).pt'.format(size, round(eps, 6), number))
         self.plot_coupling(gw, eps, acc)
 

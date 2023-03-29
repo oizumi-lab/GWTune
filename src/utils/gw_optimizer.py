@@ -145,12 +145,34 @@ class RunOptuna():
 
         return study
 
+    def run_adjust_study(self, dataset):
+        """
+        2023.3.29 佐々木
+        adjust_distribution.pyのために作ってみたが、run_studyに統合すべき内容。if文などを使えば可能だが・・・。
+        
+        """
+        if self.delete_study:
+            self._confirm_delete()
 
-    def get_study(self, dataset):
         study = optuna.create_study(direction = "minimize",
-                                        study_name = self.filename,
-                                        storage = self.storage,
-                                        load_if_exists = True)
+                                    study_name = self.filename,
+                                    sampler = self.choose_sampler(),
+                                    pruner = self.choose_pruner(dataset),
+                                    storage = self.storage,
+                                    load_if_exists = True)
+
+        with parallel_backend("multiprocessing", n_jobs = self.n_jobs):
+            study.optimize(dataset, n_trials = self.num_trial, n_jobs = self.n_jobs)
+
+        return study
+
+
+
+    def get_study(self):
+        study = optuna.create_study(direction = "minimize",
+                                    study_name = self.filename,
+                                    storage = self.storage,
+                                    load_if_exists = True)
         return study
 
 
@@ -210,6 +232,7 @@ class RunOptuna():
         if self.pruner_name == 'median':
             pruner = optuna.pruners.MedianPruner(n_startup_trials = self.n_startup_trials, n_warmup_steps = self.n_warmup_steps)
         elif self.pruner_name.lower() == 'hyperband':
+            # ここのn_iterはデータセットからではなく、他の引数と同じようにした方がいい気がする。
             pruner = optuna.pruners.HyperbandPruner(min_resource = self.min_resource, max_resource = dataset.n_iter, reduction_factor = self.reduction_factor)
         elif self.pruner_name.lower() == 'nop':
             pruner = optuna.pruners.NopPruner()
