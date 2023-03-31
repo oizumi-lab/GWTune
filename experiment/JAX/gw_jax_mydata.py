@@ -31,9 +31,13 @@ model2_jax = jnp.array(model2)
 # apply https://ott-jax.readthedocs.io/en/latest/geometry.html
 geom1 = ott.geometry.geometry.Geometry(cost_matrix = model1_jax)
 geom2 = ott.geometry.geometry.Geometry(cost_matrix = model2_jax)
-prob = quadratic_problem.QuadraticProblem(geom1, geom2)
-solver = gromov_wasserstein.GromovWasserstein(epsilon=1, max_iterations=100)
-out = solver(prob)
+# prob = quadratic_problem.QuadraticProblem(geom1, geom2, tolerances = 1e-9)
+# solver = gromov_wasserstein.GromovWasserstein(epsilon=1e-5, max_iterations=100)
+# out = solver(prob)
+
+# %%
+solver = ott.solvers.linear.sinkhorn.Sinkhorn(threshold = 1e-9)
+out = ott.solvers.quadratic.gromov_wasserstein.solve(geom1, geom2, epsilon=1e-3, linear_ot_solver = solver, min_iterations=100, max_iterations=1000)
 
 n_outer_iterations = jnp.sum(out.costs != -1)
 has_converged = bool(out.linear_convergence[n_outer_iterations - 1])
