@@ -1,6 +1,6 @@
 # %%
 import optuna
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import torch
 
 torch.cuda.manual_seed(42)

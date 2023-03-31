@@ -374,37 +374,61 @@ if __name__ == '__main__':
 
     # %%
     # 以下はMulti-GPUで計算を回す場合。こちらの方が非常に早い。
-    from multiprocessing import Manager
-    from joblib import parallel_backend
+    # from multiprocessing import Manager
+    # from joblib import parallel_backend
 
-    n_gpu = 4
-    with Manager() as manager:
-        gpu_queue = manager.Queue()
+    # n_gpu = 4
+    # with Manager() as manager:
+    #     gpu_queue = manager.Queue()
 
-        for i in range(n_gpu):
-            gpu_queue.put(i)
+    #     for i in range(n_gpu):
+    #         gpu_queue.put(i)
 
-        dataset = GW_Alignment(model1, model2, p, q, unittest_save_path, max_iter = 1000, n_iter = 100, device = 'cuda', gpu_queue = gpu_queue)
+    #     dataset = GW_Alignment(model1, model2, p, q, unittest_save_path, max_iter = 1000, n_iter = 100, device = 'cuda', gpu_queue = gpu_queue)
 
-        study = optuna.create_study(direction = "minimize",
-                                    study_name = "test",
-                                    sampler = optuna.samplers.TPESampler(seed = 42),
-                                    pruner = optuna.pruners.MedianPruner(),
-                                    storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db', #この辺のパス設定は一度議論した方がいいかも。
-                                    load_if_exists = True)
+    #     study = optuna.create_study(direction = "minimize",
+    #                                 study_name = "test",
+    #                                 sampler = optuna.samplers.TPESampler(seed = 42),
+    #                                 pruner = optuna.pruners.MedianPruner(),
+    #                                 storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db', #この辺のパス設定は一度議論した方がいいかも。
+    #                                 load_if_exists = True)
 
-        with parallel_backend("multiprocessing", n_jobs = n_gpu):
-            study.optimize(lambda trial: dataset(trial, init_mat_types, eps_list), n_trials = 20, n_jobs = n_gpu)
+    #     with parallel_backend("multiprocessing", n_jobs = n_gpu):
+    #         study.optimize(lambda trial: dataset(trial, init_mat_types, eps_list), n_trials = 20, n_jobs = n_gpu)
+    
+    # df = study.trials_dataframe()
+    # print(df)
+    # # %%
+    # df.dropna()
 
     # %%
-    # study = optuna.create_study(direction = "minimize",
-    #                             study_name = "test",
-    #                             storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db', #この辺のパス設定は一度議論した方がいいかも。
-    #                             load_if_exists = True)
+    from concurrent.futures import ThreadPoolExecutor
 
-    df = study.trials_dataframe()
-    print(df)
-    # %%
-    df.dropna()
+    study = optuna.create_study(direction = "minimize",
+                        study_name = "test",
+                        sampler = optuna.samplers.TPESampler(seed = 42),
+                        pruner = optuna.pruners.MedianPruner(),
+                        storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db', #この辺のパス設定は一度議論した方がいいかも。
+                        load_if_exists = True)
 
-# %%
+    def multi_run(dataset, seed):
+        load_study = optuna.load_study(study_name = "test",
+                                       sampler = optuna.samplers.TPESampler(seed = seed),
+                                       pruner = optuna.pruners.MedianPruner(),
+                                       storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db'
+                                       )
+
+        load_study.optimize(lambda trial: dataset(trial, init_mat_types, eps_list), n_trials = 5, n_jobs = 1)
+
+
+    processes = []
+    
+    n_jobs = 4
+    seed = 42
+    
+    with ThreadPoolExecutor(n_jobs) as pool:
+        for i in range(n_jobs):
+            pool.submit(multi_run, dataset, seed + i)
+
+#%%
+
