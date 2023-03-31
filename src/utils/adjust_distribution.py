@@ -209,12 +209,17 @@ class Adjust_Distribution():
             lam2 = best_trial.params["lam2"]
         
         return a1, lam1, a2, lam2
+
+    def best_models(self, study):
+        a1, lam1, a2, lam2 = self.best_parameters(study)
+        model1_norm = self.model_normalize(self.model1, lam1, a1) 
+        model2_norm = self.model_normalize(self.model2, lam2, a2)
+        return model1_norm, model2_norm
     
     def make_graph(self, study):
         
         a1, lam1, a2, lam2 = self.best_parameters(study)
-        model1_norm = self.model_normalize(self.model1, lam1, a1) 
-        model2_norm = self.model_normalize(self.model2, lam2, a2)
+        model1_norm, model2_norm = self.best_models(study)
         
         plt.figure()
         plt.subplot(121)

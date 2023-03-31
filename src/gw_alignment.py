@@ -1,5 +1,5 @@
 #%%
-import os, sys, gc
+import os, sys, gc, math
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -10,9 +10,7 @@ import matplotlib.pyplot as plt
 import optuna
 from joblib import parallel_backend
 import warnings
-import copy
 # warnings.simplefilter("ignore")
-import os
 import seaborn as sns
 import matplotlib.style as mplstyle
 from tqdm.auto import tqdm
@@ -21,8 +19,9 @@ from tqdm.auto import tqdm
 # %%
 from utils.backend import Backend
 from utils.init_matrix import InitMatrix
-from utils.gw_optimizer import RunOptuna
+from utils.gw_optimizer import load_optimizer
 
+# %%
 class GW_Alignment():
     def __init__(self, pred_dist, target_dist, p, q, save_path, max_iter = 1000, n_iter = 100, device='cpu', to_types='torch', gpu_queue = None):
         """
@@ -140,14 +139,15 @@ class GW_Alignment():
     def load_graph(self, study):
         best_trial = study.best_trial
         eps = best_trial.params['eps']
+        init_plan = best_trial.params['initialize']
         acc = best_trial.user_attrs['acc']
         size = best_trial.user_attrs['size']
         number = best_trial.number
 
         if self.to_types == 'torch':
-            gw = torch.load(self.file_path +f'/gw_{best_trial.number}.pt')
+            gw = torch.load(self.save_path + '/' + init_plan + f'/gw_{best_trial.number}.pt')
         elif self.to_types == 'numpy':
-            gw = np.load(self.file_path +f'/gw_{best_trial.number}.npy')
+            gw = np.load(self.save_path + '/' + init_plan + f'/gw_{best_trial.number}.npy')
         # gw = torch.load(self.file_path + '/GW({} pictures, epsilon = {}, trial = {}).pt'.format(size, round(eps, 6), number))
         self.plot_coupling(gw, eps, acc)
 
@@ -277,13 +277,38 @@ class MainGromovWasserstainComputation():
         return trial
 
     def _check_pruner_should_work(self, gw_loss, trial, init_mat_plan, eps, num_iter = None, gpu_id = None):
-        trial.report(gw_loss, num_iter)
+        """
+        2023.3.28 佐々木
+        全条件において、prunerを動かすメソッド。
 
+        Args:
+            gw_loss (_type_): _description_
+            trial (_type_): _description_
+            init_mat_plan (_type_): _description_
+            eps (_type_): _description_
+            num_iter (_type_, optional): _description_. Defaults to None.
+            gpu_id (_type_, optional): _description_. Defaults to None.
+
+        Raises:
+            optuna.TrialPruned: _description_
+        """
+        
+        if init_mat_plan in ['uniform', 'diag'] and math.isnan(gw_loss): # math.isnan()を使わないとnanの判定ができない。 
+            # このifブロックがなくても、diag, uniformのprunerは正しく動作する。
+            # ただ、tutorialの挙動を見ていると、これがあった方が良さそう。(2023.3.28 佐々木)
+            self._gpu_queue_put(gpu_id)
+            raise optuna.TrialPruned(f"Trial for '{init_mat_plan}' was pruned with parameters: {{'eps': {eps}}}")
+
+        if num_iter is None: # uniform, diagにおいて、nanにならなかったがprunerが動くときのためのifブロック。
+            num_iter = trial.number
+        
+        trial.report(gw_loss, num_iter)
+        
         if trial.should_prune():
             self._gpu_queue_put(gpu_id)
             raise optuna.TrialPruned(f"Trial was pruned at iteration {num_iter} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
 
-    def _gpu_queue_put(self, gpu_id: int) -> None:
+    def _gpu_queue_put(self, gpu_id) -> None:
         if self.gpu_queue is not None:
             self.gpu_queue.put(gpu_id)
 
@@ -292,19 +317,21 @@ class MainGromovWasserstainComputation():
         2023.3.17 佐々木
         uniform, diagでも、prunerを使うこともできるが、いまのところはコメントアウトしている。
         どちらにも使えるようにする場合は、ある程度の手直しが必要。
+        
+        2023.3.28 佐々木
+        全条件において、正しくprunerを動かすメソッドを作成。
+        各条件ごとへの拡張性を考慮すると、prunerの挙動は一本化しておく方が絶対にいい。
         """
 
         if init_mat_plan in ['uniform', 'diag']:
             gw, logv, gw_loss, acc, init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device)
             trial = self._save_results(gw_loss, acc, trial, init_mat_plan)
-            if self.backend.check_zeros(gw):
-                self._gpu_queue_put(gpu_id)
-                raise optuna.TrialPruned(f"Failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
+            self._check_pruner_should_work(gw_loss, trial, init_mat_plan, eps, gpu_id = gpu_id)
             return gw, logv, gw_loss, acc, init_mat, trial
 
         elif init_mat_plan in ['random', 'permutation']:
             best_gw_loss = float('inf')
-            for i, seed in tqdm(enumerate(np.random.randint(0, 100000, self.n_iter))):
+            for i, seed in enumerate(tqdm(np.random.randint(0, 100000, self.n_iter))):
                 c_gw, c_logv, c_gw_loss, c_acc, c_init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, seed = seed)
 
                 if c_gw_loss < best_gw_loss:
@@ -338,7 +365,7 @@ if __name__ == '__main__':
     p = ot.unif(len(model1))
     q = ot.unif(len(model2))
 
-    init_mat_types = ['random']
+    init_mat_types = ['diag']
     eps_list = [1e-4, 1e-2]
     eps_log = True
 
@@ -350,7 +377,7 @@ if __name__ == '__main__':
     from multiprocessing import Manager
     from joblib import parallel_backend
 
-    n_gpu = 1
+    n_gpu = 4
     with Manager() as manager:
         gpu_queue = manager.Queue()
 
