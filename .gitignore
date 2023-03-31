@@ -1,7 +1,5 @@
 results
-.vscode/*
-
-
+*.vscode
 *.lock
 *.pyc
 .python-version
