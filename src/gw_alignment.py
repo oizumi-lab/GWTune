@@ -145,10 +145,10 @@ class GW_Alignment():
         number = best_trial.number
 
         if self.to_types == 'torch':
-            gw = torch.load(self.save_path + '/' + init_plan + f'/gw_{best_trial.number}.pt')
+            gw = torch.load(self.save_path + '/' + init_plan + f'/gw_{number}.pt')
         elif self.to_types == 'numpy':
-            gw = np.load(self.save_path + '/' + init_plan + f'/gw_{best_trial.number}.npy')
-        # gw = torch.load(self.file_path + '/GW({} pictures, epsilon = {}, trial = {}).pt'.format(size, round(eps, 6), number))
+            gw = np.load(self.save_path + '/' + init_plan + f'/gw_{number}.npy')
+            
         self.plot_coupling(gw, eps, acc)
 
     def make_eval_graph(self, study):
@@ -157,7 +157,7 @@ class GW_Alignment():
 
         plt.figure()
         plt.title('The evaluation of GW results for random pictures')
-        plt.scatter(success_test['values_1'], np.log(success_test['values_0']), label = 'init diag plan ('+str(self.train_size)+')', c = 'C0')
+        plt.scatter(success_test['values_1'], np.log(success_test['values_0']), label = 'init diag plan ('+str(self.size)+')', c = 'C0')
         plt.xlabel('accuracy')
         plt.ylabel('log(GWD)')
         plt.legend()

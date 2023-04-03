@@ -5,9 +5,31 @@ import ot
 # %%
 class InitMatrix():
     def __init__(self, matrix_size, backend):
-        self.matrix_size = matrix_size
+        self.matrix_size = matrix_size  
+        self.initialize = ['uniform', 'random', 'permutation', 'diag'] # 実装済みの方法の名前を入れる。
         self.backend = backend
-        pass
+        
+    def implemented_init_plans(self, init_plans_list): # リストを入力して、実行可能な方法のみをリストにして返す。
+        """
+        ここから、初期値の条件を1個または複数個選択することができる。
+        選択はself.initializeの中にあるものの中から。
+        選択したい条件が1つであっても、リストで入力をすること。
+
+        Args:
+            init_plans_list (list) : 初期値の条件を1個または複数個入れたリスト。
+
+        Raises:
+            ValueError: 選択したい条件が1つであっても、リストで入力をすること。
+
+        Returns:
+            list : 選択希望の条件のリスト。
+        """
+
+        if type(init_plans_list) != list:
+            raise ValueError('variable named "init_plans_list" is not list!')
+
+        else:
+            return [v for v in self.initialize if v in init_plans_list]
 
     def make_initial_T(self, initialize, seed = 42):
         """
