@@ -77,18 +77,18 @@ class GW_Alignment():
 
         return trial, eps
 
-    def __call__(self, trial, init_plans_list, eps_list, eps_log=True):
+    def __call__(self, trial, init_plans_list, eps_list, device, eps_log=True):
         '''
         0.  define the "gpu_queue" here.
             This will be used when the memory of dataset was too much large for a single GPU board, and so on.
         '''
-        if self.gpu_queue is None:
-            gpu_id = None
-            device = self.device
+        # if self.gpu_queue is None:
+        #     gpu_id = None
+        #     device = self.device
 
-        else:
-            gpu_id = self.gpu_queue.get()
-            device = 'cuda:' + str(gpu_id % 4)
+        # else:
+        #     gpu_id = self.gpu_queue.get()
+        #     device = 'cuda:' + str(gpu_id % 4)
 
         if self.to_types == 'numpy':
             assert device == 'cpu'
@@ -111,7 +111,7 @@ class GW_Alignment():
         '''
         2.  Compute GW alignment with hyperparameters defined above.
         '''
-        gw, logv, gw_loss, acc, init_mat, trial = self.main_compute.compute_GW_with_init_plans(trial, eps, init_mat_plan, device, gpu_id = gpu_id)
+        gw, logv, gw_loss, acc, init_mat, trial = self.main_compute.compute_GW_with_init_plans(trial, eps, init_mat_plan, device, gpu_id = None)
 
         '''
         3.  count the accuracy of alignment and save the results if computation was finished in the right way.
@@ -131,8 +131,8 @@ class GW_Alignment():
         '''
         5.  "gpu_queue" can manage the GPU boards for the next computation.
         '''
-        if self.gpu_queue is not None:
-            self.gpu_queue.put(gpu_id)
+        # if self.gpu_queue is not None:
+        #     self.gpu_queue.put(gpu_id)
 
         return gw_loss
 
@@ -145,10 +145,10 @@ class GW_Alignment():
         number = best_trial.number
 
         if self.to_types == 'torch':
-            gw = torch.load(self.save_path + '/' + init_plan + f'/gw_{best_trial.number}.pt')
+            gw = torch.load(self.save_path + '/' + init_plan + f'/gw_{number}.pt')
         elif self.to_types == 'numpy':
-            gw = np.load(self.save_path + '/' + init_plan + f'/gw_{best_trial.number}.npy')
-        # gw = torch.load(self.file_path + '/GW({} pictures, epsilon = {}, trial = {}).pt'.format(size, round(eps, 6), number))
+            gw = np.load(self.save_path + '/' + init_plan + f'/gw_{number}.npy')
+            
         self.plot_coupling(gw, eps, acc)
 
     def make_eval_graph(self, study):
@@ -157,7 +157,7 @@ class GW_Alignment():
 
         plt.figure()
         plt.title('The evaluation of GW results for random pictures')
-        plt.scatter(success_test['values_1'], np.log(success_test['values_0']), label = 'init diag plan ('+str(self.train_size)+')', c = 'C0')
+        plt.scatter(success_test['values_1'], np.log(success_test['values_0']), label = 'init diag plan ('+str(self.size)+')', c = 'C0')
         plt.xlabel('accuracy')
         plt.ylabel('log(GWD)')
         plt.legend()
@@ -374,37 +374,122 @@ if __name__ == '__main__':
 
     # %%
     # 以下はMulti-GPUで計算を回す場合。こちらの方が非常に早い。
-    from multiprocessing import Manager
-    from joblib import parallel_backend
+    # from multiprocessing import Manager
+    # from joblib import parallel_backend
 
-    n_gpu = 4
-    with Manager() as manager:
-        gpu_queue = manager.Queue()
+    # n_gpu = 4
+    # with Manager() as manager:
+    #     gpu_queue = manager.Queue()
 
-        for i in range(n_gpu):
-            gpu_queue.put(i)
+    #     for i in range(n_gpu):
+    #         gpu_queue.put(i)
 
-        dataset = GW_Alignment(model1, model2, p, q, unittest_save_path, max_iter = 1000, n_iter = 100, device = 'cuda', gpu_queue = gpu_queue)
+    #     dataset = GW_Alignment(model1, model2, p, q, unittest_save_path, max_iter = 1000, n_iter = 100, device = 'cuda', gpu_queue = gpu_queue)
 
-        study = optuna.create_study(direction = "minimize",
-                                    study_name = "test",
-                                    sampler = optuna.samplers.TPESampler(seed = 42),
-                                    pruner = optuna.pruners.MedianPruner(),
-                                    storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db', #この辺のパス設定は一度議論した方がいいかも。
-                                    load_if_exists = True)
+    #     study = optuna.create_study(direction = "minimize",
+    #                                 study_name = "test",
+    #                                 sampler = optuna.samplers.TPESampler(seed = 42),
+    #                                 pruner = optuna.pruners.MedianPruner(),
+    #                                 storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db', #この辺のパス設定は一度議論した方がいいかも。
+    #                                 load_if_exists = True)
 
-        with parallel_backend("multiprocessing", n_jobs = n_gpu):
-            study.optimize(lambda trial: dataset(trial, init_mat_types, eps_list), n_trials = 20, n_jobs = n_gpu)
+    #     with parallel_backend("multiprocessing", n_jobs = n_gpu):
+    #         study.optimize(lambda trial: dataset(trial, init_mat_types, eps_list), n_trials = 20, n_jobs = n_gpu)
+    
+    # df = study.trials_dataframe()
+    # print(df)
+    # # %%
+    # df.dropna()
 
     # %%
-    # study = optuna.create_study(direction = "minimize",
-    #                             study_name = "test",
-    #                             storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db', #この辺のパス設定は一度議論した方がいいかも。
-    #                             load_if_exists = True)
+    from concurrent.futures import ThreadPoolExecutor
+
+    study = optuna.create_study(direction = "minimize",
+                                study_name = "test",
+                                sampler = optuna.samplers.TPESampler(seed = 42),
+                                pruner = optuna.pruners.MedianPruner(),
+                                storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db', #この辺のパス設定は一度議論した方がいいかも。
+                                load_if_exists = True)
+
+    def multi_run(dataset, seed, device, num_trials = 40):
+        load_study = optuna.load_study(study_name = "test",
+                                       sampler = optuna.samplers.TPESampler(seed = seed),
+                                       pruner = optuna.pruners.MedianPruner(),
+                                       storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db')
+
+        load_study.optimize(lambda trial: dataset(trial, init_mat_types, eps_list, device), n_trials = num_trials, n_jobs = 1)
+
+    n_trials = 20
+    n_jobs = 10
+    seed = 42
+    
+    with ThreadPoolExecutor(n_jobs) as pool:
+        for i in range(n_jobs):
+            device = 'cuda:0'# + str(i % 4)
+            dataset = GW_Alignment(model1, model2, p, q, max_iter = 1000, n_iter = 100, device = device, save_path = unittest_save_path)
+            pool.submit(multi_run, dataset, seed + i, device, num_trials = n_trials // n_jobs)
+
+    #%%
+    study = optuna.load_study(study_name = "test",
+                              sampler = optuna.samplers.TPESampler(seed = seed),
+                              pruner = optuna.pruners.MedianPruner(),
+                              storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db')
 
     df = study.trials_dataframe()
     print(df)
     # %%
     df.dropna()
+    
 
-# %%
+    # %%
+    """
+    [I 2023-04-01 00:05:16,942] A new study created in RDB with name: test
+    /home/masaru-sasaki/.pyenv/versions/mambaforge-22.9.0-3/lib/python3.10/site-packages/ot/bregman.py:492: UserWarning: Warning: numerical errors at iteration 0
+    warnings.warn('Warning: numerical errors at iteration %d' % ii)
+    [I 2023-04-01 00:05:18,148] Trial 1 pruned. Trial for 'diag' was pruned with parameters: {'eps': 0.00016864634905345633}
+    [I 2023-04-01 00:05:18,518] Trial 8 pruned. Trial for 'diag' was pruned with parameters: {'eps': 0.0001698670453505509}
+    [I 2023-04-01 00:05:18,524] Trial 9 pruned. Trial for 'diag' was pruned with parameters: {'eps': 0.00010838783508283825}
+    [I 2023-04-01 00:06:14,865] Trial 12 finished with value: 0.013235032558441162 and parameters: {'eps': 0.0060694108171990896, 'initialize': 'diag'}. Best is trial 12 with value: 0.013235032558441162.
+    [I 2023-04-01 00:06:19,481] Trial 6 finished with value: 0.013266123831272125 and parameters: {'eps': 0.009506551974984317, 'initialize': 'diag'}. Best is trial 12 with value: 0.013235032558441162.
+    [I 2023-04-01 00:06:20,045] Trial 10 finished with value: 0.013262338005006313 and parameters: {'eps': 0.00889131893580497, 'initialize': 'diag'}. Best is trial 12 with value: 0.013235032558441162.
+    [I 2023-04-01 00:06:21,871] Trial 4 finished with value: 0.013180121779441833 and parameters: {'eps': 0.003695427629909335, 'initialize': 'diag'}. Best is trial 4 with value: 0.013180121779441833.
+    [I 2023-04-01 00:06:22,595] Trial 7 finished with value: 0.013094939291477203 and parameters: {'eps': 0.002246274520879033, 'initialize': 'diag'}. Best is trial 7 with value: 0.013094939291477203.
+    [I 2023-04-01 00:06:22,762] Trial 15 pruned. Trial for 'diag' was pruned with parameters: {'eps': 0.00012286391913479718}
+    [I 2023-04-01 00:06:30,498] Trial 3 finished with value: 0.013209367170929909 and parameters: {'eps': 0.00467395253077256, 'initialize': 'diag'}. Best is trial 7 with value: 0.013094939291477203.
+    [I 2023-04-01 00:06:45,984] Trial 11 finished with value: 0.013026578351855278 and parameters: {'eps': 0.0016524680777017765, 'initialize': 'diag'}. Best is trial 11 with value: 0.013026578351855278.
+    [I 2023-04-01 00:06:51,954] Trial 2 finished with value: 0.012748004868626595 and parameters: {'eps': 0.0009754461323261458, 'initialize': 'diag'}. Best is trial 2 with value: 0.012748004868626595.
+    [I 2023-04-01 00:07:05,149] Trial 14 finished with value: 0.013054275885224342 and parameters: {'eps': 0.0018606616740103096, 'initialize': 'diag'}. Best is trial 2 with value: 0.012748004868626595.
+    [I 2023-04-01 00:07:15,443] Trial 13 finished with value: 0.012949157506227493 and parameters: {'eps': 0.0012562887007755699, 'initialize': 'diag'}. Best is trial 2 with value: 0.012748004868626595.
+    [I 2023-04-01 00:07:18,461] Trial 16 finished with value: 0.013045035302639008 and parameters: {'eps': 0.0017871695144801546, 'initialize': 'diag'}. Best is trial 2 with value: 0.012748004868626595.
+    [I 2023-04-01 00:07:28,586] Trial 0 finished with value: 0.012348032556474209 and parameters: {'eps': 0.0005611516415334506, 'initialize': 'diag'}. Best is trial 0 with value: 0.012348032556474209.
+    [I 2023-04-01 00:07:39,551] Trial 17 finished with value: 0.012670058757066727 and parameters: {'eps': 0.0008807412123296194, 'initialize': 'diag'}. Best is trial 0 with value: 0.012348032556474209.
+    [I 2023-04-01 00:07:56,682] Trial 5 finished with value: 0.0120679447427392 and parameters: {'eps': 0.00039987928942942635, 'initialize': 'diag'}. Best is trial 5 with value: 0.0120679447427392.
+    [I 2023-04-01 00:08:10,249] Trial 18 finished with value: 0.012284882366657257 and parameters: {'eps': 0.0005220207331711442, 'initialize': 'diag'}. Best is trial 5 with value: 0.0120679447427392.
+    [I 2023-04-01 00:08:24,811] Trial 19 finished with value: 0.012181275524199009 and parameters: {'eps': 0.000459804725256059, 'initialize': 'diag'}. Best is trial 5 with value: 0.0120679447427392.
+    """
+
+    """
+    [I 2023-04-01 00:11:08,739] A new study created in RDB with name: test
+    /home/masaru-sasaki/.pyenv/versions/mambaforge-22.9.0-3/lib/python3.10/site-packages/ot/bregman.py:492: UserWarning: Warning: numerical errors at iteration 0
+    warnings.warn('Warning: numerical errors at iteration %d' % ii)
+    [I 2023-04-01 00:11:09,777] Trial 1 pruned. Trial for 'diag' was pruned with parameters: {'eps': 0.0001698670453505509}
+    [I 2023-04-01 00:11:10,151] Trial 8 pruned. Trial for 'diag' was pruned with parameters: {'eps': 0.00016864634905345633}
+    [I 2023-04-01 00:11:10,214] Trial 5 pruned. Trial for 'diag' was pruned with parameters: {'eps': 0.00010838783508283825}
+    [I 2023-04-01 00:12:06,391] Trial 12 finished with value: 0.013235032558441162 and parameters: {'eps': 0.0060694108171990896, 'initialize': 'diag'}. Best is trial 12 with value: 0.013235032558441162.
+    [I 2023-04-01 00:12:11,041] Trial 3 finished with value: 0.013266123831272125 and parameters: {'eps': 0.009506551974984317, 'initialize': 'diag'}. Best is trial 12 with value: 0.013235032558441162.
+    [I 2023-04-01 00:12:11,608] Trial 11 finished with value: 0.013262338005006313 and parameters: {'eps': 0.00889131893580497, 'initialize': 'diag'}. Best is trial 12 with value: 0.013235032558441162.
+    [I 2023-04-01 00:12:13,571] Trial 4 finished with value: 0.013180121779441833 and parameters: {'eps': 0.003695427629909335, 'initialize': 'diag'}. Best is trial 4 with value: 0.013180121779441833.
+    [I 2023-04-01 00:12:14,527] Trial 7 finished with value: 0.013094939291477203 and parameters: {'eps': 0.002246274520879033, 'initialize': 'diag'}. Best is trial 7 with value: 0.013094939291477203.
+    [I 2023-04-01 00:12:14,731] Trial 15 pruned. Trial for 'diag' was pruned with parameters: {'eps': 0.00012286391913479718}
+    [I 2023-04-01 00:12:22,171] Trial 2 finished with value: 0.013209367170929909 and parameters: {'eps': 0.00467395253077256, 'initialize': 'diag'}. Best is trial 7 with value: 0.013094939291477203.
+    [I 2023-04-01 00:12:37,812] Trial 10 finished with value: 0.013026578351855278 and parameters: {'eps': 0.0016524680777017765, 'initialize': 'diag'}. Best is trial 10 with value: 0.013026578351855278.
+    [I 2023-04-01 00:12:43,798] Trial 6 finished with value: 0.012748004868626595 and parameters: {'eps': 0.0009754461323261458, 'initialize': 'diag'}. Best is trial 6 with value: 0.012748004868626595.
+    [I 2023-04-01 00:12:57,259] Trial 14 finished with value: 0.013054275885224342 and parameters: {'eps': 0.0018606616740103096, 'initialize': 'diag'}. Best is trial 6 with value: 0.012748004868626595.
+    [I 2023-04-01 00:13:07,250] Trial 13 finished with value: 0.012949157506227493 and parameters: {'eps': 0.0012562887007755699, 'initialize': 'diag'}. Best is trial 6 with value: 0.012748004868626595.
+    [I 2023-04-01 00:13:09,679] Trial 16 finished with value: 0.013045035302639008 and parameters: {'eps': 0.0017871695144801546, 'initialize': 'diag'}. Best is trial 6 with value: 0.012748004868626595.
+    [I 2023-04-01 00:13:20,035] Trial 0 finished with value: 0.012348032556474209 and parameters: {'eps': 0.0005611516415334506, 'initialize': 'diag'}. Best is trial 0 with value: 0.012348032556474209.
+    [I 2023-04-01 00:13:31,620] Trial 17 finished with value: 0.012670058757066727 and parameters: {'eps': 0.0008807412123296194, 'initialize': 'diag'}. Best is trial 0 with value: 0.012348032556474209.
+    [I 2023-04-01 00:13:48,982] Trial 9 finished with value: 0.0120679447427392 and parameters: {'eps': 0.00039987928942942635, 'initialize': 'diag'}. Best is trial 9 with value: 0.0120679447427392.
+    [I 2023-04-01 00:14:03,002] Trial 18 finished with value: 0.012284882366657257 and parameters: {'eps': 0.0005220207331711442, 'initialize': 'diag'}. Best is trial 9 with value: 0.0120679447427392.
+    [I 2023-04-01 00:14:17,417] Trial 19 finished with value: 0.012181275524199009 and parameters: {'eps': 0.000459804725256059, 'initialize': 'diag'}. Best is trial 9 with value: 0.0120679447427392.
+    """
