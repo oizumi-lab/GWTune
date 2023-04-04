@@ -40,7 +40,7 @@ q = ot.unif(len(model2))
 #　%%
 # 2023.4.3 佐々木　
 # 阿部さんが作った、以下のオリジナルのdirectory構造の方が良さそうです (特に2条件以上で計算を行う場合)。
-# 
+#
 # filename(study_name)を書く
 # 保存結果としては
 # ├── results
@@ -109,13 +109,13 @@ opt = load_optimizer(save_path,
                      delete_study = delete_study
 )
 #%%
-### 最適化実行 
+### 最適化実行
 '''
 2023.4.3 佐々木
 実装済みの初期値条件の抽出をgw_optimizer.pyからinit_matrix.pyに移動しました。
 また、run_studyに渡す関数は、alignmentとhistogramの両方ともを揃えるようにしました。
 事前に、functools.partialで、必要なhyper parametersの条件を渡しておく。
-''' 
+'''
 # 1. 初期値の選択。実装済みの初期値条件の抽出をgw_optimizer.pyからinit_matrix.pyに移動しました。
 init_plans = test_gw.main_compute.init_mat_builder.implemented_init_plans(init_plans_list)
 
