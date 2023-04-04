@@ -51,12 +51,8 @@ class Test():
         adjust = self.adjustment_test(save_path, fix_method = 'both')
         opt_adjust = self.optimizer(adjust_filename, save_path, n_jobs = 4, num_trial = 1000)
         
-        db_file_path = save_path + '/' + adjust_filename + '.db'
-        
-        if os.path.exists(db_file_path):
-            study_adjust = opt_adjust.load_study()
-        else:
-            study_adjust = opt_adjust.run_study(adjust, gpu_board = 'cuda:0')
+        forced_run = False
+        study_adjust = opt_adjust.run_study(adjust, gpu_board = 'cuda:0', forced_run = forced_run)
         
         adjust.make_graph(study_adjust)
         

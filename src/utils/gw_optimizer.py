@@ -144,7 +144,7 @@ class RunOptuna():
         
         
 
-    def run_study(self, objective, gpu_board = 'cuda:0'):
+    def run_study(self, objective, gpu_board = 'cuda:0', forced_run = True):
         """
         2023.3.29 佐々木
         
@@ -153,25 +153,26 @@ class RunOptuna():
         if self.delete_study:
             self._confirm_delete()
         
-        self.load_study() #dbファイルがない場合、ここでloadをさせないとmulti_runが正しく動かなくなってしまう。
-        
-        def multi_run(objective, seed, num_trials, device):
-            tt = functools.partial(objective, device = device)
-            study = self.load_study(seed = seed)
-            study.optimize(tt, n_trials = num_trials, n_jobs = 1)
+        if forced_run:
+            self.load_study() #dbファイルがない場合、ここでloadをさせないとmulti_runが正しく動かなくなってしまう。
+            
+            def multi_run(objective, seed, num_trials, device):
+                tt = functools.partial(objective, device = device)
+                study = self.load_study(seed = seed)
+                study.optimize(tt, n_trials = num_trials, n_jobs = 1)
 
-        seed = 42
-        
-        with ThreadPoolExecutor(self.n_jobs) as pool:
-            for i in range(self.n_jobs):
-                if gpu_board == 'multi':
-                    device = 'cuda:' + str(i % 4)
-                elif 'cuda' in gpu_board:
-                    device = gpu_board
-                elif gpu_board == 'cpu':
-                    device = 'cpu'
-                
-                pool.submit(multi_run, objective, seed + i, self.num_trial // self.n_jobs, device)
+            seed = 42
+            
+            with ThreadPoolExecutor(self.n_jobs) as pool:
+                for i in range(self.n_jobs):
+                    if gpu_board == 'multi':
+                        device = 'cuda:' + str(i % 4)
+                    elif 'cuda' in gpu_board:
+                        device = gpu_board
+                    elif gpu_board == 'cpu':
+                        device = 'cpu'
+                    
+                    pool.submit(multi_run, objective, seed + i, self.num_trial // self.n_jobs, device)
 
         study = self.load_study()
 
