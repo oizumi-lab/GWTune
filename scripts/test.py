@@ -51,7 +51,7 @@ class Test():
         adjust = self.adjustment_test(save_path, fix_method = 'both')
         opt_adjust = self.optimizer(adjust_filename, save_path, n_jobs = 4, num_trial = 1000)
         
-        forced_run = True
+        forced_run = False
         study_adjust = opt_adjust.run_study(adjust, gpu_board = 'cuda:0', forced_run = forced_run)
         
         adjust.make_graph(study_adjust)
@@ -60,9 +60,9 @@ class Test():
         
         # histogramを調整後にalignmentの計算を行う
         init_plans_list = ['random']
-        eps_list = [1e-4, 1e-2]
+        eps_list = [1e-4, 1e-3]
         eps_log = True
-        n_iter = 100
+        n_iter = 20
         
         test_gw = GW_Alignment(model1_best_yj, model2_best_yj, self.p, self.q, save_path, max_iter = 1000, n_iter = n_iter, device = self.device, to_types = self.to_types, gpu_queue = None)
         
@@ -73,8 +73,8 @@ class Test():
         gw_objective = functools.partial(test_gw, init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log)
         
         # 3. 最適化を実行。run_studyに渡す関数は、alignmentとhistogramの両方ともを揃えるようにしました。
-        opt_gw = self.optimizer(filename, save_path, n_jobs = 4, num_trial = 40, n_iter = n_iter)
-        study = opt_gw.run_study(gw_objective, gpu_board = 'multi')
+        opt_gw = self.optimizer(filename, save_path, n_jobs = 8, num_trial = 40, n_iter = n_iter)
+        study = opt_gw.run_study(gw_objective, gpu_board = 'cuda')
         test_gw.load_graph(study)
         
         return study
