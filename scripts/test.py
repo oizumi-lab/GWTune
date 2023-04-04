@@ -51,7 +51,7 @@ class Test():
         adjust = self.adjustment_test(save_path, fix_method = 'both')
         opt_adjust = self.optimizer(adjust_filename, save_path, n_jobs = 4, num_trial = 1000)
         
-        forced_run = False
+        forced_run = True
         study_adjust = opt_adjust.run_study(adjust, gpu_board = 'cuda:0', forced_run = forced_run)
         
         adjust.make_graph(study_adjust)
@@ -59,11 +59,12 @@ class Test():
         model1_best_yj, model2_best_yj = adjust.best_models(study_adjust)
         
         # histogramを調整後にalignmentの計算を行う
-        test_gw = GW_Alignment(model1_best_yj, model2_best_yj, self.p, self.q, save_path, max_iter = 1000, n_iter = 10, device = self.device, to_types = self.to_types, gpu_queue = None)
-        
         init_plans_list = ['random']
         eps_list = [1e-4, 1e-2]
         eps_log = True
+        n_iter = 100
+        
+        test_gw = GW_Alignment(model1_best_yj, model2_best_yj, self.p, self.q, save_path, max_iter = 1000, n_iter = n_iter, device = self.device, to_types = self.to_types, gpu_queue = None)
         
         # 1. 初期値の選択。実装済みの初期値条件の抽出をgw_optimizer.pyからinit_matrix.pyに移動しました。
         init_plans = test_gw.main_compute.init_mat_builder.implemented_init_plans(init_plans_list)
@@ -72,14 +73,14 @@ class Test():
         gw_objective = functools.partial(test_gw, init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log)
         
         # 3. 最適化を実行。run_studyに渡す関数は、alignmentとhistogramの両方ともを揃えるようにしました。
-        opt_gw = self.optimizer(filename, save_path, n_jobs = 6, num_trial = 30)
-        study = opt_gw.run_study(gw_objective)
+        opt_gw = self.optimizer(filename, save_path, n_jobs = 4, num_trial = 40, n_iter = n_iter)
+        study = opt_gw.run_study(gw_objective, gpu_board = 'multi')
         test_gw.load_graph(study)
         
         return study
         
         
-    def optimizer(self, filename, save_path, n_jobs = 4, num_trial = 100, delete_study = False):
+    def optimizer(self, filename, save_path, n_jobs = 4, num_trial = 100, n_iter = 100, delete_study = False):
         
         # 分散計算のために使うRDBを指定
         sql_name = 'sqlite'
@@ -103,7 +104,6 @@ class Test():
         
         pruner_name = 'median'
         pruner_params = {'n_startup_trials': 1, 'n_warmup_steps': 2, 'min_resource': 2, 'reduction_factor' : 3}
-        n_iter = 10
         
         opt = load_optimizer(save_path,
                              n_jobs = n_jobs,
