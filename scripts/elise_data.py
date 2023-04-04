@@ -22,20 +22,36 @@ import seaborn as sns
 import matplotlib.style as mplstyle
 from tqdm.auto import tqdm
 
+
 from src.gw_alignment import GW_Alignment
 from src.utils.gw_optimizer import load_optimizer
+
+import scipy.io
 # %load_ext autoreload
 
+#%%
+data_path = '../data/faces_GROUP_interp.mat'
+mat_dic = scipy.io.loadmat(data_path)
+
+C1 = mat_dic["group_mean_ATTENDED"]
+C2 = mat_dic["group_mean_UNATTENDED"]
+
+im1 = plt.imshow(C1)
+plt.colorbar(im1)
+plt.title('ATTENDED')
+plt.show()
+
+im2 = plt.imshow(C2)
+plt.colorbar(im2)
+plt.title('UNATTENDED')
+plt.show()
 
 #%%
-# データダウンロード
-path1 = '../data/model1.pt'
-path2 = '../data/model2.pt'
+# C1 = torch.from_numpy(C1.astype(np.float32)).clone()
+# C2 = torch.from_numpy(C2.astype(np.float32)).clone()
 
-model1 = torch.load(path1)
-model2 = torch.load(path2)
-p = ot.unif(len(model1))
-q = ot.unif(len(model2))
+p = ot.unif(len(C1))
+q = ot.unif(len(C2))
 #%%
 # filename(study_name)を書く
 # 保存結果としては
@@ -51,12 +67,15 @@ q = ot.unif(len(model2))
 #                 └── {filename}.db # sqliteでの挙動なら、ここがわかりやすいかと。MySQLなら阿部さんの方がいいのだろうか・・・ (2023.3.28 佐々木)
 
 
-filename = 'test'
+filename = 'elise_data'
 save_path = '../results/gw_alignment/' + filename
 
 # 使用する型とマシンを決定
-device = 'cuda'
-to_types = 'torch'
+# device = 'cuda'
+# to_types = 'torch'
+
+device = 'cpu'
+to_types = 'numpy'
 
 # 分散計算のために使うRDBを指定
 sql_name = 'sqlite'
@@ -65,8 +84,8 @@ storage = "sqlite:///" + save_path +  '/' + filename + '.db'
 # storage = 'mysql+pymysql://root:olabGPU61@localhost/GW_MethodsTest'
 # GW_MethodsTest
 # チューニング対象のハイパーパラメーターの探索範囲を指定
-init_plans_list = ['uniform', 'random']#, 'permutation']
-eps_list = [1e-4, 1e-2]
+init_plans_list = ['random']#, 'permutation']
+eps_list = [1e-2, 1e-1]
 eps_log = True
 
 # init_mat_plan in ['random', 'permutation']のときに生成する初期値の数を指定
@@ -85,16 +104,19 @@ sampler_name = 'tpe'
 #     min_resource     : 各trialについてこのステップ以下ではprunerを作動させない
 #     reduction_factor : どれくらいの間隔でpruningをcheckするか。値が小さいほど細かい間隔でpruning checkが入る。2~6程度.
 
-pruner_name = 'hyperband'
+# pruner_name = 'hyperband'
+# pruner_name = 'nop'
+pruner_name = 'median'
 pruner_params = {'n_startup_trials': 1, 'n_warmup_steps': 2, 'min_resource': 2, 'reduction_factor' : 3}
 
 delete_study = True
 #%%
-test_gw = GW_Alignment(model1, model2, p, q, save_path, max_iter = 100, n_iter = n_iter, device = device, to_types = to_types, gpu_queue = None)
+# max_iter: GWの回数
+test_gw = GW_Alignment(C1, C2, p, q, save_path, max_iter = 1000, n_iter = n_iter, device = device, to_types = to_types, gpu_queue = None)
 
 opt = load_optimizer(test_gw.save_path,
                     n_jobs = 4,
-                    num_trial = 10,
+                    num_trial = 20,
                     to_types = to_types,
                     method = 'optuna',
                     init_plans_list = init_plans_list,
@@ -119,4 +141,12 @@ processed_time = time.time() - start
 best_trial = study.best_trial
 print(best_trial)
 
+# epsilon + GWD
+print(best_trial.number)
+print(best_trial.params)
+
+# %%
+gw_opt = np.load(save_path+f'/random/gw_{best_trial.number}.npy')
+plt.imshow(gw_opt)
+plt.show()
 # %%
