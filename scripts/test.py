@@ -56,7 +56,7 @@ class Test():
         if os.path.exists(db_file_path):
             study_adjust = opt_adjust.load_study()
         else:
-            study_adjust = opt_adjust.run_study(adjust)
+            study_adjust = opt_adjust.run_study(adjust, gpu_board = 'cuda:0')
         
         adjust.make_graph(study_adjust)
         
@@ -65,7 +65,7 @@ class Test():
         # histogramを調整後にalignmentの計算を行う
         test_gw = GW_Alignment(model1_best_yj, model2_best_yj, self.p, self.q, save_path, max_iter = 1000, n_iter = 10, device = self.device, to_types = self.to_types, gpu_queue = None)
         
-        init_plans_list = ['uniform']
+        init_plans_list = ['random']
         eps_list = [1e-4, 1e-2]
         eps_log = True
         
