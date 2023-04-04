@@ -2,7 +2,7 @@
 import os, sys, gc
 # ここがないと、srcのimportが通らなかったです。(2023.3.28 佐々木)
 # ただ、jupyterで動かすのか、debuggerで動かすのかで、必要かどうかは変わる。
-sys.path.append(os.path.join(os.path.dirname(__file__), '../')) 
+sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 
 import jax
 import jax.numpy as jnp
@@ -27,6 +27,7 @@ from src.utils.gw_optimizer import load_optimizer
 # %load_ext autoreload
 
 os.chdir(os.path.dirname(__file__))
+
 #%%
 # データダウンロード
 path1 = '../data/model1.pt'
