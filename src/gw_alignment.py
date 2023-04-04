@@ -77,18 +77,18 @@ class GW_Alignment():
 
         return trial, eps
 
-    def __call__(self, trial, init_plans_list, eps_list, eps_log=True):
+    def __call__(self, trial, init_plans_list, eps_list, device, eps_log=True):
         '''
         0.  define the "gpu_queue" here.
             This will be used when the memory of dataset was too much large for a single GPU board, and so on.
         '''
-        if self.gpu_queue is None:
-            gpu_id = None
-            device = self.device
+        # if self.gpu_queue is None:
+        #     gpu_id = None
+        #     device = self.device
 
-        else:
-            gpu_id = self.gpu_queue.get()
-            device = 'cuda:' + str(gpu_id % 4)
+        # else:
+        #     gpu_id = self.gpu_queue.get()
+        #     device = 'cuda:' + str(gpu_id % 4)
 
         if self.to_types == 'numpy':
             assert device == 'cpu'
@@ -111,7 +111,7 @@ class GW_Alignment():
         '''
         2.  Compute GW alignment with hyperparameters defined above.
         '''
-        gw, logv, gw_loss, acc, init_mat, trial = self.main_compute.compute_GW_with_init_plans(trial, eps, init_mat_plan, device, gpu_id = gpu_id)
+        gw, logv, gw_loss, acc, init_mat, trial = self.main_compute.compute_GW_with_init_plans(trial, eps, init_mat_plan, device, gpu_id = None)
 
         '''
         3.  count the accuracy of alignment and save the results if computation was finished in the right way.
@@ -131,8 +131,8 @@ class GW_Alignment():
         '''
         5.  "gpu_queue" can manage the GPU boards for the next computation.
         '''
-        if self.gpu_queue is not None:
-            self.gpu_queue.put(gpu_id)
+        # if self.gpu_queue is not None:
+        #     self.gpu_queue.put(gpu_id)
 
         return gw_loss
 
@@ -411,13 +411,13 @@ if __name__ == '__main__':
                                 storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db', #この辺のパス設定は一度議論した方がいいかも。
                                 load_if_exists = True)
 
-    def multi_run(dataset, seed, num_trials = 40):
+    def multi_run(dataset, seed, device, num_trials = 40):
         load_study = optuna.load_study(study_name = "test",
                                        sampler = optuna.samplers.TPESampler(seed = seed),
                                        pruner = optuna.pruners.MedianPruner(),
                                        storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db')
 
-        load_study.optimize(lambda trial: dataset(trial, init_mat_types, eps_list), n_trials = num_trials, n_jobs = 1)
+        load_study.optimize(lambda trial: dataset(trial, init_mat_types, eps_list, device), n_trials = num_trials, n_jobs = 1)
 
     n_trials = 20
     n_jobs = 10
@@ -427,7 +427,7 @@ if __name__ == '__main__':
         for i in range(n_jobs):
             device = 'cuda:0'# + str(i % 4)
             dataset = GW_Alignment(model1, model2, p, q, max_iter = 1000, n_iter = 100, device = device, save_path = unittest_save_path)
-            pool.submit(multi_run, dataset, seed + i, num_trials = n_trials // n_jobs)
+            pool.submit(multi_run, dataset, seed + i, device, num_trials = n_trials // n_jobs)
 
     #%%
     study = optuna.load_study(study_name = "test",

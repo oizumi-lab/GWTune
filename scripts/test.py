@@ -49,17 +49,23 @@ class Test():
         
         # まずは、histogramの調整の計算を行う。
         adjust = self.adjustment_test(save_path, fix_method = 'both')
-        opt_adjust = self.optimizer(adjust_filename, save_path, num_trial = 200)
+        opt_adjust = self.optimizer(adjust_filename, save_path, n_jobs = 4, num_trial = 1000)
         
-        study_adjust = opt_adjust.run_study(adjust)
+        db_file_path = save_path + '/' + adjust_filename + '.db'
+        
+        if os.path.exists(db_file_path):
+            study_adjust = opt_adjust.load_study()
+        else:
+            study_adjust = opt_adjust.run_study(adjust)
+        
         adjust.make_graph(study_adjust)
         
         model1_best_yj, model2_best_yj = adjust.best_models(study_adjust)
         
         # histogramを調整後にalignmentの計算を行う
-        test_gw = GW_Alignment(model1_best_yj, model2_best_yj, self.p, self.q, save_path, max_iter = 100, n_iter = 10, device = self.device, to_types = self.to_types, gpu_queue = None)
+        test_gw = GW_Alignment(model1_best_yj, model2_best_yj, self.p, self.q, save_path, max_iter = 1000, n_iter = 10, device = self.device, to_types = self.to_types, gpu_queue = None)
         
-        init_plans_list = ['diag']
+        init_plans_list = ['uniform']
         eps_list = [1e-4, 1e-2]
         eps_log = True
         
@@ -70,9 +76,9 @@ class Test():
         gw_objective = functools.partial(test_gw, init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log)
         
         # 3. 最適化を実行。run_studyに渡す関数は、alignmentとhistogramの両方ともを揃えるようにしました。
-        opt_gw = self.optimizer(filename, save_path, num_trial = 30)
+        opt_gw = self.optimizer(filename, save_path, n_jobs = 6, num_trial = 30)
         study = opt_gw.run_study(gw_objective)
-        gw_objective.load_graph(study)
+        test_gw.load_graph(study)
         
         return study
         
@@ -104,18 +110,18 @@ class Test():
         n_iter = 10
         
         opt = load_optimizer(save_path,
-                            n_jobs = n_jobs,
-                            num_trial = num_trial,
-                            to_types = self.to_types,
-                            method = 'optuna',
-                            sampler_name = sampler_name,
-                            pruner_name = pruner_name,
-                            pruner_params = pruner_params,
-                            n_iter = n_iter,
-                            filename = filename,
-                            sql_name = sql_name,
-                            storage = storage,
-                            delete_study = delete_study)
+                             n_jobs = n_jobs,
+                             num_trial = num_trial,
+                             to_types = self.to_types,
+                             method = 'optuna',
+                             sampler_name = sampler_name,
+                             pruner_name = pruner_name,
+                             pruner_params = pruner_params,
+                             n_iter = n_iter,
+                             filename = filename,
+                             sql_name = sql_name,
+                             storage = storage,
+                             delete_study = delete_study)
         
         return opt
 

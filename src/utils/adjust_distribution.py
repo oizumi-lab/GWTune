@@ -13,7 +13,7 @@ from matplotlib.cm import ScalarMappable, get_cmap
 import matplotlib.colors as colors
 from scipy import stats
 import warnings
-
+import functools
 import scipy as sp
 warnings.simplefilter("ignore")
 # optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -126,20 +126,20 @@ class Adjust_Distribution():
         
         return res
     
-    def __call__(self, trial):
+    def __call__(self, trial, device):
         
-        if self.gpu_queue is None:
-            gpu_id = None
-            de = self.device
-        else:
-            gpu_id = self.gpu_queue.get()
-            de = 'cuda:' + str(gpu_id % 4) 
+        # if self.gpu_queue is None:
+        #     gpu_id = None
+        #     de = self.device
+        # else:
+        #     gpu_id = self.gpu_queue.get()
+        #     de = 'cuda:' + str(gpu_id % 4) 
         
         if self.to_types == 'numpy':
-            assert self.gpu_queue is None
-            assert de == 'cpu'
+            # assert self.gpu_queue is None
+            assert device == 'cpu'
         
-        self.model1, self.model2 = self.backend.change_device(de, self.model1, self.model2)
+        self.model1, self.model2 = self.backend.change_device(device, self.model1, self.model2)
         
         if self.fix_method == 'pred':
             alpha = trial.suggest_float("alpha", 1e-6, 1e1, log = True)
@@ -176,8 +176,8 @@ class Adjust_Distribution():
         
         trial.report(ot_cost, trial.number)
         
-        if self.gpu_queue is not None:
-            self.gpu_queue.put(gpu_id)
+        # if self.gpu_queue is not None:
+        #     self.gpu_queue.put(gpu_id)
         
         if trial.should_prune():    
             raise optuna.TrialPruned(f"Trial was pruned at iteration {trial.number}")
@@ -282,9 +282,10 @@ if __name__ == '__main__':
     model2 = torch.load('../../data/model2.pt')
     unittest_save_path = '../../results/unittest/adjust_histogram'
     fix_method = 'both'
+    device = 'cuda'
     
     # %%
-    tt = Adjust_Distribution(model1, model2, unittest_save_path, fix_method = fix_method, device = 'cuda') 
+    tt = Adjust_Distribution(model1, model2, unittest_save_path, fix_method = fix_method, device = device) 
     # %%
     study = optuna.create_study(direction = 'minimize',
                                 study_name = 'unit_test('+fix_method+')',
@@ -293,7 +294,8 @@ if __name__ == '__main__':
                                 storage = 'sqlite:///' + unittest_save_path + '/unit_test('+fix_method+').db',
                                 load_if_exists = True)
 
-    study.optimize(tt, n_trials = 1500)
+    test_adjust = functools.partial(tt, device = device)
+    study.optimize(test_adjust, n_trials = 1500)
     
     # %%
     tt.make_graph(study)
