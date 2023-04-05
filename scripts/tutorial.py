@@ -123,7 +123,7 @@ init_plans = test_gw.main_compute.init_mat_builder.implemented_init_plans(init_p
 gw_objective = functools.partial(test_gw, init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log)
 
 # 3. 最適化を実行。run_studyに渡す関数は、alignmentとhistogramの両方ともを揃えるようにしました。
-study = opt.run_study(gw_objective)
+study = opt.run_study(gw_objective, gpu_board = device)
 
 # %%
 # 最適化結果を確認
