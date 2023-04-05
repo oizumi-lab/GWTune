@@ -71,11 +71,11 @@ filename = 'elise_data'
 save_path = '../results/gw_alignment/' + filename
 
 # 使用する型とマシンを決定
-device = 'cuda'
-to_types = 'torch'
+# device = 'cuda'
+# to_types = 'torch'
 
-# device = 'cpu'
-# to_types = 'numpy'
+device = 'cpu'
+to_types = 'numpy'
 
 # 分散計算のために使うRDBを指定
 sql_name = 'sqlite'
@@ -84,7 +84,7 @@ storage = "sqlite:///" + save_path +  '/' + filename + '.db'
 # storage = 'mysql+pymysql://root:olabGPU61@localhost/GW_MethodsTest'
 # GW_MethodsTest
 # チューニング対象のハイパーパラメーターの探索範囲を指定
-init_plans_list = ['random']#, 'permutation']
+init_plans_list = ['uniform']#, 'permutation']
 eps_list = [1e-2, 1e-1]
 eps_log = True
 
@@ -142,7 +142,7 @@ init_plans = test_gw.main_compute.init_mat_builder.implemented_init_plans(init_p
 gw_objective = functools.partial(test_gw, init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log)
 
 # 3. 最適化を実行。run_studyに渡す関数は、alignmentとhistogramの両方ともを揃えるようにしました。
-study = opt.run_study(gw_objective)
+study = opt.run_study(gw_objective, gpu_board = device)
 
 #%%
 # 最適化結果を確認
