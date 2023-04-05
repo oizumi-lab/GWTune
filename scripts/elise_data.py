@@ -21,7 +21,7 @@ import warnings
 import seaborn as sns
 import matplotlib.style as mplstyle
 from tqdm.auto import tqdm
-
+import functools
 
 from src.gw_alignment import GW_Alignment
 from src.utils.gw_optimizer import load_optimizer
@@ -71,11 +71,11 @@ filename = 'elise_data'
 save_path = '../results/gw_alignment/' + filename
 
 # 使用する型とマシンを決定
-# device = 'cuda'
-# to_types = 'torch'
+device = 'cuda'
+to_types = 'torch'
 
-device = 'cpu'
-to_types = 'numpy'
+# device = 'cpu'
+# to_types = 'numpy'
 
 # 分散計算のために使うRDBを指定
 sql_name = 'sqlite'
@@ -109,32 +109,40 @@ sampler_name = 'tpe'
 pruner_name = 'median'
 pruner_params = {'n_startup_trials': 1, 'n_warmup_steps': 2, 'min_resource': 2, 'reduction_factor' : 3}
 
-delete_study = True
+delete_study = False
 #%%
-# max_iter: GWの回数
 test_gw = GW_Alignment(C1, C2, p, q, save_path, max_iter = 1000, n_iter = n_iter, device = device, to_types = to_types, gpu_queue = None)
 
-opt = load_optimizer(test_gw.save_path,
-                    n_jobs = 4,
-                    num_trial = 20,
-                    to_types = to_types,
-                    method = 'optuna',
-                    init_plans_list = init_plans_list,
-                    eps_list = eps_list,
-                    eps_log = eps_log,
-                    sampler_name = sampler_name,
-                    pruner_name = pruner_name,
-                    pruner_params = pruner_params,
-                    filename = filename,
-                    sql_name = sql_name,
-                    storage = storage,
-                    delete_study = delete_study
+opt = load_optimizer(save_path,
+                     n_jobs = 4,
+                     num_trial = 100,
+                     to_types = to_types,
+                     method = 'optuna',
+                     sampler_name = sampler_name,
+                     pruner_name = pruner_name,
+                     pruner_params = pruner_params,
+                     n_iter = n_iter,
+                     filename = filename,
+                     sql_name = sql_name,
+                     storage = storage,
+                     delete_study = delete_study
 )
 #%%
-# 最適化実行
-start = time.time()
-study = opt.run_study(test_gw)
-processed_time = time.time() - start
+### 最適化実行 
+'''
+2023.4.3 佐々木
+実装済みの初期値条件の抽出をgw_optimizer.pyからinit_matrix.pyに移動しました。
+また、run_studyに渡す関数は、alignmentとhistogramの両方ともを揃えるようにしました。
+事前に、functools.partialで、必要なhyper parametersの条件を渡しておく。
+''' 
+# 1. 初期値の選択。実装済みの初期値条件の抽出をgw_optimizer.pyからinit_matrix.pyに移動しました。
+init_plans = test_gw.main_compute.init_mat_builder.implemented_init_plans(init_plans_list)
+
+# 2. 最適化関数の定義。事前に、functools.partialで、必要なhyper parametersの条件を渡しておく。
+gw_objective = functools.partial(test_gw, init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log)
+
+# 3. 最適化を実行。run_studyに渡す関数は、alignmentとhistogramの両方ともを揃えるようにしました。
+study = opt.run_study(gw_objective)
 
 #%%
 # 最適化結果を確認

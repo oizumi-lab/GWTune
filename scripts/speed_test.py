@@ -5,6 +5,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 # %%
 import time
 import numpy as np
+import scipy
 import pandas as pd
 import torch
 import ot
@@ -30,14 +31,20 @@ class SpeedTest():
         Returns:
             _type_: _description_
         """
-        model1 = torch.load(self.path_model1)
-        model2 = torch.load(self.path_model2)
+        data_path = '../data/faces_GROUP_interp.mat'
+        mat_dic = scipy.io.loadmat(data_path)
+
+        model1 = mat_dic["group_mean_ATTENDED"]
+        model2 = mat_dic["group_mean_UNATTENDED"]
+        
+        # model1 = torch.load(self.path_model1)
+        # model2 = torch.load(self.path_model2)
         p = ot.unif(len(model1))
         q = ot.unif(len(model2))
         return model1, model2, p, q
 
     def entropic_GW(self, epsilon, T = None, log = True, verbose = False):
-        max_iter = 10
+        max_iter = 1000
         tol = 1e-9
 
         C1, C2, p, q = self.pred_dist, self.target_dist, self.p, self.q
@@ -62,7 +69,6 @@ class SpeedTest():
             T = ot.bregman.sinkhorn(p, q, tens, epsilon, method = 'sinkhorn')
 
             if cpt % 10 == 0:
-                # we can speed up the process by checking for the error only all the 10th iterations
                 err = nx.norm(T - Tprev)
                 if log:
                     log['err'].append(err)
@@ -72,8 +78,11 @@ class SpeedTest():
                     print('{:5d}|{:8e}|'.format(cpt, err))
             cpt += 1
 
+        
         if log:
             log['gw_dist'] = ot.gromov.gwloss(constC, hC1, hC2, T)
+            print(cpt)
+            print(log['gw_dist'])
             return T, log
 
         else:
@@ -112,11 +121,24 @@ class SpeedTest():
         return df
 
     def comparison(self):
-        epsilon = 6e-4
-
+        """
+        POTによるGW計算の確認。
+        3Type(numpy, torch, jax)での計算が正しくできるかを検証できる。
+        
+        2023.4.4 現在
+        '../data/faces_GROUP_interp.mat'のデータを使うと、
+        torchでの計算がepsilonの値次第で、実行不可能になることが判明。
+        
+        epsilon = 0.06 # この値だと、torchでの計算は全て0になる。cpu, cuda関係なく。
+        epsilon = 0.08 # この値だと、torch, numpy, jaxで正しい計算結果となる。
+        
+        """
+        epsilon = 0.06 # この値だと、torchでの計算は全て0になる。
+        epsilon = 0.08 # この値だと、torch, numpy, jaxで正しい計算結果となる。
+        
         torch_gpu_log, torch_gpu_end = self.time_test(epsilon, device='cuda', to_types='torch')
         jax_gpu_log, jax_gpu_end = self.time_test(epsilon, device='gpu', to_types='jax')
-         
+        
         numpy_cpu_log, numpy_cpu_end = self.time_test(epsilon, device='cpu', to_types='numpy')
         torch_cpu_log, torch_cpu_end = self.time_test(epsilon, device='cpu', to_types='torch')
         jax_cpu_log, jax_cpu_end = self.time_test(epsilon, device='cpu', to_types='jax')
