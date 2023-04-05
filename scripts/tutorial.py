@@ -1,7 +1,5 @@
 #%%
 import os, sys, gc
-# ここがないと、srcのimportが通らなかったです。(2023.3.28 佐々木)
-# ただ、jupyterで動かすのか、debuggerで動かすのかで、必要かどうかは変わる。
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 
 import jax
@@ -25,40 +23,67 @@ import functools
 from src.gw_alignment import GW_Alignment
 from src.utils.gw_optimizer import load_optimizer
 # %load_ext autoreload
+import scipy.io
+import pickle as pkl
 
 os.chdir(os.path.dirname(__file__))
 
 #%%
-# データダウンロード
-path1 = '../data/model1.pt'
-path2 = '../data/model2.pt'
+### load data
+# you can choose the following data
+# 'DNN': representations of 2000 imagenet images in AlexNet and VGG
+# 'color': human similarity judgements of 93 colors for 5 paricipants groups
+# 'face': human similarity judgements of 16 faces, attended vs unattended condition in the same participant
+data_select = 'color'
 
-model1 = torch.load(path1)
-model2 = torch.load(path2)
-p = ot.unif(len(model1))
-q = ot.unif(len(model2))
-#　%%
-# 2023.4.3 佐々木　
-# 阿部さんが作った、以下のオリジナルのdirectory構造の方が良さそうです (特に2条件以上で計算を行う場合)。
-#
-# filename(study_name)を書く
-# 保存結果としては
-# ├── results
-#     ├── gw_alignment
-#         ├── {filename}(これがstudy_nameにもなる)
-#             ├── {filename}.db
-#             ├── diag
-#             ├── uniform
-#             └── random
-#                 ├── gw_{trial_number}.pt
-#                 ├── init_mat_{trial_number}.pt
+if data_select == 'DNN':
+    path1 = '../data/model1.pt'
+    path2 = '../data/model2.pt'
+    C1 = torch.load(path1)
+    C2 = torch.load(path2)
+elif data_select == 'color':
+    data_path = '../data/num_groups_5_seed_0_fill_val_3.5.pickle'
+    with open(data_path, "rb") as f:
+        data = pkl.load(f)
+    sim_mat_list = data["group_ave_mat"]
+    C1 = sim_mat_list[0]
+    C2 = sim_mat_list[1]
+elif data_select == 'face':
+    data_path = '../data/faces_GROUP_interp.mat'
+    mat_dic = scipy.io.loadmat(data_path)
+    C1 = mat_dic["group_mean_ATTENDED"]
+    C2 = mat_dic["group_mean_UNATTENDED"]
 
+# may not be needed?
+if type(C1) == np.ndarray:
+    C1 = torch.from_numpy(C1.astype(np.float32)).clone()
+    C2 = torch.from_numpy(C2.astype(np.float32)).clone()
+
+im1 = plt.imshow(C1)
+plt.colorbar(im1)
+plt.title('Dissmilarity matrix #1')
+plt.show()
+
+im2 = plt.imshow(C2)
+plt.colorbar(im2)
+plt.title('Dissmilarity matrix #2')
+plt.show()
+#%%
+# set the filename and foldername for saving optuna results
 filename = 'test'
 save_path = '../results/gw_alignment/' + filename
 
-# 使用する型とマシンを決定
+# Delete previous optimization results or not
+delete_study = True
+
+# set the device ('cuda' or 'cpu') and variable type ('torch' or 'numpy')
 device = 'cuda'
 to_types = 'torch'
+# device = 'cpu'
+# to_types = 'numpy'
+
+# the number of jobs
+n_jobs = 4
 
 # 分散計算のために使うRDBを指定
 sql_name = 'sqlite'
@@ -66,37 +91,55 @@ storage = "sqlite:///" + save_path +  '/' + filename + '.db'
 # sql_name = 'mysql'
 # storage = 'mysql+pymysql://root:olabGPU61@localhost/GW_MethodsTest'
 # GW_MethodsTest
-# チューニング対象のハイパーパラメーターの探索範囲を指定
-init_plans_list = ['uniform', 'random']#, 'permutation']
-eps_list = [1e-4, 1e-2]
-eps_log = True
 
-# init_mat_plan in ['random', 'permutation']のときに生成する初期値の数を指定
+#%%
+### Set the parameters for optimization
+# initialization of transportation plan
+# 'uniform': uniform matrix, 'random': random matrix, 'permutation': permutation matrix
+init_plans_list = ['random']
+
+# you can select multiple options
+# init_plans_list = ['uniform', 'random']
+
+# set the range of epsilon
+# you should set the minimum value and maximum value
+eps_list = [1e-2, 1e-1]
+eps_log = False # use log scale if True
+
+# set the number of trials, i.e., the number of epsilon values tested in optimization
+num_trial = 10
+
+# the number of random initial matrices for 'random' or 'permutation'] options
 n_iter = 10
 
-# 使用するsamplerを指定
-# 現状使えるのは['random', 'grid', 'tpe']
-sampler_name = 'random'
+# the maximum number of iteration for GW optimization: default: 1000
+max_iter = 1000
 
-# 使用するprunerを指定
-# 現状使えるのは['median', 'hyperband', 'nop']
-# median pruner (ある時点でスコアが過去の中央値を下回っていた場合にpruning)
+# choose sampler 
+# 'random': randomly select epsilon between the range of epsilon
+# 'grid': grid search between the range of epsilon
+# 'tpe': Bayesian sampling
+sampler_name = 'tpe'
+
+# choose pruner
+# 'median': ある時点でスコアが過去の中央値を下回っていた場合にpruning
 #     n_startup_trials : この数字の数だけtrialが終わるまではprunerを作動させない
 #     n_warmup_steps   : 各trialについてこのステップ以下ではprunerを作動させない
-# hyperband pruner (pruning判定の期間がだんだん伸びていく代わりに基準がだんだん厳しくなっていく)
+# 'hyperband': pruning判定の期間がだんだん伸びていく代わりに基準がだんだん厳しくなっていく)
 #     min_resource     : 各trialについてこのステップ以下ではprunerを作動させない
 #     reduction_factor : どれくらいの間隔でpruningをcheckするか。値が小さいほど細かい間隔でpruning checkが入る。2~6程度.
-
+# 'nop': no pruning
 pruner_name = 'median'
 pruner_params = {'n_startup_trials': 1, 'n_warmup_steps': 2, 'min_resource': 2, 'reduction_factor' : 3}
 
-delete_study = False
 #%%
-test_gw = GW_Alignment(model1, model2, p, q, save_path, max_iter = 100, n_iter = n_iter, device = device, to_types = to_types, gpu_queue = None)
+p = ot.unif(len(C1))
+q = ot.unif(len(C2))
+test_gw = GW_Alignment(C1, C2, p, q, save_path, max_iter = max_iter, n_iter = n_iter, device = device, to_types = to_types, gpu_queue = None)
 
 opt = load_optimizer(save_path,
-                     n_jobs = 4,
-                     num_trial = 100,
+                     n_jobs = n_jobs,
+                     num_trial = num_trial,
                      to_types = to_types,
                      method = 'optuna',
                      sampler_name = sampler_name,
@@ -108,25 +151,19 @@ opt = load_optimizer(save_path,
                      storage = storage,
                      delete_study = delete_study
 )
-#%%
-### 最適化実行
-'''
-2023.4.3 佐々木
-実装済みの初期値条件の抽出をgw_optimizer.pyからinit_matrix.pyに移動しました。
-また、run_studyに渡す関数は、alignmentとhistogramの両方ともを揃えるようにしました。
-事前に、functools.partialで、必要なhyper parametersの条件を渡しておく。
-'''
+
+### optimization
 # 1. 初期値の選択。実装済みの初期値条件の抽出をgw_optimizer.pyからinit_matrix.pyに移動しました。
 init_plans = test_gw.main_compute.init_mat_builder.implemented_init_plans(init_plans_list)
 
 # 2. 最適化関数の定義。事前に、functools.partialで、必要なhyper parametersの条件を渡しておく。
 gw_objective = functools.partial(test_gw, init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log)
 
-# 3. 最適化を実行。run_studyに渡す関数は、alignmentとhistogramの両方ともを揃えるようにしました。
+# run optimzation
 study = opt.run_study(gw_objective, gpu_board = device)
 
 # %%
-# 最適化結果を確認
+# check the results
 print(study.best_trial)
 
 #%%
@@ -134,214 +171,3 @@ df_trial = study.trials_dataframe()
 
 # %%
 df_trial['params_eps'].tolist()
-
-# %%
-
-"""
-optunaのrandomの乱数seedは固定されていることを確認。
-1回目
-[0.0005611516415334506,
- 0.009506551974984317,
- 0.0001698670453505509,
- 0.00467395253077256,
- 0.00030281629390877977,
- 0.00014275099109495461,
- 0.0015751320499779737,
- 0.00013066739238053285,
- 0.0026070247583707684,
- 0.0021487229685265546,
- 0.00012503857102775314,
- 0.001797973826855262,
- 0.00293424648200471,
- 0.009581717659065276,
- 0.000526019292141025,
- 0.004622589001020831,
- 0.00023270677083837802,
- 0.00032273216524928187,
- 0.0003675652221198018,
- 0.0007309539835912913,
- 0.00027673111425162845,
- 0.0001423394882200059,
- 0.0007604344395735721,
- 0.008768598459278859,
- 0.0007789628064511682,
- 0.0062258285969045484,
- 0.00010239036664087426,
- 0.0018739040729381555,
- 0.00661159361460596,
- 0.00023005368305599854,
- 0.005370741394037357,
- 0.0003557275926283841,
- 0.0006438882295589764,
- 0.0007764666819777239,
- 0.0028443038158540027,
- 0.0001678501723772171,
- 0.0025670316054294397,
- 0.00019010245319870352,
- 0.00025832337245090093,
- 0.0006131392272351956,
- 0.00030585551339621427,
- 0.000816845589476017,
- 0.0010677482709481358,
- 0.00038077248258733476,
- 0.00014095535195817502,
- 0.0025866815727069283,
- 0.0016409286730647919,
- 0.007902619549708232,
- 0.0004066563313514797,
- 0.00019451663897343885,
- 0.0003067580953322034,
- 0.0031299775574811,
- 0.0006510061272839043,
- 0.0008231443146565119,
- 0.00016614322815469219,
- 0.004482372355359217,
- 0.00594848643044334,
- 0.005149180825595944,
- 0.00022097016227316107,
- 0.0003236782450055064,
- 0.002278194235669276,
- 0.0007722328145090779,
- 0.002632061221168846,
- 0.0007166432953436667,
- 0.001990544544334726,
- 0.0002374058718387067,
- 0.0001547174562002343,
- 0.005749459948938181,
- 0.008221368943935898,
- 0.001962551783638816,
- 0.00018979838119228884,
- 0.0007591104805282694,
- 0.00032877638181089597,
- 0.00011715937392307068,
- 0.0021137059440645744,
- 0.0001984705741660534,
- 0.0002217123336407024,
- 0.0008135394049241408,
- 0.0012399967836846098,
- 0.004074125483259236,
- 0.0035503048581283078,
- 0.0015696396388661157,
- 0.0002465844721448739,
- 0.00013115892327278796,
- 0.005824024105718896,
- 0.0005989003672254305,
- 0.0026330637110449145,
- 0.0057988983731103476,
- 0.0009670456678167124,
- 0.00930182290026891,
- 0.00021304399188638314,
- 0.0005170191786366995,
- 0.00041195057904985815,
- 0.001368203653690197,
- 0.00034459799081383054,
- 0.00010757605172895558,
- 0.0001189489423098656,
- 0.00019135880487692312,
- 0.009413993046829943,
- 0.00010257563974185662]
-"""
-
-"""
-2回目
-[0.009506551974984317,
- 0.0005611516415334506,
- 0.00467395253077256,
- 0.0001698670453505509,
- 0.00030281629390877977,
- 0.00014275099109495461,
- 0.0015751320499779737,
- 0.00013066739238053285,
- 0.0026070247583707684,
- 0.0021487229685265546,
- 0.00293424648200471,
- 0.00012503857102775314,
- 0.001797973826855262,
- 0.009581717659065276,
- 0.000526019292141025,
- 0.004622589001020831,
- 0.00023270677083837802,
- 0.00032273216524928187,
- 0.0003675652221198018,
- 0.0007309539835912913,
- 0.00027673111425162845,
- 0.0001423394882200059,
- 0.0007604344395735721,
- 0.008768598459278859,
- 0.0007789628064511682,
- 0.0062258285969045484,
- 0.00010239036664087426,
- 0.0018739040729381555,
- 0.00661159361460596,
- 0.00023005368305599854,
- 0.005370741394037357,
- 0.0003557275926283841,
- 0.0006438882295589764,
- 0.0007764666819777239,
- 0.0028443038158540027,
- 0.0001678501723772171,
- 0.0025670316054294397,
- 0.0006131392272351956,
- 0.00025832337245090093,
- 0.00019010245319870352,
- 0.00030585551339621427,
- 0.00038077248258733476,
- 0.000816845589476017,
- 0.00014095535195817502,
- 0.0025866815727069283,
- 0.0010677482709481358,
- 0.0016409286730647919,
- 0.00019451663897343885,
- 0.0003067580953322034,
- 0.0031299775574811,
- 0.007902619549708232,
- 0.0004066563313514797,
- 0.0006510061272839043,
- 0.0008231443146565119,
- 0.00016614322815469219,
- 0.004482372355359217,
- 0.00594848643044334,
- 0.005149180825595944,
- 0.00022097016227316107,
- 0.0003236782450055064,
- 0.002278194235669276,
- 0.0007722328145090779,
- 0.002632061221168846,
- 0.0007166432953436667,
- 0.001990544544334726,
- 0.0002374058718387067,
- 0.0001547174562002343,
- 0.005749459948938181,
- 0.008221368943935898,
- 0.001962551783638816,
- 0.00018979838119228884,
- 0.00032877638181089597,
- 0.0007591104805282694,
- 0.0001984705741660534,
- 0.0002217123336407024,
- 0.0008135394049241408,
- 0.00011715937392307068,
- 0.0021137059440645744,
- 0.0012399967836846098,
- 0.004074125483259236,
- 0.0035503048581283078,
- 0.0015696396388661157,
- 0.00013115892327278796,
- 0.005824024105718896,
- 0.0002465844721448739,
- 0.0005989003672254305,
- 0.0026330637110449145,
- 0.0057988983731103476,
- 0.0009670456678167124,
- 0.00930182290026891,
- 0.00021304399188638314,
- 0.0005170191786366995,
- 0.00041195057904985815,
- 0.001368203653690197,
- 0.00034459799081383054,
- 0.00010757605172895558,
- 0.0001189489423098656,
- 0.00019135880487692312,
- 0.009413993046829943,
- 0.00010257563974185662]
-"""
