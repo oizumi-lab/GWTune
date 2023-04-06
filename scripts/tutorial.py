@@ -163,6 +163,24 @@ study = opt.run_study(gw_objective, gpu_board = device)
 #%%
 print(study.trials_dataframe().sort_values('params_eps'))
 
+#%% checkresults
+df_trial = study.trials_dataframe()
+best_trial = study.best_trial
+print(best_trial)
+
+# optimized epsilon, GWD, and optimal transportation plan
+eps_opt = best_trial.params['eps']
+GWD_opt = best_trial.values[0]
+OT = np.load(save_path+f'/{init_plans_list[0]}/gw_{best_trial.number}.npy')
+
+plt.imshow(OT)
+plt.title(f'OT eps:{eps_opt:.3f} GWD:{GWD_opt:.3f}')
+plt.show()
+
+df_trial = study.trials_dataframe()
+
+# want the plot epsilon as x-axis and GWD as y-axis -> abe-san
+
 #%%
 
 """   
@@ -278,23 +296,6 @@ epsの値を小さい順にソートした結果 (torch-cuda, 初期値はunifor
 0       0  1.964718 2023-04-06 17:45:47.300805 2023-04-06 17:47:31.265332   
 2       2  1.769057 2023-04-06 17:45:47.304962 2023-04-06 17:47:30.401175   
 3       3  1.777119 2023-04-06 17:45:47.416516 2023-04-06 17:47:30.660180   
-#%% checkresults
-df_trial = study.trials_dataframe()
-best_trial = study.best_trial
-print(best_trial)
-
-# optimized epsilon, GWD, and optimal transportation plan
-eps_opt = best_trial.params['eps']
-GWD_opt = best_trial.values[0]
-OT = np.load(save_path+f'/{init_plans_list[0]}/gw_{best_trial.number}.npy')
-
-plt.imshow(OT)
-plt.title(f'OT eps:{eps_opt:.3f} GWD:{GWD_opt:.3f}')
-plt.show()
-
-df_trial = study.trials_dataframe()
-
-# want the plot epsilon as x-axis and GWD as y-axis -> abe-san
 
                 duration  params_eps params_initialize  user_attrs_acc  \
 1 0 days 00:01:44.608806    0.020355           uniform        0.010753   
