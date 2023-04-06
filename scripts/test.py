@@ -49,7 +49,7 @@ class Test():
         
         # まずは、histogramの調整の計算を行う。
         adjust = self.adjustment_test(save_path, fix_method = 'both')
-        opt_adjust = self.optimizer(adjust_filename, save_path, n_jobs = 8, num_trial = 1000)
+        opt_adjust = self.optimizer(adjust_filename, save_path, n_jobs = 4, num_trial = 1000)
         
         forced_run = False
         study_adjust = opt_adjust.run_study(adjust, gpu_board = 'cuda:0', forced_run = forced_run)
@@ -73,7 +73,7 @@ class Test():
         gw_objective = functools.partial(test_gw, init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log)
         
         # 3. 最適化を実行。run_studyに渡す関数は、alignmentとhistogramの両方ともを揃えるようにしました。
-        opt_gw = self.optimizer(filename, save_path, n_jobs = 4, num_trial = 20, n_iter = n_iter)
+        opt_gw = self.optimizer(filename, save_path, n_jobs = 8, num_trial = 40, n_iter = n_iter)
         study = opt_gw.run_study(gw_objective, gpu_board = 'cuda')
         test_gw.load_graph(study)
         
