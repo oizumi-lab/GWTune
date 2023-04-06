@@ -168,6 +168,3 @@ print(study.best_trial)
 
 #%%
 df_trial = study.trials_dataframe()
-
-# %%
-df_trial['params_eps'].tolist()
