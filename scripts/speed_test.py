@@ -2,6 +2,8 @@
 import os, sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 
+os.chdir(os.path.dirname(__file__))
+
 # %%
 import time
 import numpy as np
@@ -155,13 +157,13 @@ class SpeedTest():
         
         numpy_cpu_log, numpy_cpu_end = self.time_test(epsilon, device='cpu', to_types='numpy')
         torch_cpu_log, torch_cpu_end = self.time_test(epsilon, device='cpu', to_types='torch')
-        # jax_cpu_log, jax_cpu_end = self.time_test(epsilon, device='cpu', to_types='jax')
+        torch_gpu_log, torch_gpu_end = self.time_test(epsilon, device='cuda', to_types='torch')
         
-        # torch_gpu_log, torch_gpu_end = self.time_test(epsilon, device='cuda', to_types='torch')
+        # jax_cpu_log, jax_cpu_end = self.time_test(epsilon, device='cpu', to_types='jax') 
         # jax_gpu_log, jax_gpu_end = self.time_test(epsilon, device='gpu', to_types='jax')
 
-        time_list = [numpy_cpu_end, torch_cpu_end]#, torch_gpu_end, jax_cpu_end, jax_gpu_end]
-        log_list = [numpy_cpu_log, torch_cpu_log]#, torch_gpu_log, jax_cpu_log, jax_gpu_log]
+        time_list = [numpy_cpu_end, torch_cpu_end, torch_gpu_end]#, jax_cpu_end, jax_gpu_end]
+        log_list = [numpy_cpu_log, torch_cpu_log, torch_gpu_log]#, jax_cpu_log, jax_gpu_log]
 
         df = self._make_df(time_list, log_list)
 

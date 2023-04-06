@@ -74,7 +74,7 @@ filename = 'test'
 save_path = '../results/gw_alignment/' + filename
 
 # Delete previous optimization results or not
-delete_study = True
+delete_study = False
 
 # set the device ('cuda' or 'cpu') and variable type ('torch' or 'numpy')
 device = 'cuda'
@@ -107,13 +107,13 @@ eps_list = [1e-2, 1e-1]
 eps_log = False # use log scale if True
 
 # set the number of trials, i.e., the number of epsilon values tested in optimization
-num_trial = 10
+num_trial = 4
 
 # the number of random initial matrices for 'random' or 'permutation'] options
-n_iter = 10
+n_iter = 2
 
 # the maximum number of iteration for GW optimization: default: 1000
-max_iter = 1000
+max_iter = 100
 
 # choose sampler 
 # 'random': randomly select epsilon between the range of epsilon
@@ -162,9 +162,7 @@ gw_objective = functools.partial(test_gw, init_plans_list = init_plans, eps_list
 # run optimzation
 study = opt.run_study(gw_objective, gpu_board = device)
 
-# %%
-# check the results
-print(study.best_trial)
+#%%
+print(study.trials_dataframe())
 
 #%%
-df_trial = study.trials_dataframe()

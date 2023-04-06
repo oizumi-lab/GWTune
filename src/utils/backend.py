@@ -89,11 +89,11 @@ class Backend():
                 raise ValueError('torch uses "cuda" instead of "gpu".')
 
             if isinstance(args, np.ndarray):
-                return torch.from_numpy(args).float()
+                return torch.from_numpy(args)#.double()#.float()
 
             elif isinstance(args, jax.numpy.ndarray):
                 args = np.array(args)
-                return torch.from_numpy(args).float()
+                return torch.from_numpy(args)#.double()#.float()
 
             else:
                 return args
@@ -157,7 +157,7 @@ class Backend():
                 return jax.device_put(args, cpus[0])
 
         elif isinstance(args, torch.Tensor):
-            return args.to(device)
+            return args.to(device).double()
 
         else:
             raise ValueError("Unknown type of non implemented here.")
