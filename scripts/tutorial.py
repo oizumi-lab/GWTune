@@ -34,7 +34,7 @@ os.chdir(os.path.dirname(__file__))
 # 'DNN': representations of 2000 imagenet images in AlexNet and VGG
 # 'color': human similarity judgements of 93 colors for 5 paricipants groups
 # 'face': human similarity judgements of 16 faces, attended vs unattended condition in the same participant
-data_select = 'color'
+data_select = 'face'
 
 if data_select == 'DNN':
     path1 = '../data/model1.pt'
@@ -54,11 +54,6 @@ elif data_select == 'face':
     C1 = mat_dic["group_mean_ATTENDED"]
     C2 = mat_dic["group_mean_UNATTENDED"]
 
-# may not be needed?
-if type(C1) == np.ndarray:
-    C1 = torch.from_numpy(C1.astype(np.float32)).clone()
-    C2 = torch.from_numpy(C2.astype(np.float32)).clone()
-
 im1 = plt.imshow(C1)
 plt.colorbar(im1)
 plt.title('Dissmilarity matrix #1')
@@ -77,10 +72,9 @@ save_path = '../results/gw_alignment/' + filename
 delete_study = True
 
 # set the device ('cuda' or 'cpu') and variable type ('torch' or 'numpy')
-device = 'cuda'
-to_types = 'torch'
-# device = 'cpu'
-# to_types = 'numpy'
+# we cannot use 'torch' in general but it might work in some cases (e.g., DNN)
+device = 'cpu'
+to_types = 'numpy'
 
 # the number of jobs
 n_jobs = 4
@@ -95,31 +89,35 @@ storage = "sqlite:///" + save_path +  '/' + filename + '.db'
 #%%
 ### Set the parameters for optimization
 # initialization of transportation plan
-# 'uniform': uniform matrix, 'random': random matrix, 'permutation': permutation matrix
+# 'uniform': uniform matrix, 'diag': diagonal matrix
+# 'random': random matrix, 'permutation': permutation matrix
 init_plans_list = ['random']
 
 # you can select multiple options
 # init_plans_list = ['uniform', 'random']
 
-# set the range of epsilon
-# you should set the minimum value and maximum value
-eps_list = [1e-2, 1e-1]
-eps_log = False # use log scale if True
-
 # set the number of trials, i.e., the number of epsilon values tested in optimization
-num_trial = 10
+num_trial = 4
 
 # the number of random initial matrices for 'random' or 'permutation'] options
-n_iter = 10
+n_iter = 2
 
 # the maximum number of iteration for GW optimization: default: 1000
-max_iter = 1000
+max_iter = 200
 
 # choose sampler 
 # 'random': randomly select epsilon between the range of epsilon
 # 'grid': grid search between the range of epsilon
 # 'tpe': Bayesian sampling
 sampler_name = 'tpe'
+
+# set the range of epsilon
+# set only the minimum value and maximum value for 'tpe' sampler
+eps_log = False # use log scale if True
+eps_list = [1e-2, 1e-1]
+
+# set also the step size for 'grid' or 'random' sampler
+# eps_list = np.linspace(1e-2, 1e-1, num_trial) 
 
 # choose pruner
 # 'median': ある時点でスコアが過去の中央値を下回っていた場合にpruning
@@ -166,8 +164,22 @@ study = opt.run_study(gw_objective, gpu_board = device)
 # check the results
 print(study.best_trial)
 
-#%%
+#%% checkresults
+df_trial = study.trials_dataframe()
+best_trial = study.best_trial
+print(best_trial)
+
+# optimized epsilon, GWD, and optimal transportation plan
+eps_opt = best_trial.params['eps']
+GWD_opt = best_trial.values[0]
+OT = np.load(save_path+f'/{init_plans_list[0]}/gw_{best_trial.number}.npy')
+
+plt.imshow(OT)
+plt.title(f'OT eps:{eps_opt:.3f} GWD:{GWD_opt:.3f}')
+plt.show()
+
 df_trial = study.trials_dataframe()
 
+# want the plot epsilon as x-axis and GWD as y-axis -> abe-san
+
 # %%
-df_trial['params_eps'].tolist()
