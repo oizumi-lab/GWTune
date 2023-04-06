@@ -140,7 +140,12 @@ class GW_Alignment():
         best_trial = study.best_trial
         eps = best_trial.params['eps']
         init_plan = best_trial.params['initialize']
-        acc = best_trial.user_attrs['acc']
+        
+        if init_plan in ['uniform', 'diag']:
+            acc = best_trial.user_attrs['acc']
+        else:
+            acc = best_trial.user_attrs['best_acc']
+            
         size = best_trial.user_attrs['size']
         number = best_trial.number
 
