@@ -72,7 +72,6 @@ save_path = '../results/gw_alignment/' + filename
 delete_study = True
 
 # set the device ('cuda' or 'cpu') and variable type ('torch' or 'numpy')
-# we cannot use 'torch' in general but it might work in some cases (e.g., DNN)
 device = 'cpu'
 to_types = 'numpy'
 
