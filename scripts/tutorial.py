@@ -55,9 +55,9 @@ elif data_select == 'face':
     C2 = mat_dic["group_mean_UNATTENDED"]
 
 # may not be needed?
-if type(C1) == np.ndarray:
-    C1 = torch.from_numpy(C1.astype(np.float32)).clone()
-    C2 = torch.from_numpy(C2.astype(np.float32)).clone()
+# if type(C1) == np.ndarray:
+#     C1 = torch.from_numpy(C1.astype(np.float32)).clone()
+#     C2 = torch.from_numpy(C2.astype(np.float32)).clone()
 
 im1 = plt.imshow(C1)
 plt.colorbar(im1)
@@ -74,13 +74,13 @@ filename = 'test'
 save_path = '../results/gw_alignment/' + filename
 
 # Delete previous optimization results or not
-delete_study = False
+delete_study = True
 
 # set the device ('cuda' or 'cpu') and variable type ('torch' or 'numpy')
-# device = 'cuda'
-# to_types =    'torch'
-device = 'cpu'
-to_types = 'numpy'
+device = 'cuda'
+to_types = 'torch'
+# device = 'cpu'
+# to_types = 'numpy'
 
 # the number of jobs
 n_jobs = 4
@@ -96,7 +96,7 @@ storage = "sqlite:///" + save_path +  '/' + filename + '.db'
 ### Set the parameters for optimization
 # initialization of transportation plan
 # 'uniform': uniform matrix, 'random': random matrix, 'permutation': permutation matrix
-init_plans_list = ['random']
+init_plans_list = ['uniform']
 
 # you can select multiple options
 # init_plans_list = ['uniform', 'random']
@@ -166,3 +166,130 @@ study = opt.run_study(gw_objective, gpu_board = device)
 print(study.trials_dataframe().sort_values('params_eps'))
 
 #%%
+
+"""   
+epsの値を小さい順にソートした結果 (numpy, 初期値はuniform, 1回目)
+number     value             datetime_start          datetime_complete  \
+0       0  2.093160 2023-04-06 17:36:28.290625 2023-04-06 17:36:45.079221   
+2       2  1.964718 2023-04-06 17:36:28.310103 2023-04-06 17:36:44.272258   
+3       3  1.769057 2023-04-06 17:36:28.378479 2023-04-06 17:36:44.435796   
+1       1  1.777119 2023-04-06 17:36:28.305552 2023-04-06 17:36:44.699341   
+
+                duration  params_eps params_initialize  user_attrs_acc  \
+0 0 days 00:00:16.788596    0.020355           uniform        0.010753   
+2 0 days 00:00:15.962155    0.043709           uniform        0.096774   
+3 0 days 00:00:16.057317    0.085136           uniform        0.333333   
+1 0 days 00:00:16.393789    0.099011           uniform        0.322581   
+
+   user_attrs_size     state  
+0               93  COMPLETE  
+2               93  COMPLETE  
+3               93  COMPLETE  
+1               93  COMPLETE  
+"""
+
+
+"""   
+epsの値を小さい順にソートした結果 (numpy, 初期値はuniform, 2回目)
+number     value             datetime_start          datetime_complete  \
+3       3  2.093160 2023-04-06 17:37:22.448483 2023-04-06 17:37:40.863074   
+1       1  1.964718 2023-04-06 17:37:22.334266 2023-04-06 17:37:39.919847   
+2       2  1.769057 2023-04-06 17:37:22.394548 2023-04-06 17:37:40.401976   
+0       0  1.777119 2023-04-06 17:37:22.326114 2023-04-06 17:37:40.201290   
+
+                duration  params_eps params_initialize  user_attrs_acc  \
+3 0 days 00:00:18.414591    0.020355           uniform        0.010753   
+1 0 days 00:00:17.585581    0.043709           uniform        0.096774   
+2 0 days 00:00:18.007428    0.085136           uniform        0.333333   
+0 0 days 00:00:17.875176    0.099011           uniform        0.322581   
+
+   user_attrs_size     state  
+3               93  COMPLETE  
+1               93  COMPLETE  
+2               93  COMPLETE  
+0               93  COMPLETE  
+"""
+
+"""   
+epsの値を小さい順にソートした結果 (torch-cpu, 初期値はuniform, 1回目)
+number     value             datetime_start          datetime_complete  \
+0       0  2.093160 2023-04-06 17:38:19.104478 2023-04-06 17:39:31.098700   
+2       2  1.964718 2023-04-06 17:38:19.216654 2023-04-06 17:39:30.631421   
+3       3  1.769057 2023-04-06 17:38:19.255331 2023-04-06 17:39:30.616081   
+1       1  1.777119 2023-04-06 17:38:19.118711 2023-04-06 17:39:29.906577   
+
+                duration  params_eps params_initialize  user_attrs_acc  \
+0 0 days 00:01:11.994222    0.020355           uniform        0.010753   
+2 0 days 00:01:11.414767    0.043709           uniform        0.096774   
+3 0 days 00:01:11.360750    0.085136           uniform        0.333333   
+1 0 days 00:01:10.787866    0.099011           uniform        0.322581   
+
+   user_attrs_size     state  
+0               93  COMPLETE  
+2               93  COMPLETE  
+3               93  COMPLETE  
+1               93  COMPLETE  
+"""
+
+"""   
+epsの値を小さい順にソートした結果 (torch-cpu, 初期値はuniform, 2回目)
+number     value             datetime_start          datetime_complete  \
+0       0  2.093160 2023-04-06 17:40:16.439669 2023-04-06 17:41:33.122219   
+3       3  1.964718 2023-04-06 17:40:16.581776 2023-04-06 17:41:32.530253   
+1       1  1.769057 2023-04-06 17:40:16.447829 2023-04-06 17:41:32.086414   
+2       2  1.777119 2023-04-06 17:40:16.523372 2023-04-06 17:41:32.870302   
+
+                duration  params_eps params_initialize  user_attrs_acc  \
+0 0 days 00:01:16.682550    0.020355           uniform        0.010753   
+3 0 days 00:01:15.948477    0.043709           uniform        0.096774   
+1 0 days 00:01:15.638585    0.085136           uniform        0.333333   
+2 0 days 00:01:16.346930    0.099011           uniform        0.322581   
+
+   user_attrs_size     state  
+0               93  COMPLETE  
+3               93  COMPLETE  
+1               93  COMPLETE  
+2               93  COMPLETE  
+"""
+
+"""   d
+epsの値を小さい順にソートした結果 (torch-cuda, 初期値はuniform, 1回目)
+   number     value             datetime_start          datetime_complete  \
+0       0  2.093160 2023-04-06 17:43:21.687171 2023-04-06 17:45:05.362005   
+2       2  1.964718 2023-04-06 17:43:21.812053 2023-04-06 17:45:04.793788   
+3       3  1.769057 2023-04-06 17:43:21.857894 2023-04-06 17:45:05.071219   
+1       1  1.777119 2023-04-06 17:43:21.715573 2023-04-06 17:45:03.977050   
+
+                duration  params_eps params_initialize  user_attrs_acc  \
+0 0 days 00:01:43.674834    0.020355           uniform        0.010753   
+2 0 days 00:01:42.981735    0.043709           uniform        0.096774   
+3 0 days 00:01:43.213325    0.085136           uniform        0.333333   
+1 0 days 00:01:42.261477    0.099011           uniform        0.322581   
+
+   user_attrs_size     state  
+0               93  COMPLETE  
+2               93  COMPLETE  
+3               93  COMPLETE  
+1               93  COMPLETE  
+"""
+
+"""   
+epsの値を小さい順にソートした結果 (torch-cuda, 初期値はuniform, 2回目)
+   number     value             datetime_start          datetime_complete  \
+1       1  2.093160 2023-04-06 17:45:47.330814 2023-04-06 17:47:31.939620   
+0       0  1.964718 2023-04-06 17:45:47.300805 2023-04-06 17:47:31.265332   
+2       2  1.769057 2023-04-06 17:45:47.304962 2023-04-06 17:47:30.401175   
+3       3  1.777119 2023-04-06 17:45:47.416516 2023-04-06 17:47:30.660180   
+
+                duration  params_eps params_initialize  user_attrs_acc  \
+1 0 days 00:01:44.608806    0.020355           uniform        0.010753   
+0 0 days 00:01:43.964527    0.043709           uniform        0.096774   
+2 0 days 00:01:43.096213    0.085136           uniform        0.333333   
+3 0 days 00:01:43.243664    0.099011           uniform        0.322581   
+
+   user_attrs_size     state  
+1               93  COMPLETE  
+0               93  COMPLETE  
+2               93  COMPLETE  
+3               93  COMPLETE  
+"""
