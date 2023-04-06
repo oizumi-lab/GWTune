@@ -77,10 +77,10 @@ save_path = '../results/gw_alignment/' + filename
 delete_study = False
 
 # set the device ('cuda' or 'cpu') and variable type ('torch' or 'numpy')
-device = 'cuda'
-to_types = 'torch'
-# device = 'cpu'
-# to_types = 'numpy'
+# device = 'cuda'
+# to_types =    'torch'
+device = 'cpu'
+to_types = 'numpy'
 
 # the number of jobs
 n_jobs = 4
@@ -163,6 +163,6 @@ gw_objective = functools.partial(test_gw, init_plans_list = init_plans, eps_list
 study = opt.run_study(gw_objective, gpu_board = device)
 
 #%%
-print(study.trials_dataframe())
+print(study.trials_dataframe().sort_values('params_eps'))
 
 #%%
