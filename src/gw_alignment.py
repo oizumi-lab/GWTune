@@ -66,6 +66,25 @@ class GW_Alignment():
 
         return trial, eps
 
+    def check_eps(self, eps_list, eps_log):
+
+        if type(eps_list) != list:
+            raise ValueError('variable named "eps_list" is not list!')
+
+        else:
+            if len(eps_list) == 2:
+                pass
+            if len(eps_list) == 3:
+                if eps_log:
+                    warnings.warn('You cannot use "eps_log" and "eps_step" at the same time, in such case "eps_log = False". \n If you want to use "eps_log = True", set "eps_list = [eps_lower, eps_upper]".', UserWarning)
+                    eps_log = False
+
+            else:
+                ValueError('Not defined initialize matrix.')
+
+            return eps_list, eps_log
+
+
     def __call__(self, trial, init_plans_list, eps_list, device, eps_log=True):
         '''
         0.  define the "gpu_queue" here.
