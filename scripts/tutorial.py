@@ -1,32 +1,40 @@
 #%%
-import os, sys, gc
+# Standard Library
+import functools
+import gc
+import os
+import pickle as pkl
+import sys
+import time
+import warnings
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 
+# Third Party Library
 import jax
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
+import matplotlib.style as mplstyle
 import numpy as np
+import optuna
+import ot
 import pandas as pd
 import pymysql
+import scipy.io
+import seaborn as sns
 import sqlalchemy
 import torch
-import ot
-import time
-import matplotlib.pyplot as plt
-import optuna
 from joblib import parallel_backend
-import warnings
-# warnings.simplefilter("ignore")
-import seaborn as sns
-import matplotlib.style as mplstyle
 from tqdm.auto import tqdm
-import functools
+
+# First Party Library
 from src.gw_alignment import GW_Alignment
 from src.utils.gw_optimizer import load_optimizer
-# %load_ext autoreload
-import scipy.io
-import pickle as pkl
 
 os.chdir(os.path.dirname(__file__))
+
+# %load_ext autoreload
+# warnings.simplefilter("ignore")
 
 #%%
 ### load data
@@ -65,28 +73,28 @@ axes[1].set_title('Dissmimilarity matrix #2')
 plt.show()
 #%%
 # set the filename and foldername for saving optuna results
+# filename is also treated as optuna study_name
 filename = 'test'
 save_path = '../results/gw_alignment/' + filename
 
 # Delete previous optimization results or not
-delete_study = True
+# If the same filename has different search space, optuna may not work well.
+delete_study = False
 
 # set the device ('cuda' or 'cpu') and variable type ('torch' or 'numpy')
 device = 'cpu'
 to_types = 'numpy'
-
 # device = 'cuda'
 # to_types = 'torch'
 
 # the number of jobs
 n_jobs = 4
 
-# 分散計算のために使うRDBを指定
+# Specify the RDB to use for distributed calculations
 sql_name = 'sqlite'
 storage = "sqlite:///" + save_path +  '/' + filename + '.db'
 # sql_name = 'mysql'
 # storage = 'mysql+pymysql://root:olabGPU61@localhost/GW_MethodsTest'
-# GW_MethodsTest
 
 #%%
 ### Set the parameters for optimization
@@ -98,26 +106,26 @@ init_plans_list = ['random']
 # you can select multiple options
 # init_plans_list = ['uniform', 'random']
 
-# set the number of trials, i.e., the number of epsilon values tested in optimization
+# set the number of trials, i.e., the number of epsilon values tested in optimization: default : 20
 num_trial = 4
 
-# the number of random initial matrices for 'random' or 'permutation'] options
+# the number of random initial matrices for 'random' or 'permutation' options：default: 100
 n_iter = 1
 
 # the maximum number of iteration for GW optimization: default: 1000
 max_iter = 200
 
-# choose sampler 
+# choose sampler
 # 'random': randomly select epsilon between the range of epsilon
 # 'grid': grid search between the range of epsilon
 # 'tpe': Bayesian sampling
-sampler_name = 'tpe'
+sampler_name = 'random'
 
 # set the range of epsilon
 # set only the minimum value and maximum value for 'tpe' sampler
-# set also the step size for 'grid' or 'random' sampler
+# for 'grid' or 'random' sampler, you can also set the step size
 eps_list = [1e-2, 1e-1]
-# eps_list = np.linspace(1e-2, 1e-1, num_trial) 
+# eps_list = [1e-2, 1e-1, 1e-2]
 
 eps_log = True # use log scale if True
 
@@ -125,18 +133,20 @@ eps_log = True # use log scale if True
 # 'median': Pruning if the score is below the past median at a certain point in time
 #   n_startup_trials: Do not activate the pruner until this number of trials has finished
 #   n_warmup_steps: Do not activate the pruner for each trial below this step
-# 'hyperband': Instead of the pruning decision period gradually increasing, the criteria becomes gradually stricter
+# 'hyperband': Use multiple SuccessiveHalvingPrunerd that gradually longer pruning decision periods and that gradually stricter criteria
 #   min_resource: Do not activate the pruner for each trial below this step
 #   reduction_factor: How often to check for pruning. Smaller values result in more frequent pruning checks. Between 2 to 6.
 # 'nop': no pruning
-pruner_name = 'median'
+pruner_name = 'hyperband'
 pruner_params = {'n_startup_trials': 1, 'n_warmup_steps': 2, 'min_resource': 2, 'reduction_factor' : 3}
 
 #%%
+# distribution in the source space, and target space
 p = ot.unif(len(C1))
 q = ot.unif(len(C2))
+# generate instance solves gw_alignment　
 test_gw = GW_Alignment(C1, C2, p, q, save_path, max_iter = max_iter, n_iter = n_iter, device = device, to_types = to_types, gpu_queue = None)
-
+# generate instance optimize gw_alignment　
 opt = load_optimizer(save_path,
                      n_jobs = n_jobs,
                      num_trial = num_trial,
@@ -163,7 +173,8 @@ gw_objective = functools.partial(test_gw, init_plans_list = init_plans, eps_list
 study = opt.run_study(gw_objective, gpu_board = device)
 
 #%%
-print(study.trials_dataframe().sort_values('params_eps'))
+### View Results
+display(study.trials_dataframe().sort_values('params_eps'))
 
 #%% checkresults
 df_trial = study.trials_dataframe()
@@ -191,9 +202,15 @@ max_indices = np.argmax(OT, axis=1)
 accuracy = np.mean(max_indices == np.arange(OT.shape[0])) * 100
 print(f'accuracy={accuracy}%')
 
-# please add the figure plotting epsilon as x-axis and GWD as y-axis -> abe-san
+# figure plotting epsilon as x-axis and GWD as y-axis
+sns.scatterplot(data = df_trial, x = 'params_eps', y = 'value', s = 50)
+plt.xlabel('$\epsilon$')
+plt.ylabel('GWD')
+plt.show()
 
-
-# please add the figure plotting GWD as x-axis and accuracy as y-axis -> abe-san
-
-#%%
+#　figure plotting GWD as x-axis and accuracy as y-axis
+sns.scatterplot(data = df_trial, x = 'value', y = 'user_attrs_best_acc', s = 50)
+plt.xlabel('GWD')
+plt.ylabel('accuracy')
+plt.show()
+# %%

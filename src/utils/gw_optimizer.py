@@ -155,6 +155,9 @@ class RunOptuna():
 
         objective = functools.partial(dataset, init_plans_list = init_mat_types, eps_list = self.eps_list)
         """
+        # Substitute partial applicated init_mat_types
+        self.init_mat_types = objective.keywords['init_plans_list']
+
         if self.delete_study:
             self._confirm_delete()
 
