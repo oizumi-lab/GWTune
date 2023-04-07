@@ -84,7 +84,6 @@ delete_study = False
 # set the device ('cuda' or 'cpu') and variable type ('torch' or 'numpy')
 device = 'cpu'
 to_types = 'numpy'
-
 # device = 'cuda'
 # to_types = 'torch'
 
@@ -142,10 +141,12 @@ pruner_name = 'hyperband'
 pruner_params = {'n_startup_trials': 1, 'n_warmup_steps': 2, 'min_resource': 2, 'reduction_factor' : 3}
 
 #%%
+# distribution in the source space, and target space
 p = ot.unif(len(C1))
 q = ot.unif(len(C2))
+# generate instance solves gw_alignment　
 test_gw = GW_Alignment(C1, C2, p, q, save_path, max_iter = max_iter, n_iter = n_iter, device = device, to_types = to_types, gpu_queue = None)
-
+# generate instance optimize gw_alignment　
 opt = load_optimizer(save_path,
                      n_jobs = n_jobs,
                      num_trial = num_trial,
