@@ -10,7 +10,8 @@ import torch
 import ot
 import matplotlib.pyplot as plt
 import functools
-
+import scipy
+import pickle as pkl
 # nvidia-smi --query-compute-apps=timestamp,pid,name,used_memory --format=csv # GPUをだれが使用しているのかを確認できるコマンド。
 
 # %%
@@ -20,9 +21,9 @@ from src.utils.gw_optimizer import load_optimizer
 
 # %%
 class Test():
-    def __init__(self, path_model1, path_model2, device, to_types) -> None:
-        self.path_model1 = path_model1
-        self.path_model2 = path_model2
+    def __init__(self, data_select, device, to_types) -> None:
+        
+        self.data_select = data_select
         self.main_save_path = '../results/gw_alignment_test'
         
         self.device = device
@@ -31,18 +32,28 @@ class Test():
         self.model1, self.model2, self.p, self.q = self.load_sample_data()
 
     def load_sample_data(self):
-        """
-        ただ、sample dataをloadするだけの関数。
+        if self.data_select == 'DNN':
+            path1 = '../data/model1.pt'
+            path2 = '../data/model2.pt'
+            C1 = torch.load(path1)
+            C2 = torch.load(path2)
+        elif self.data_select == 'color':
+            data_path = '../data/num_groups_5_seed_0_fill_val_3.5.pickle'
+            with open(data_path, "rb") as f:
+                data = pkl.load(f)
+            sim_mat_list = data["group_ave_mat"]
+            C1 = sim_mat_list[0]
+            C2 = sim_mat_list[1]
+        elif self.data_select == 'face':
+            data_path = '../data/faces_GROUP_interp.mat'
+            mat_dic = scipy.io.loadmat(data_path)
+            C1 = mat_dic["group_mean_ATTENDED"]
+            C2 = mat_dic["group_mean_UNATTENDED"]
 
-        Returns:
-            _type_: _description_
-        """
-        model1 = torch.load(self.path_model1)
-        model2 = torch.load(self.path_model2)
-        p = ot.unif(len(model1))
-        q = ot.unif(len(model2))
-        return model1, model2, p, q
-
+        p = ot.unif(len(C1))
+        q = ot.unif(len(C2))
+        return C1, C2, p, q
+    
     def main_test(self, filename):
         save_path = self.main_save_path + '/' + filename
         adjust_filename = filename + '_adjust'
@@ -51,7 +62,7 @@ class Test():
         adjust = self.adjustment_test(save_path, fix_method = 'both')
         opt_adjust = self.optimizer(adjust_filename, save_path, n_jobs = 4, num_trial = 1000)
         
-        forced_run = False
+        forced_run = True
         study_adjust = opt_adjust.run_study(adjust, gpu_board = 'cuda:0', forced_run = forced_run)
         
         adjust.make_graph(study_adjust)
@@ -135,12 +146,11 @@ class Test():
 
 # %%
 if __name__ == '__main__':
-    path1 = '../data/model1.pt'
-    path2 = '../data/model2.pt'
+    data_select = 'DNN'
     device = 'cuda'
     to_types = 'torch'
 
-    tgw = Test(path1, path2, device, to_types)
+    tgw = Test(data_select, device, to_types)
     # diagと['random', 'uniform']ではfilenameを分けてください
     
     filename = 'test'

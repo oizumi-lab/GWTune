@@ -2,6 +2,7 @@
 import os
 import numpy as np
 import torch
+import torch.multiprocessing as mp
 import pymysql
 import matplotlib.pyplot as plt
 import optuna
@@ -178,6 +179,18 @@ class RunOptuna():
                         device = 'cpu'
 
                     pool.submit(multi_run, objective, seed + i, self.num_trial // self.n_jobs, device)
+            
+            
+            # for i in range(self.n_jobs):
+            #     if gpu_board == 'multi':
+            #         device = 'cuda:' + str(i % 4)
+            #     elif 'cuda' in gpu_board:
+            #         device = gpu_board
+            #     elif gpu_board == 'cpu':
+            #         device = 'cpu'
+                
+            #     p = mp.Process(target = multi_run, args=(objective, seed + i, self.num_trial // self.n_jobs, device))
+            #     p.run()
 
         study = self.load_study()
 
