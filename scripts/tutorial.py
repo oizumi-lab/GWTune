@@ -107,17 +107,17 @@ n_iter = 1
 # the maximum number of iteration for GW optimization: default: 1000
 max_iter = 200
 
-# choose sampler 
+# choose sampler
 # 'random': randomly select epsilon between the range of epsilon
 # 'grid': grid search between the range of epsilon
 # 'tpe': Bayesian sampling
-sampler_name = 'tpe'
+sampler_name = 'grid'
 
 # set the range of epsilon
 # set only the minimum value and maximum value for 'tpe' sampler
 # set also the step size for 'grid' or 'random' sampler
 eps_list = [1e-2, 1e-1]
-# eps_list = np.linspace(1e-2, 1e-1, num_trial) 
+# eps_list = np.linspace(1e-2, 1e-1, num_trial)
 
 eps_log = True # use log scale if True
 
@@ -163,7 +163,7 @@ gw_objective = functools.partial(test_gw, init_plans_list = init_plans, eps_list
 study = opt.run_study(gw_objective, gpu_board = device)
 
 #%%
-print(study.trials_dataframe().sort_values('params_eps'))
+display(study.trials_dataframe().sort_values('params_eps'))
 
 #%% checkresults
 df_trial = study.trials_dataframe()
