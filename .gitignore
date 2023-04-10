@@ -14,3 +14,6 @@ src/GW_alignment_abe.py
 src/GW_alignment.py
 *.python-version
 pyproject.toml
+
+.history/
+.vscode/
