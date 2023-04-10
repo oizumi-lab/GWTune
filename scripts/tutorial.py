@@ -119,7 +119,7 @@ max_iter = 200
 # 'random': randomly select epsilon between the range of epsilon
 # 'grid': grid search between the range of epsilon
 # 'tpe': Bayesian sampling
-sampler_name = 'grid'
+sampler_name = 'tpe'
 
 # set the range of epsilon
 # set only the minimum value and maximum value for 'tpe' sampler
@@ -170,7 +170,7 @@ init_plans = InitMatrix().implemented_init_plans(init_plans_list)
 
 # used only in grid search sampler below the two lines
 eps_space = opt.define_eps_space(eps_list, eps_log, num_trial)
-search_space = {"eps": eps_space, "initialize": init_plans} 
+search_space = {"eps": eps_space, "initialize": init_plans}
 
 # 2. run optimzation
 study = opt.run_study(test_gw, device, init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log, search_space = search_space)
