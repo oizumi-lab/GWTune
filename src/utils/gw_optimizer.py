@@ -212,7 +212,7 @@ class RunOptuna():
 
         objective = functools.partial(objective, **kwargs)
 
-        study = self._run_study(objective, device, forced_run)
+        study = self._run_study(objective, device = device, forced_run = forced_run)
 
         return study
 
