@@ -54,30 +54,38 @@ class GW_Alignment():
         2023.3.16 佐々木 作成
 
         epsの範囲を指定する関数。
-        Args:
-            trial (_type_): _description_
-            eps_list (_type_): _description_
-            eps_log (_type_): _description_
-
-        Raises:
-            ValueError: _description_
-
-        Returns:
-            _type_: _description_
         """
-        ep_lower, ep_upper = eps_list
-
         if len(eps_list) == 2:
+            ep_lower, ep_upper = eps_list
             eps = trial.suggest_float("eps", ep_lower, ep_upper, log = eps_log)
         elif len(eps_list) == 3:
             ep_lower, ep_upper, ep_step = eps_list
-            eps = trial.suggest_float("eps", ep_lower, ep_upper, ep_step)
+            eps = trial.suggest_float("eps", ep_lower, ep_upper, step = ep_step)
         else:
             raise ValueError("The eps_list doesn't match.")
 
         return trial, eps
 
-    def __call__(self, trial, init_plans_list, eps_list, device, eps_log=True):
+    def check_eps(self, eps_list, eps_log):
+
+        if type(eps_list) != list:
+            raise ValueError('variable named "eps_list" is not list!')
+
+        else:
+            if len(eps_list) == 2:
+                pass
+            if len(eps_list) == 3:
+                if eps_log:
+                    warnings.warn('You cannot use "eps_log" and "eps_step" at the same time, in such case "eps_log = False". \n If you want to use "eps_log = True", set "eps_list = [eps_lower, eps_upper]".', UserWarning)
+                    eps_log = False
+
+            else:
+                ValueError('Not defined initialize matrix.')
+
+            return eps_list, eps_log
+
+
+    def __call__(self, trial, device, init_plans_list, eps_list, eps_log=True):
         '''
         0.  define the "gpu_queue" here.
             This will be used when the memory of dataset was too much large for a single GPU board, and so on.
@@ -140,12 +148,12 @@ class GW_Alignment():
         best_trial = study.best_trial
         eps = best_trial.params['eps']
         init_plan = best_trial.params['initialize']
-        
+
         if init_plan in ['uniform', 'diag']:
             acc = best_trial.user_attrs['acc']
         else:
             acc = best_trial.user_attrs['best_acc']
-            
+
         size = best_trial.user_attrs['size']
         number = best_trial.number
 
@@ -153,7 +161,7 @@ class GW_Alignment():
             gw = torch.load(self.save_path + '/' + init_plan + f'/gw_{number}.pt')
         elif self.to_types == 'numpy':
             gw = np.load(self.save_path + '/' + init_plan + f'/gw_{number}.npy')
-            
+
         self.plot_coupling(gw, eps, acc)
 
     def make_eval_graph(self, study):
@@ -191,8 +199,8 @@ class MainGromovWasserstainComputation():
         self.pred_dist, self.target_dist, self.p, self.q = self.backend(pred_dist, target_dist, p, q) # 特殊メソッドのcallに変更した (2023.3.16 佐々木)
 
         # hyperparameter
-        self.initialize = ['uniform', 'random', 'permutation', 'diag']
-        self.init_mat_builder = InitMatrix(self.size, self.backend)
+        # self.initialize = ['uniform', 'random', 'permutation', 'diag']
+        self.init_mat_builder = InitMatrix(matrix_size = self.size, backend = self.backend)
 
         # gw alignmentに関わるparameter
         self.max_iter = max_iter
@@ -297,8 +305,8 @@ class MainGromovWasserstainComputation():
         Raises:
             optuna.TrialPruned: _description_
         """
-        
-        if init_mat_plan in ['uniform', 'diag'] and math.isnan(gw_loss): # math.isnan()を使わないとnanの判定ができない。 
+
+        if init_mat_plan in ['uniform', 'diag'] and math.isnan(gw_loss): # math.isnan()を使わないとnanの判定ができない。
             # このifブロックがなくても、diag, uniformのprunerは正しく動作する。
             # ただ、tutorialの挙動を見ていると、これがあった方が良さそう。(2023.3.28 佐々木)
             self._gpu_queue_put(gpu_id)
@@ -306,9 +314,9 @@ class MainGromovWasserstainComputation():
 
         if num_iter is None: # uniform, diagにおいて、nanにならなかったがprunerが動くときのためのifブロック。
             num_iter = trial.number
-        
+
         trial.report(gw_loss, num_iter)
-        
+
         if trial.should_prune():
             self._gpu_queue_put(gpu_id)
             raise optuna.TrialPruned(f"Trial was pruned at iteration {num_iter} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
@@ -322,7 +330,7 @@ class MainGromovWasserstainComputation():
         2023.3.17 佐々木
         uniform, diagでも、prunerを使うこともできるが、いまのところはコメントアウトしている。
         どちらにも使えるようにする場合は、ある程度の手直しが必要。
-        
+
         2023.3.28 佐々木
         全条件において、正しくprunerを動かすメソッドを作成。
         各条件ごとへの拡張性を考慮すると、prunerの挙動は一本化しておく方が絶対にいい。
@@ -400,7 +408,7 @@ if __name__ == '__main__':
 
     #     with parallel_backend("multiprocessing", n_jobs = n_gpu):
     #         study.optimize(lambda trial: dataset(trial, init_mat_types, eps_list), n_trials = 20, n_jobs = n_gpu)
-    
+
     # df = study.trials_dataframe()
     # print(df)
     # # %%
@@ -427,7 +435,7 @@ if __name__ == '__main__':
     n_trials = 20
     n_jobs = 10
     seed = 42
-    
+
     with ThreadPoolExecutor(n_jobs) as pool:
         for i in range(n_jobs):
             device = 'cuda:0'# + str(i % 4)
@@ -444,7 +452,7 @@ if __name__ == '__main__':
     print(df)
     # %%
     df.dropna()
-    
+
 
     # %%
     """

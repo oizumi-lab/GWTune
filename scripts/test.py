@@ -79,13 +79,10 @@ class Test():
         
         # 1. 初期値の選択。実装済みの初期値条件の抽出をgw_optimizer.pyからinit_matrix.pyに移動しました。
         init_plans = test_gw.main_compute.init_mat_builder.implemented_init_plans(init_plans_list)
-
-        # 2. 最適化関数の定義。事前に、functools.partialで、必要なhyper parametersの条件を渡しておく。
-        gw_objective = functools.partial(test_gw, init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log)
         
         # 3. 最適化を実行。run_studyに渡す関数は、alignmentとhistogramの両方ともを揃えるようにしました。
         opt_gw = self.optimizer(filename, save_path, n_jobs = 8, num_trial = 40, n_iter = n_iter)
-        study = opt_gw.run_study(gw_objective, gpu_board = 'cuda')
+        study = opt_gw.run_study(test_gw, device = 'cuda', init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log)
         test_gw.load_graph(study)
         
         return study
