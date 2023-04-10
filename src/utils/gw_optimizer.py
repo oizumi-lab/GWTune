@@ -3,7 +3,7 @@
 import functools
 import os
 from concurrent.futures import ThreadPoolExecutor
-from typing import Union
+import warnings
 
 # Third Party Library
 import matplotlib.pyplot as plt
@@ -158,7 +158,7 @@ class RunOptuna():
 
         if forced_run:
             self.create_study() #dbファイルがない場合、ここでloadをさせないとmulti_runが正しく動かなくなってしまう。
-            
+
             if self.sampler_name == 'grid':
                 # 2023.4.10 佐々木
                 # grid searchの場合、epsの値は決まっているので、通常の書き方で問題なし。
@@ -196,14 +196,16 @@ class RunOptuna():
         """
         2023.3.29 佐々木
         """
-        
+
         if self.sampler_name == 'grid':
             assert kwargs.get('search_space') != None, 'please define search space for grid search.'
             self.search_space = kwargs.pop('search_space')
-        
+
         else:
-            assert kwargs.get('search_space') == None, 'please remove search space except for grid search.'
-        
+            if kwargs.get('search_space') is not None:
+                warnings.warn('except for grid search, search space is ignored.', UserWarning)
+                del kwargs['search_space']
+
         objective = functools.partial(objective, **kwargs)
 
         study = self._run_study(objective, device, forced_run)

@@ -24,7 +24,7 @@ class Test():
         self.path_model1 = path_model1
         self.path_model2 = path_model2
         self.main_save_path = '../results/gw_alignment_test'
-        
+
         self.device = device
         self.to_types = to_types
 
@@ -46,43 +46,43 @@ class Test():
     def main_test(self, filename):
         save_path = self.main_save_path + '/' + filename
         adjust_filename = filename + '_adjust'
-        
+
         # まずは、histogramの調整の計算を行う。
         adjust = self.adjustment_test(save_path, fix_method = 'both')
         opt_adjust = self.optimizer(adjust_filename, save_path, n_jobs = 4, num_trial = 1000)
-        
+
         forced_run = True
         study_adjust = opt_adjust.run_study(adjust, device = 'cuda:0', forced_run = forced_run)
-        
+
         adjust.make_graph(study_adjust)
-        
+
         model1_best_yj, model2_best_yj = adjust.best_models(study_adjust)
-        
+
         # histogramを調整後にalignmentの計算を行う
         init_plans_list = ['random']
         eps_list = [1e-4, 1e-3]
         eps_log = True
         n_iter = 20
-        
+
         test_gw = GW_Alignment(model1_best_yj, model2_best_yj, self.p, self.q, save_path, max_iter = 1000, n_iter = n_iter, device = self.device, to_types = self.to_types, gpu_queue = None)
-        
+
         # 1. 初期値の選択。実装済みの初期値条件の抽出をgw_optimizer.pyからinit_matrix.pyに移動しました。
         init_plans = test_gw.main_compute.init_mat_builder.implemented_init_plans(init_plans_list)
-        
+
         # 3. 最適化を実行。run_studyに渡す関数は、alignmentとhistogramの両方ともを揃えるようにしました。
-        opt_gw = self.optimizer(filename, save_path, n_jobs = 8, num_trial = 40, n_iter = n_iter)
+        opt_gw = self.optimizer(filename, save_path, n_jobs = 4, num_trial = 40, n_iter = n_iter)
         study = opt_gw.run_study(test_gw, device = 'cuda', init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log)
         test_gw.load_graph(study)
-        
+
         return study
-        
-        
+
+
     def optimizer(self, filename, save_path, n_jobs = 4, num_trial = 100, n_iter = 100, delete_study = False):
-        
+
         # 分散計算のために使うRDBを指定
         sql_name = 'sqlite'
         storage = "sqlite:///" + save_path +  '/' + filename + '.db'
-        
+
         # sql_name = 'mysql'
         # storage = 'mysql+pymysql://root:olabGPU61@localhost/GW_MethodsTest'
 
@@ -98,10 +98,10 @@ class Test():
         # hyperband pruner (pruning判定の期間がだんだん伸びていく代わりに基準がだんだん厳しくなっていく)
         #     min_resource     : 各trialについてこのステップ以下ではprunerを作動させない
         #     reduction_factor : どれくらいの間隔でpruningをcheckするか。値が小さいほど細かい間隔でpruning checkが入る。2~6程度.
-        
+
         pruner_name = 'median'
         pruner_params = {'n_startup_trials': 1, 'n_warmup_steps': 2, 'min_resource': 2, 'reduction_factor' : 3}
-        
+
         opt = load_optimizer(save_path,
                              n_jobs = n_jobs,
                              num_trial = num_trial,
@@ -115,7 +115,7 @@ class Test():
                              sql_name = sql_name,
                              storage = storage,
                              delete_study = delete_study)
-        
+
         return opt
 
     def adjustment_test(self, save_path, fix_method = 'both'):
@@ -125,10 +125,10 @@ class Test():
         """
         dataset = Adjust_Distribution(self.model1, self.model2, save_path, fix_method = fix_method, device = self.device, to_types = self.to_types, gpu_queue = None)
         return dataset
-    
-        
-    
-    
+
+
+
+
 
 # %%
 if __name__ == '__main__':
@@ -139,7 +139,7 @@ if __name__ == '__main__':
 
     tgw = Test(path1, path2, device, to_types)
     # diagと['random', 'uniform']ではfilenameを分けてください
-    
+
     filename = 'test'
     tgw.main_test(filename)
 # %%
