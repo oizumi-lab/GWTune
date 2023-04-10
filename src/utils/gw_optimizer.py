@@ -3,7 +3,6 @@
 import functools
 import os
 from concurrent.futures import ThreadPoolExecutor
-from typing import Union
 
 # Third Party Library
 import numpy as np
