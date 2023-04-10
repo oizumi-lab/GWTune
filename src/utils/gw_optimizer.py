@@ -1,15 +1,20 @@
 # %%
-import os
-import numpy as np
-import torch
-import pymysql
-import matplotlib.pyplot as plt
-import optuna
-from joblib import parallel_backend
-import matplotlib.style as mplstyle
-import seaborn as sns
-from concurrent.futures import ThreadPoolExecutor
+# Standard Library
 import functools
+import os
+from concurrent.futures import ThreadPoolExecutor
+from typing import Union
+
+# Third Party Library
+import matplotlib.pyplot as plt
+import matplotlib.style as mplstyle
+import numpy as np
+import optuna
+import pymysql
+import seaborn as sns
+import torch
+from joblib import parallel_backend
+
 
 # %%
 def load_optimizer(save_path, n_jobs = 4, num_trial = 20,
@@ -157,6 +162,7 @@ class RunOptuna():
         """
         # Substitute partial applicated init_mat_types
         self.init_mat_types = objective.keywords['init_plans_list']
+        self.eps_space = self.define_eps_space(objective.keywords['eps_list'], objective.keywords['eps_log'])
 
         if self.delete_study:
             self._confirm_delete()
@@ -197,7 +203,7 @@ class RunOptuna():
         elif self.sampler_name == 'grid':
 
             search_space = {
-                "eps": np.logspace(-4, -2),
+                "eps": self.eps_space,
                 "initialize": self.init_mat_types
             }
 
@@ -226,3 +232,24 @@ class RunOptuna():
         else:
             raise ValueError('not implemented pruner yet.')
         return pruner
+
+    def define_eps_space(self, eps_list: list, eps_log: bool):
+        '''
+        2023/4/8 abe
+        grid samplerにepsilonのrangeを渡す関数を追加
+        '''
+        if len(eps_list) == 2:
+            ep_lower, ep_upper = eps_list
+            if eps_log:
+                eps_space = np.logspace(ep_lower, ep_upper)
+            else:
+                eps_space = np.linspace(ep_lower, ep_upper)
+
+        elif len(eps_list) == 3:
+            ep_lower, ep_upper, ep_step = eps_list
+            eps_space = np.arange(ep_lower, ep_upper, ep_step)
+
+        else:
+            raise ValueError("The eps_list doesn't match.")
+
+        return eps_space

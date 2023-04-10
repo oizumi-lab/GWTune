@@ -79,7 +79,7 @@ save_path = '../results/gw_alignment/' + filename
 
 # Delete previous optimization results or not
 # If the same filename has different search space, optuna may not work well.
-delete_study = False
+delete_study = True
 
 # set the device ('cuda' or 'cpu') and variable type ('torch' or 'numpy')
 device = 'cpu'
@@ -119,7 +119,7 @@ max_iter = 200
 # 'random': randomly select epsilon between the range of epsilon
 # 'grid': grid search between the range of epsilon
 # 'tpe': Bayesian sampling
-sampler_name = 'random'
+sampler_name = 'grid'
 
 # set the range of epsilon
 # set only the minimum value and maximum value for 'tpe' sampler
@@ -165,6 +165,7 @@ opt = load_optimizer(save_path,
 ### optimization
 # 1. 初期値の選択。実装済みの初期値条件の抽出をgw_optimizer.pyからinit_matrix.pyに移動しました。
 init_plans = test_gw.main_compute.init_mat_builder.implemented_init_plans(init_plans_list)
+eps_list, eps_log = test_gw.check_eps(eps_list, eps_log)
 
 # 2. 最適化関数の定義。事前に、functools.partialで、必要なhyper parametersの条件を渡しておく。
 gw_objective = functools.partial(test_gw, init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log)
