@@ -85,7 +85,7 @@ class GW_Alignment():
             return eps_list, eps_log
 
 
-    def __call__(self, trial, init_plans_list, eps_list, device, eps_log=True):
+    def __call__(self, trial, device, init_plans_list, eps_list, eps_log=True):
         '''
         0.  define the "gpu_queue" here.
             This will be used when the memory of dataset was too much large for a single GPU board, and so on.
@@ -199,8 +199,8 @@ class MainGromovWasserstainComputation():
         self.pred_dist, self.target_dist, self.p, self.q = self.backend(pred_dist, target_dist, p, q) # 特殊メソッドのcallに変更した (2023.3.16 佐々木)
 
         # hyperparameter
-        self.initialize = ['uniform', 'random', 'permutation', 'diag']
-        self.init_mat_builder = InitMatrix(self.size, self.backend)
+        # self.initialize = ['uniform', 'random', 'permutation', 'diag']
+        self.init_mat_builder = InitMatrix(matrix_size = self.size, backend = self.backend)
 
         # gw alignmentに関わるparameter
         self.max_iter = max_iter

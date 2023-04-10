@@ -30,7 +30,7 @@ from tqdm.auto import tqdm
 # First Party Library
 from src.gw_alignment import GW_Alignment
 from src.utils.gw_optimizer import load_optimizer
-
+from src.utils.init_matrix import InitMatrix
 os.chdir(os.path.dirname(__file__))
 
 # %load_ext autoreload
@@ -144,8 +144,10 @@ pruner_params = {'n_startup_trials': 1, 'n_warmup_steps': 2, 'min_resource': 2, 
 # distribution in the source space, and target space
 p = ot.unif(len(C1))
 q = ot.unif(len(C2))
+
 # generate instance solves gw_alignment　
 test_gw = GW_Alignment(C1, C2, p, q, save_path, max_iter = max_iter, n_iter = n_iter, device = device, to_types = to_types, gpu_queue = None)
+
 # generate instance optimize gw_alignment　
 opt = load_optimizer(save_path,
                      n_jobs = n_jobs,
@@ -164,18 +166,18 @@ opt = load_optimizer(save_path,
 
 ### optimization
 # 1. 初期値の選択。実装済みの初期値条件の抽出をgw_optimizer.pyからinit_matrix.pyに移動しました。
-init_plans = test_gw.main_compute.init_mat_builder.implemented_init_plans(init_plans_list)
-eps_list, eps_log = test_gw.check_eps(eps_list, eps_log)
+init_plans = InitMatrix().implemented_init_plans(init_plans_list)
 
-# 2. 最適化関数の定義。事前に、functools.partialで、必要なhyper parametersの条件を渡しておく。
-gw_objective = functools.partial(test_gw, init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log)
+# used only in grid search sampler below the two lines
+eps_space = opt.define_eps_space(eps_list, eps_log, num_trial)
+search_space = {"eps": eps_space, "initialize": init_plans} 
 
-# run optimzation
-study = opt.run_study(gw_objective, gpu_board = device)
+# 2. run optimzation
+study = opt.run_study(test_gw, device, init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log, search_space = search_space)
 
 #%%
 ### View Results
-display(study.trials_dataframe().sort_values('params_eps'))
+print(study.trials_dataframe().sort_values('params_eps')) # jupyterだと、displayでもいいが、vscodeでは警告がでるので、printに変えます。(2023.4.10 佐々木)
 
 #%% checkresults
 df_trial = study.trials_dataframe()

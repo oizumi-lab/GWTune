@@ -152,43 +152,61 @@ class RunOptuna():
             raise ValueError('This db does not exist.')
         return study
 
-
-
-    def run_study(self, objective, gpu_board = 'cuda:0', forced_run = True):
-        """
-        2023.3.29 佐々木
-
-        objective = functools.partial(dataset, init_plans_list = init_mat_types, eps_list = self.eps_list)
-        """
-        # Substitute partial applicated init_mat_types
-        self.init_mat_types = objective.keywords['init_plans_list']
-        self.eps_space = self.define_eps_space(objective.keywords['eps_list'], objective.keywords['eps_log'])
-
+    def _run_study(self, objective, device = 'cuda:0', forced_run = True):
         if self.delete_study:
             self._confirm_delete()
 
         if forced_run:
             self.create_study() #dbファイルがない場合、ここでloadをさせないとmulti_runが正しく動かなくなってしまう。
-
-            def multi_run(objective, seed, num_trials, device):
+            
+            if self.sampler_name == 'grid':
+                # 2023.4.10 佐々木
+                # grid searchの場合、epsの値は決まっているので、通常の書き方で問題なし。
                 tt = functools.partial(objective, device = device)
-                study = self.load_study(seed = seed)
-                study.optimize(tt, n_trials = num_trials, n_jobs = 1)
+                study = self.load_study()
+                study.optimize(tt, n_trials = self.num_trial, n_jobs = self.n_jobs)
 
-            seed = 42
+            else:
+                # 2023.4.10 佐々木
+                # grid search以外は、以下のように書かないと乱数が固定されない問題がある(本当に面倒くさい・・・)。
+                def multi_run(objective, seed, num_trials, device):
+                    tt = functools.partial(objective, device = device)
+                    study = self.load_study(seed = seed)
+                    study.optimize(tt, n_trials = num_trials, n_jobs = 1)
 
-            with ThreadPoolExecutor(self.n_jobs) as pool:
-                for i in range(self.n_jobs):
-                    if gpu_board == 'multi':
-                        device = 'cuda:' + str(i % 4)
-                    elif 'cuda' in gpu_board:
-                        device = gpu_board
-                    elif gpu_board == 'cpu':
-                        device = 'cpu'
+                seed = 42
 
-                    pool.submit(multi_run, objective, seed + i, self.num_trial // self.n_jobs, device)
+                with ThreadPoolExecutor(self.n_jobs) as pool:
+                    for i in range(self.n_jobs):
+                        if device == 'multi':
+                            device = 'cuda:' + str(i % 4)
+                        elif 'cuda' in device:
+                            device = device
+                        elif device == 'cpu':
+                            device = 'cpu'
+
+                        pool.submit(multi_run, objective, seed + i, self.num_trial // self.n_jobs, device)
 
         study = self.load_study()
+
+        return study
+
+
+    def run_study(self, objective, device, forced_run = True, **kwargs):
+        """
+        2023.3.29 佐々木
+        """
+        
+        if self.sampler_name == 'grid':
+            assert kwargs.get('search_space') != None, 'please define search space for grid search.'
+            self.search_space = kwargs.pop('search_space')
+        
+        else:
+            assert kwargs.get('search_space') == None, 'please remove search space except for grid search.'
+        
+        objective = functools.partial(objective, **kwargs)
+
+        study = self._run_study(objective, device, forced_run)
 
         return study
 
@@ -201,13 +219,7 @@ class RunOptuna():
             sampler = optuna.samplers.RandomSampler(seed)
 
         elif self.sampler_name == 'grid':
-
-            search_space = {
-                "eps": self.eps_space,
-                "initialize": self.init_mat_types
-            }
-
-            sampler = optuna.samplers.GridSampler(search_space)
+            sampler = optuna.samplers.GridSampler(self.search_space)
 
         elif self.sampler_name.lower() == 'tpe':
             sampler = optuna.samplers.TPESampler(constant_liar = True, multivariate = True, seed = seed) # 分散最適化のときはTrueにするのが良いらしい(阿部)
@@ -233,7 +245,7 @@ class RunOptuna():
             raise ValueError('not implemented pruner yet.')
         return pruner
 
-    def define_eps_space(self, eps_list: list, eps_log: bool):
+    def define_eps_space(self, eps_list: list, eps_log: bool, num_trial: int):
         '''
         2023/4/8 abe
         grid samplerにepsilonのrangeを渡す関数を追加
@@ -241,9 +253,9 @@ class RunOptuna():
         if len(eps_list) == 2:
             ep_lower, ep_upper = eps_list
             if eps_log:
-                eps_space = np.logspace(ep_lower, ep_upper)
+                eps_space = np.logspace(np.log10(ep_lower), np.log10(ep_upper), num = num_trial) # defaultだと50個の分割になる(numpyのtutorialより)。
             else:
-                eps_space = np.linspace(ep_lower, ep_upper)
+                eps_space = np.linspace(ep_lower, ep_upper, num = num_trial)
 
         elif len(eps_list) == 3:
             ep_lower, ep_upper, ep_step = eps_list

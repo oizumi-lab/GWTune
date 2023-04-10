@@ -4,7 +4,7 @@ import ot
 
 # %%
 class InitMatrix():
-    def __init__(self, matrix_size, backend):
+    def __init__(self, matrix_size = None, backend = None):
         self.matrix_size = matrix_size  
         self.initialize = ['uniform', 'random', 'permutation', 'diag'] # 実装済みの方法の名前を入れる。
         self.backend = backend
