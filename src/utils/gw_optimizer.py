@@ -207,7 +207,7 @@ class RunOptuna():
         else:
             assert kwargs.get('search_space') == None, 'please remove search space except for grid search.'
         
-        objective = functools.partial(objective, **kwargs)
+        objective = functools.partial(objective, **kwargs) # もしかしたら、ここの書き換えだけでかなり早くなった可能性がある・・・
 
         study = self._run_study(objective, device, forced_run)
 
