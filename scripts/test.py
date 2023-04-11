@@ -60,10 +60,10 @@ class Test():
 
         # まずは、histogramの調整の計算を行う。
         adjust = self.adjustment_test(save_path, fix_method = 'both')
-        opt_adjust = self.optimizer(adjust_filename, save_path, n_jobs = 4, num_trial = 1000)
+        opt_adjust = self.optimizer(adjust_filename, save_path, n_jobs = 8, num_trial = 1000)
 
         forced_run = True
-        study_adjust = opt_adjust.run_study(adjust, device = 'cuda:0', forced_run = forced_run)
+        study_adjust = opt_adjust.run_study(adjust, device = 'cuda', forced_run = forced_run)
 
         adjust.make_graph(study_adjust)
 
@@ -75,7 +75,7 @@ class Test():
         eps_log = True
         n_iter = 20
 
-        test_gw = GW_Alignment(model1_best_yj, model2_best_yj, self.p, self.q, save_path, max_iter = 1000, n_iter = n_iter, device = self.device, to_types = self.to_types, gpu_queue = None)
+        test_gw = GW_Alignment(model1_best_yj, model2_best_yj, self.p, self.q, save_path, max_iter = 1000, n_iter = n_iter, to_types = self.to_types)
 
         # 1. 初期値の選択。実装済みの初期値条件の抽出をgw_optimizer.pyからinit_matrix.pyに移動しました。
         init_plans = test_gw.main_compute.init_mat_builder.implemented_init_plans(init_plans_list)
@@ -99,7 +99,7 @@ class Test():
 
         # 使用するsamplerを指定
         # 現状使えるのは['random', 'grid', 'tpe']
-        sampler_name = 'tpe'
+        sampler_name = 'random'
 
         # 使用するprunerを指定
         # 現状使えるのは['median', 'hyperband', 'nop']
@@ -134,7 +134,7 @@ class Test():
         2023.3.29 佐々木
         yeo-johnson変換を使った場合のhistogramの調整(マッチング)を行う。
         """
-        dataset = Adjust_Distribution(self.model1, self.model2, save_path, fix_method = fix_method, device = self.device, to_types = self.to_types, gpu_queue = None)
+        dataset = Adjust_Distribution(self.model1, self.model2, save_path, fix_method = fix_method, to_types = self.to_types)
         return dataset
 
 

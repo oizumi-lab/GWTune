@@ -126,11 +126,9 @@ class RunOptuna():
             else:
                 print("Invalid input. Please enter again.")
 
-    def create_study(self, seed = 42):
+    def create_study(self):
         study = optuna.create_study(direction = "minimize",
                                     study_name = self.filename,
-                                    sampler = self.choose_sampler(seed = seed),
-                                    pruner = self.choose_pruner(),
                                     storage = self.storage,
                                     load_if_exists = True)
         return study
@@ -157,39 +155,76 @@ class RunOptuna():
         return study
 
     def _run_study(self, objective, device = 'cuda:0', forced_run = True):
+        """
+        
+        2023.4.11 佐々木
+        multi-threadによる計算よりもmultiprocessingの方が、CUDAでの計算が早いことがわかった。
+        
+        しかし、すでに、以下のバグが発生していることがわかっている。
+        
+        ・初期値がrandomのとき、GridSamplerを使うと同じepsの値が異なるworkerで計算されてしまう(しかし、初期値の乱数は異なる)。
+          → これは2023.4.10に作成した "if sampler_name == grid" で起こっているバグ。おそらくoptunaの仕様かもしれない。
+        
+        ・初期値がrandomのとき、multiprocessingを使うと、各workerの1回目のとき、tqdmが表示されない。2回目以降は表示される。
+          おそらくjupyter側のバグかと思われる。
+        
+        ・multiprocessingで、GridSamplerを使うと、一つのepsの値だけ、重複して計算されてしまう。
+
+        """
+        
         if self.delete_study:
             self._confirm_delete()
 
         if forced_run:
             self.create_study() #dbファイルがない場合、ここでloadをさせないとmulti_runが正しく動かなくなってしまう。
 
-            if self.sampler_name == 'grid':
-                # 2023.4.10 佐々木
-                # grid searchの場合、epsの値は決まっているので、通常の書き方で問題なし。
+            # if self.sampler_name == 'grid':
+            #     # 2023.4.10 佐々木
+            #     # grid searchの場合、epsの値は決まっているので、通常の書き方で問題なし。
+            #     tt = functools.partial(objective, device = device)
+            #     study = self.load_study()
+            #     study.optimize(tt, n_trials = self.num_trial, n_jobs = self.n_jobs)
+
+            # else:
+            #     # 2023.4.10 佐々木
+            #     # grid search以外は、以下のように書かないと乱数が固定されない問題がある(本当に面倒くさい・・・)。
+            
+            def multi_run(objective, seed, num_trials, device):
                 tt = functools.partial(objective, device = device)
-                study = self.load_study()
-                study.optimize(tt, n_trials = self.num_trial, n_jobs = self.n_jobs)
+                study = self.load_study(seed = seed)
+                study.optimize(tt, n_trials = num_trials)
 
-            else:
-                # 2023.4.10 佐々木
-                # grid search以外は、以下のように書かないと乱数が固定されない問題がある(本当に面倒くさい・・・)。
-                def multi_run(objective, seed, num_trials, device):
-                    tt = functools.partial(objective, device = device)
-                    study = self.load_study(seed = seed)
-                    study.optimize(tt, n_trials = num_trials, n_jobs = 1)
+            seed = 42
 
-                seed = 42
+            # with ThreadPoolExecutor(self.n_jobs) as pool:
+            #     for i in range(self.n_jobs):
+            #         if device == 'multi':
+            #             device = 'cuda:' + str(i % 4)
+            #         elif 'cuda' in device:
+            #             device = device
+            #         elif device == 'cpu':
+            #             device = 'cpu'
 
-                with ThreadPoolExecutor(self.n_jobs) as pool:
-                    for i in range(self.n_jobs):
-                        if device == 'multi':
-                            device = 'cuda:' + str(i % 4)
-                        elif 'cuda' in device:
-                            device = device
-                        elif device == 'cpu':
-                            device = 'cpu'
+            #         pool.submit(multi_run, objective, seed + i, self.num_trial // self.n_jobs, device)
+            
+            # プロセスを生成する
+            processes = []
+            
+            for i in range(self.n_jobs):
+                if device == 'multi':
+                    device = 'cuda:' + str(i % 4)
 
-                        pool.submit(multi_run, objective, seed + i, self.num_trial // self.n_jobs, device)
+                subp = mp.Process(target=multi_run, args=(objective, seed + i, self.num_trial // self.n_jobs, device))
+                processes.append(subp)
+
+            # プロセスを実行する
+            print('starting parallel computation...')
+            for subp in processes:
+                subp.start()
+
+            # プロセスが終了するのを待つ
+            for subp in processes:
+                subp.join()
 
         study = self.load_study()
 
@@ -225,7 +260,7 @@ class RunOptuna():
             sampler = optuna.samplers.RandomSampler(seed)
 
         elif self.sampler_name == 'grid':
-            sampler = optuna.samplers.GridSampler(self.search_space)
+            sampler = optuna.samplers.GridSampler(self.search_space, seed = seed)
 
         elif self.sampler_name.lower() == 'tpe':
             sampler = optuna.samplers.TPESampler(constant_liar = True, multivariate = True, seed = seed) # 分散最適化のときはTrueにするのが良いらしい(阿部)

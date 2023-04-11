@@ -84,8 +84,6 @@ delete_study = True
 # set the device ('cuda' or 'cpu') and variable type ('torch' or 'numpy')
 device = 'cpu'
 to_types = 'numpy'
-# device = 'cuda'
-# to_types = 'torch'
 
 # the number of jobs
 n_jobs = 4
@@ -107,7 +105,7 @@ init_plans_list = ['random']
 # init_plans_list = ['uniform', 'random']
 
 # set the number of trials, i.e., the number of epsilon values tested in optimization: default : 20
-num_trial = 4
+num_trial = 8
 
 # the number of random initial matrices for 'random' or 'permutation' options：default: 100
 n_iter = 1
@@ -119,7 +117,7 @@ max_iter = 200
 # 'random': randomly select epsilon between the range of epsilon
 # 'grid': grid search between the range of epsilon
 # 'tpe': Bayesian sampling
-sampler_name = 'tpe'
+sampler_name = 'random'
 
 # set the range of epsilon
 # set only the minimum value and maximum value for 'tpe' sampler
@@ -146,7 +144,7 @@ p = ot.unif(len(C1))
 q = ot.unif(len(C2))
 
 # generate instance solves gw_alignment　
-test_gw = GW_Alignment(C1, C2, p, q, save_path, max_iter = max_iter, n_iter = n_iter, device = device, to_types = to_types, gpu_queue = None)
+test_gw = GW_Alignment(C1, C2, p, q, save_path, max_iter = max_iter, n_iter = n_iter, to_types = to_types)
 
 # generate instance optimize gw_alignment　
 opt = load_optimizer(save_path,

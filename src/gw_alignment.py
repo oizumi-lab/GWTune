@@ -353,25 +353,27 @@ if __name__ == '__main__':
     def multi_run(dataset, subp_id, device, num_trials):
         seed = 42 + subp_id
         load_study = optuna.load_study(study_name = "test",
-                                       sampler = optuna.samplers.TPESampler(seed = seed),
+                                       sampler = optuna.samplers.RandomSampler(seed = seed),
+                                       # sampler = optuna.samplers.GridSampler(search_space, seed = seed),
                                        pruner = optuna.pruners.MedianPruner(),
                                        storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db')
         
-        load_study.optimize(lambda trial: dataset(trial, device, init_mat_types, eps_list), n_trials = num_trials, n_jobs = 1)
+        load_study.optimize(lambda trial: dataset(trial, device, init_mat_types, eps_list), n_trials = num_trials)
 
-    n_trials = 4
+    n_trials = 8
     n_jobs = 4
+    search_space = {'eps':np.logspace(np.log10(eps_list[0]), np.log10(eps_list[1]), num = n_trials)}
 
-    with ThreadPoolExecutor(n_jobs) as pool:
-        for i in range(n_jobs):
-            device = 'cuda:0'# + str(i % 4)
-            pool.submit(multi_run, dataset, i, device, num_trials = n_trials // n_jobs)
+    # with ThreadPoolExecutor(n_jobs) as pool:
+    #     for i in range(n_jobs):
+    #         device = 'cuda:0'# + str(i % 4)
+    #         pool.submit(multi_run, dataset, i, device, num_trials = n_trials // n_jobs)
     
     # %%
     # プロセスを生成する
     processes = []
     for i in range(n_jobs):
-        device = 'cuda:0'# + str(i % 4)
+        device = 'cuda:0' # + str(i % 4)
         subp = mp.Process(target=multi_run, args=(dataset, i, device, n_trials // n_jobs))
         processes.append(subp)
 
