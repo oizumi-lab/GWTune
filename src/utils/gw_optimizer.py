@@ -144,7 +144,7 @@ class RunOptuna():
         """
         db_file_path = self.save_path + '/' + self.filename + '.db'
 
-        if os.path.exists(db_file_path):
+        if os.path.exists(db_file_path) or self.sql_name == 'mysql':
             study = optuna.load_study(study_name = self.filename,
                                       sampler = self.choose_sampler(seed = seed),
                                       pruner = self.choose_pruner(),
@@ -154,7 +154,7 @@ class RunOptuna():
             raise ValueError('This db does not exist.')
         return study
 
-    def _run_study(self, objective, device = 'cuda:0', forced_run = True):
+    def _run_study(self, objective, device = 'cuda:0', forced_run = True, parallel = 'multiprocessing'):
         """
         
         2023.4.11 佐々木
@@ -181,38 +181,41 @@ class RunOptuna():
             self.create_study() #dbファイルがない場合、ここでloadをさせないとmulti_runが正しく動かなくなってしまう。
             
             def multi_run(objective, worker_id, num_trials, device):
+                # if worker_id == 0:
+                print('parallel method is ' + parallel + ', worker_id:' + str(worker_id) + '\n') # 完全に苦肉の策。tqdmの表示バグ対策。
+                
                 seed = 42
                 tt = functools.partial(objective, device = device)
                 study = self.load_study(seed = seed + worker_id)
                 study.optimize(tt, n_trials = num_trials)
 
-            with ThreadPoolExecutor(self.n_jobs) as pool:
+            if parallel == 'thread':
+                with ThreadPoolExecutor(self.n_jobs) as pool:
+                    for i in range(self.n_jobs):
+                        if device == 'multi':
+                            device = 'cuda:' + str(i % 4)
+                        pool.submit(multi_run, objective, i, self.num_trial // self.n_jobs, device)
+            
+            elif parallel == 'multiprocessing':
+                processes = []
                 for i in range(self.n_jobs):
                     if device == 'multi':
                         device = 'cuda:' + str(i % 4)
-                    pool.submit(multi_run, objective, i, self.num_trial // self.n_jobs, device)
-            
-            # プロセスを生成する
-            # processes = []
-            
-            # for i in range(self.n_jobs):
-            #     if device == 'multi':
-            #         device = 'cuda:' + str(i % 4)
 
-            #     subp = mp.Process(target=multi_run, args=(objective, i, self.num_trial // self.n_jobs, device))
-            #     subp.start()
-            #     processes.append(subp)
+                    subp = mp.Process(target=multi_run, args=(objective, i, self.num_trial // self.n_jobs, device))
+                    subp.start()
+                    processes.append(subp)
 
-            # # プロセスが終了するのを待つ
-            # for subp in processes:
-            #     subp.join()
+                # プロセスが終了するのを待つ
+                for subp in processes:
+                    subp.join()
 
         study = self.load_study()
 
         return study
 
 
-    def run_study(self, objective, device, forced_run = True, **kwargs):
+    def run_study(self, objective, device, forced_run = True, parallel = 'multiprocessing', **kwargs):
         """
         2023.3.29 佐々木
         """
@@ -228,7 +231,7 @@ class RunOptuna():
 
         objective = functools.partial(objective, **kwargs)
 
-        study = self._run_study(objective, device = device, forced_run = forced_run)
+        study = self._run_study(objective, device = device, forced_run = forced_run, parallel = parallel)
 
         return study
 

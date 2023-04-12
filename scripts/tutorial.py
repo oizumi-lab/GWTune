@@ -16,16 +16,12 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import matplotlib.style as mplstyle
 import numpy as np
-import optuna
 import ot
 import pandas as pd
 import pymysql
 import scipy.io
 import seaborn as sns
-import sqlalchemy
 import torch
-from joblib import parallel_backend
-from tqdm.auto import tqdm
 
 # First Party Library
 from src.gw_alignment import GW_Alignment
@@ -92,7 +88,7 @@ n_jobs = 4
 sql_name = 'sqlite'
 storage = "sqlite:///" + save_path +  '/' + filename + '.db'
 # sql_name = 'mysql'
-# storage = 'mysql+pymysql://root:olabGPU61@localhost/GW_MethodsTest'
+# storage = 'mysql+pymysql://root:olabGPU61@localhost/GridTest'
 
 #%%
 ### Set the parameters for optimization
@@ -105,7 +101,7 @@ init_plans_list = ['random']
 # init_plans_list = ['uniform', 'random']
 
 # set the number of trials, i.e., the number of epsilon values tested in optimization: default : 20
-num_trial = 4
+num_trial = 10
 
 # the number of random initial matrices for 'random' or 'permutation' options：default: 100
 n_iter = 1
@@ -171,7 +167,8 @@ eps_space = opt.define_eps_space(eps_list, eps_log, num_trial)
 search_space = {"eps": eps_space, "initialize": init_plans}
 
 # 2. run optimzation
-study = opt.run_study(test_gw, device, init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log, search_space = search_space)
+# parallel = 'thread' or 'multiprocessing', 
+study = opt.run_study(test_gw, device, parallel = 'thread', init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log, search_space = search_space)
 
 #%%
 ### View Results
