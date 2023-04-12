@@ -105,7 +105,7 @@ init_plans_list = ['random']
 # init_plans_list = ['uniform', 'random']
 
 # set the number of trials, i.e., the number of epsilon values tested in optimization: default : 20
-num_trial = 8
+num_trial = 4
 
 # the number of random initial matrices for 'random' or 'permutation' options：default: 100
 n_iter = 1
@@ -117,7 +117,7 @@ max_iter = 200
 # 'random': randomly select epsilon between the range of epsilon
 # 'grid': grid search between the range of epsilon
 # 'tpe': Bayesian sampling
-sampler_name = 'random'
+sampler_name = 'grid'
 
 # set the range of epsilon
 # set only the minimum value and maximum value for 'tpe' sampler

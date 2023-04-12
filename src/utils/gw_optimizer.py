@@ -169,6 +169,10 @@ class RunOptuna():
           おそらくjupyter側のバグかと思われる。
         
         ・multiprocessingで、GridSamplerを使うと、一つのepsの値だけ、重複して計算されてしまう。
+        
+        2023.4.12 佐々木
+        multiprocessingだとSQLiteを使うことが問題である気がする。
+        Chat-GPTにも聞いてみたけど、同じ意見だった。
 
         """
         
@@ -177,54 +181,33 @@ class RunOptuna():
 
         if forced_run:
             self.create_study() #dbファイルがない場合、ここでloadをさせないとmulti_runが正しく動かなくなってしまう。
-
-            # if self.sampler_name == 'grid':
-            #     # 2023.4.10 佐々木
-            #     # grid searchの場合、epsの値は決まっているので、通常の書き方で問題なし。
-            #     tt = functools.partial(objective, device = device)
-            #     study = self.load_study()
-            #     study.optimize(tt, n_trials = self.num_trial, n_jobs = self.n_jobs)
-
-            # else:
-            #     # 2023.4.10 佐々木
-            #     # grid search以外は、以下のように書かないと乱数が固定されない問題がある(本当に面倒くさい・・・)。
             
-            def multi_run(objective, seed, num_trials, device):
+            def multi_run(objective, worker_id, num_trials, device):
+                seed = 42
                 tt = functools.partial(objective, device = device)
-                study = self.load_study(seed = seed)
+                study = self.load_study(seed = seed + worker_id)
                 study.optimize(tt, n_trials = num_trials)
 
-            seed = 42
-
-            # with ThreadPoolExecutor(self.n_jobs) as pool:
-            #     for i in range(self.n_jobs):
-            #         if device == 'multi':
-            #             device = 'cuda:' + str(i % 4)
-            #         elif 'cuda' in device:
-            #             device = device
-            #         elif device == 'cpu':
-            #             device = 'cpu'
-
-            #         pool.submit(multi_run, objective, seed + i, self.num_trial // self.n_jobs, device)
+            with ThreadPoolExecutor(self.n_jobs) as pool:
+                for i in range(self.n_jobs):
+                    if device == 'multi':
+                        device = 'cuda:' + str(i % 4)
+                    pool.submit(multi_run, objective, i, self.num_trial // self.n_jobs, device)
             
             # プロセスを生成する
-            processes = []
+            # processes = []
             
-            for i in range(self.n_jobs):
-                if device == 'multi':
-                    device = 'cuda:' + str(i % 4)
+            # for i in range(self.n_jobs):
+            #     if device == 'multi':
+            #         device = 'cuda:' + str(i % 4)
 
-                subp = mp.Process(target=multi_run, args=(objective, seed + i, self.num_trial // self.n_jobs, device))
-                processes.append(subp)
+            #     subp = mp.Process(target=multi_run, args=(objective, i, self.num_trial // self.n_jobs, device))
+            #     subp.start()
+            #     processes.append(subp)
 
-            # プロセスを実行する
-            print('starting parallel computation...')
-            for subp in processes:
-                subp.start()
-
-            # プロセスが終了するのを待つ
-            for subp in processes:
-                subp.join()
+            # # プロセスが終了するのを待つ
+            # for subp in processes:
+            #     subp.join()
 
         study = self.load_study()
 

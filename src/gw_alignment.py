@@ -15,7 +15,9 @@ import seaborn as sns
 import matplotlib.style as mplstyle
 from tqdm.auto import tqdm
 #nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
-import multiprocessing as mp
+import torch.multiprocessing as mp
+from concurrent.futures import ThreadPoolExecutor
+
 # %%
 from utils.backend import Backend
 from utils.init_matrix import InitMatrix
@@ -334,15 +336,12 @@ if __name__ == '__main__':
     q = ot.unif(len(model2))
 
     init_mat_types = ['random']
-    eps_list = [1e-4, 1e-2]
+    eps_list = [1e-3, 1e-2]
     eps_log = True
 
     dataset = GW_Alignment(model1, model2, p, q, max_iter = 100, n_iter = 1, save_path = unittest_save_path)
 
     # %%
-    from concurrent.futures import ThreadPoolExecutor
-    from functools import partial
-    
     study = optuna.create_study(direction = "minimize",
                                 study_name = "test",
                                 sampler = optuna.samplers.TPESampler(seed = 42),
@@ -360,30 +359,26 @@ if __name__ == '__main__':
         
         load_study.optimize(lambda trial: dataset(trial, device, init_mat_types, eps_list), n_trials = num_trials)
 
-    n_trials = 8
+
+    n_trials = 4
     n_jobs = 4
     search_space = {'eps':np.logspace(np.log10(eps_list[0]), np.log10(eps_list[1]), num = n_trials)}
-
-    # with ThreadPoolExecutor(n_jobs) as pool:
-    #     for i in range(n_jobs):
-    #         device = 'cuda:0'# + str(i % 4)
-    #         pool.submit(multi_run, dataset, i, device, num_trials = n_trials // n_jobs)
     
     # %%
-    # プロセスを生成する
-    processes = []
-    for i in range(n_jobs):
-        device = 'cuda:0' # + str(i % 4)
-        subp = mp.Process(target=multi_run, args=(dataset, i, device, n_trials // n_jobs))
-        processes.append(subp)
-
-    # プロセスを実行する
-    for subp in processes:
-        subp.start()
-
-    # プロセスが終了するのを待つ
-    for subp in processes:
-        subp.join()
+    # processes = []
+    # for i in range(n_jobs):
+    #     device = 'cuda' # + str(i % 4)
+    #     subp = mp.Process(target=multi_run, args=(dataset, i, device, n_trials // n_jobs))
+    #     processes.append(subp)
+    #     subp.start()
+        
+    # for subp in processes:
+    #     subp.join()
+    
+    with ThreadPoolExecutor(n_jobs) as pool:
+        for i in range(n_jobs):
+            device = 'cuda'
+            pool.submit(multi_run, dataset, i, device, n_trials // n_jobs)
 
     #%%
     study = optuna.load_study(study_name = "test",
