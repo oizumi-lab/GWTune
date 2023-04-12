@@ -140,9 +140,7 @@ class HistogramMatching:
         x_data = self.model_normalize(self.x_sorted, alpha1, lam1)
         y_data = self.model_normalize(self.y_sorted, alpha2, lam2)
 
-        l = ot.emd2_1d(x_data, y_data) # これは正しい関数ではないはずです。　(画像データで試すと、対角行列を初期値にした場合でもうまくいかなくなります)。
-                                       # emd_test.pyに実験をしていますが、この関数はhistogram間のemdではなく、通常の一次元データに対する最適輸送解です。
-                                       # POTのライブラリの説明にも、ot.emd2がヒストグラム間のマッチングになります。
+        l = ot.emd2_1d(x_data, y_data) # 修正が必要とのこと。emd_test.pyと公式のチュートリアルを参照。
         return l
 
     def run_yeojohnson_study(
