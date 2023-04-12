@@ -206,7 +206,6 @@ class RunOptuna():
                     subp.start()
                     processes.append(subp)
 
-                # プロセスが終了するのを待つ
                 for subp in processes:
                     subp.join()
 
