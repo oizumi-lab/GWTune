@@ -171,9 +171,7 @@ class RunOptuna():
         ・multiprocessingで、GridSamplerを使うと、一つのepsの値だけ、重複して計算されてしまう。
         
         2023.4.12 佐々木
-        multiprocessingだとSQLiteを使うことが問題である気がする。
-        Chat-GPTにも聞いてみたけど、同じ意見だった。
-
+        ・grid searchの問題はoptunaの仕様らしい
         """
         
         if self.delete_study:
