@@ -8,7 +8,7 @@ import sys
 import time
 import warnings
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
 
 # Third Party Library
 import jax
@@ -31,6 +31,7 @@ from tqdm.auto import tqdm
 from src.gw_alignment import GW_Alignment
 from src.utils.gw_optimizer import load_optimizer
 from src.utils.init_matrix import InitMatrix
+
 os.chdir(os.path.dirname(__file__))
 
 # %load_ext autoreload
@@ -42,48 +43,48 @@ os.chdir(os.path.dirname(__file__))
 # 'DNN': representations of 2000 imagenet images in AlexNet and VGG
 # 'color': human similarity judgements of 93 colors for 5 paricipants groups
 # 'face': human similarity judgements of 16 faces, attended vs unattended condition in the same participant
-data_select = 'color'
+data_select = "color"
 
-if data_select == 'DNN':
-    path1 = '../data/model1.pt'
-    path2 = '../data/model2.pt'
+if data_select == "DNN":
+    path1 = "../data/model1.pt"
+    path2 = "../data/model2.pt"
     C1 = torch.load(path1)
     C2 = torch.load(path2)
-elif data_select == 'color':
-    data_path = '../data/num_groups_5_seed_0_fill_val_3.5.pickle'
+elif data_select == "color":
+    data_path = "../data/num_groups_5_seed_0_fill_val_3.5.pickle"
     with open(data_path, "rb") as f:
         data = pkl.load(f)
     sim_mat_list = data["group_ave_mat"]
     C1 = sim_mat_list[1]
     C2 = sim_mat_list[2]
-elif data_select == 'face':
-    data_path = '../data/faces_GROUP_interp.mat'
+elif data_select == "face":
+    data_path = "../data/faces_GROUP_interp.mat"
     mat_dic = scipy.io.loadmat(data_path)
     C1 = mat_dic["group_mean_ATTENDED"]
     C2 = mat_dic["group_mean_UNATTENDED"]
 
 fig, axes = plt.subplots(1, 2, figsize=(10, 5))
-im1 = axes[0].imshow(C1, cmap='viridis')
+im1 = axes[0].imshow(C1, cmap="viridis")
 cbar1 = fig.colorbar(im1, ax=axes[0])
-im2 = axes[1].imshow(C2, cmap='viridis')
+im2 = axes[1].imshow(C2, cmap="viridis")
 cbar2 = fig.colorbar(im2, ax=axes[1])
 
-axes[0].set_title('Dissimilarity matrix #1')
-axes[1].set_title('Dissmimilarity matrix #2')
+axes[0].set_title("Dissimilarity matrix #1")
+axes[1].set_title("Dissmimilarity matrix #2")
 plt.show()
 #%%
 # set the filename and foldername for saving optuna results
 # filename is also treated as optuna study_name
-filename = 'test'
-save_path = '../results/gw_alignment/' + filename
+filename = "test"
+save_path = "../results/gw_alignment/" + filename
 
 # Delete previous optimization results or not
 # If the same filename has different search space, optuna may not work well.
 delete_study = True
 
 # set the device ('cuda' or 'cpu') and variable type ('torch' or 'numpy')
-device = 'cpu'
-to_types = 'numpy'
+device = "cpu"
+to_types = "numpy"
 # device = 'cuda'
 # to_types = 'torch'
 
@@ -91,8 +92,8 @@ to_types = 'numpy'
 n_jobs = 4
 
 # Specify the RDB to use for distributed calculations
-sql_name = 'sqlite'
-storage = "sqlite:///" + save_path +  '/' + filename + '.db'
+sql_name = "sqlite"
+storage = "sqlite:///" + save_path + "/" + filename + ".db"
 # sql_name = 'mysql'
 # storage = 'mysql+pymysql://root:olabGPU61@localhost/GW_MethodsTest'
 
@@ -101,7 +102,7 @@ storage = "sqlite:///" + save_path +  '/' + filename + '.db'
 # initialization of transportation plan
 # 'uniform': uniform matrix, 'diag': diagonal matrix
 # 'random': random matrix, 'permutation': permutation matrix
-init_plans_list = ['random']
+init_plans_list = ["random"]
 
 # you can select multiple options
 # init_plans_list = ['uniform', 'random']
@@ -119,7 +120,7 @@ max_iter = 200
 # 'random': randomly select epsilon between the range of epsilon
 # 'grid': grid search between the range of epsilon
 # 'tpe': Bayesian sampling
-sampler_name = 'tpe'
+sampler_name = "tpe"
 
 # set the range of epsilon
 # set only the minimum value and maximum value for 'tpe' sampler
@@ -127,7 +128,7 @@ sampler_name = 'tpe'
 eps_list = [1e-2, 1e-1]
 # eps_list = [1e-2, 1e-1, 1e-2]
 
-eps_log = True # use log scale if True
+eps_log = True  # use log scale if True
 
 # choose pruner
 # 'median': Pruning if the score is below the past median at a certain point in time
@@ -137,31 +138,34 @@ eps_log = True # use log scale if True
 #   min_resource: Do not activate the pruner for each trial below this step
 #   reduction_factor: How often to check for pruning. Smaller values result in more frequent pruning checks. Between 2 to 6.
 # 'nop': no pruning
-pruner_name = 'hyperband'
-pruner_params = {'n_startup_trials': 1, 'n_warmup_steps': 2, 'min_resource': 2, 'reduction_factor' : 3}
+pruner_name = "hyperband"
+pruner_params = {"n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3}
 
 #%%
 # distribution in the source space, and target space
 p = ot.unif(len(C1))
 q = ot.unif(len(C2))
 
-# generate instance solves gw_alignment　
-test_gw = GW_Alignment(C1, C2, p, q, save_path, max_iter = max_iter, n_iter = n_iter, device = device, to_types = to_types, gpu_queue = None)
+# generate instance solves gw_alignment
+test_gw = GW_Alignment(
+    C1, C2, p, q, save_path, max_iter=max_iter, n_iter=n_iter, device=device, to_types=to_types, gpu_queue=None
+)
 
-# generate instance optimize gw_alignment　
-opt = load_optimizer(save_path,
-                     n_jobs = n_jobs,
-                     num_trial = num_trial,
-                     to_types = to_types,
-                     method = 'optuna',
-                     sampler_name = sampler_name,
-                     pruner_name = pruner_name,
-                     pruner_params = pruner_params,
-                     n_iter = n_iter,
-                     filename = filename,
-                     sql_name = sql_name,
-                     storage = storage,
-                     delete_study = delete_study
+# generate instance optimize gw_alignment
+opt = load_optimizer(
+    save_path,
+    n_jobs=n_jobs,
+    num_trial=num_trial,
+    to_types=to_types,
+    method="optuna",
+    sampler_name=sampler_name,
+    pruner_name=pruner_name,
+    pruner_params=pruner_params,
+    n_iter=n_iter,
+    filename=filename,
+    sql_name=sql_name,
+    storage=storage,
+    delete_study=delete_study,
 )
 
 ### optimization
@@ -173,11 +177,15 @@ eps_space = opt.define_eps_space(eps_list, eps_log, num_trial)
 search_space = {"eps": eps_space, "initialize": init_plans}
 
 # 2. run optimzation
-study = opt.run_study(test_gw, device, init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log, search_space = search_space)
+study = opt.run_study(
+    test_gw, device, init_plans_list=init_plans, eps_list=eps_list, eps_log=eps_log, search_space=search_space
+)
 
 #%%
 ### View Results
-print(study.trials_dataframe().sort_values('params_eps')) # jupyterだと、displayでもいいが、vscodeでは警告がでるので、printに変えます。(2023.4.10 佐々木)
+print(
+    study.trials_dataframe().sort_values("params_eps")
+)  # jupyterだと、displayでもいいが、vscodeでは警告がでるので、printに変えます。(2023.4.10 佐々木)
 
 #%% checkresults
 df_trial = study.trials_dataframe()
@@ -185,17 +193,17 @@ best_trial = study.best_trial
 print(best_trial)
 
 # optimized epsilon, GWD, and transportation plan
-eps_opt = best_trial.params['eps']
+eps_opt = best_trial.params["eps"]
 GWD_opt = best_trial.values[0]
 
-if to_types == 'numpy':
-    OT = np.load(save_path+f'/{init_plans_list[0]}/gw_{best_trial.number}.npy')
-elif to_types == 'torch':
-    OT = torch.load(save_path+f'/{init_plans_list[0]}/gw_{best_trial.number}.pt')
-    OT = OT.to('cpu').detach().numpy().copy()
+if to_types == "numpy":
+    OT = np.load(save_path + f"/{init_plans_list[0]}/gw_{best_trial.number}.npy")
+elif to_types == "torch":
+    OT = torch.load(save_path + f"/{init_plans_list[0]}/gw_{best_trial.number}.pt")
+    OT = OT.to("cpu").detach().numpy().copy()
 
 plt.imshow(OT)
-plt.title(f'OT eps:{eps_opt:.3f} GWD:{GWD_opt:.3f}')
+plt.title(f"OT eps:{eps_opt:.3f} GWD:{GWD_opt:.3f}")
 plt.show()
 
 df_trial = study.trials_dataframe()
@@ -203,17 +211,17 @@ df_trial = study.trials_dataframe()
 # evaluate accuracy of unsupervised alignment
 max_indices = np.argmax(OT, axis=1)
 accuracy = np.mean(max_indices == np.arange(OT.shape[0])) * 100
-print(f'accuracy={accuracy}%')
+print(f"accuracy={accuracy}%")
 
 # figure plotting epsilon as x-axis and GWD as y-axis
-sns.scatterplot(data = df_trial, x = 'params_eps', y = 'value', s = 50)
-plt.xlabel('$\epsilon$')
-plt.ylabel('GWD')
+sns.scatterplot(data=df_trial, x="params_eps", y="value", s=50)
+plt.xlabel("$\epsilon$")
+plt.ylabel("GWD")
 plt.show()
 
-#　figure plotting GWD as x-axis and accuracy as y-axis
-sns.scatterplot(data = df_trial, x = 'value', y = 'user_attrs_best_acc', s = 50)
-plt.xlabel('GWD')
-plt.ylabel('accuracy')
+# 　figure plotting GWD as x-axis and accuracy as y-axis
+sns.scatterplot(data=df_trial, x="value", y="user_attrs_best_acc", s=50)
+plt.xlabel("GWD")
+plt.ylabel("accuracy")
 plt.show()
 # %%
