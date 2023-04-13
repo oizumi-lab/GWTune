@@ -4,10 +4,9 @@ import ot
 
 # %%
 class InitMatrix():
-    def __init__(self, matrix_size = None, backend = None):
+    def __init__(self, matrix_size = None):
         self.matrix_size = matrix_size  
         self.initialize = ['uniform', 'random', 'permutation', 'diag'] # 実装済みの方法の名前を入れる。
-        self.backend = backend
         
     def implemented_init_plans(self, init_plans_list): # リストを入力して、実行可能な方法のみをリストにして返す。
         """
@@ -60,8 +59,7 @@ class InitMatrix():
 
         else:
             raise ValueError('Not defined initialize matrix.')
-        
-        T = self.backend(T)       
+             
         return T
 
     def randOrderedMatrix(self):
