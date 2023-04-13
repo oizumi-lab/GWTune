@@ -24,6 +24,7 @@ config = Optimization_Config(delete_study = True,
 #%%
 '''
 Create subject groups
+    - A Subject_Group needs a name and either an embedding or a similarity matrix.
 '''
 # Parameters
 n_group = 4
@@ -71,7 +72,7 @@ n_group_analysis.plot_accuracy(eval_type = "k_nearest", shuffle = False, scatter
 
 #%%
 '''
-Visualize embedding
+Visualize the aligned embeddings
 '''
 # Load the coarse categories data
 ## No need for this step if there is no coarse categories data
