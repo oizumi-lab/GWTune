@@ -43,7 +43,7 @@ for i in range(n_group):
 #%%
 '''
 N groups analysis
-    - The objects has methods for RSA, GW-alignment, evaluation and visalization of aligned embeddings.
+    - The object has methods for RSA, GW-alignment, evaluation of the alignment and visalization of aligned embeddings.
     - The parameter "shuffle" means a method is applied for a shuffled similarity matrix.
 '''
 # Set the instance
