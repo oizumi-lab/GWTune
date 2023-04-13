@@ -22,20 +22,34 @@ from src.utils.init_matrix import InitMatrix
 
 
 class Optimization_Config:
-    def __init__(self) -> None:
-        self.delete_study = True
-        self.device = 'cpu'
-        self.to_types = 'numpy'
-        self.n_jobs = 4
-        self.init_plans_list = ['random']
-        self.num_trial = 4
-        self.n_iter = 1
-        self.max_iter = 200
-        self.sampler_name = 'tpe'
-        self.eps_list = [1, 10]
-        self.eps_log = True 
-        self.pruner_name = 'hyperband'
-        self.pruner_params = {'n_startup_trials': 1, 'n_warmup_steps': 2, 'min_resource': 2, 'reduction_factor' : 3}
+    def __init__(self, 
+                 delete_study = True, 
+                 device = 'cpu',
+                 to_types = 'numpy',
+                 n_jobs = 4,
+                 init_plans_list = ['random'],
+                 num_trial = 4,
+                 n_iter = 1,
+                 max_iter = 200,
+                 sampler_name = 'tpe',
+                 eps_list = [1, 10],
+                 eps_log = True,
+                 pruner_name = 'hyperband',
+                 pruner_params = {'n_startup_trials': 1, 'n_warmup_steps': 2, 'min_resource': 2, 'reduction_factor' : 3}
+                 ) -> None:
+        self.delete_study = delete_study
+        self.device = device
+        self.to_types = to_types
+        self.n_jobs = n_jobs
+        self.init_plans_list = init_plans_list
+        self.num_trial = num_trial
+        self.n_iter = n_iter
+        self.max_iter = max_iter
+        self.sampler_name = sampler_name
+        self.eps_list = eps_list
+        self.eps_log = eps_log
+        self.pruner_name = pruner_name
+        self.pruner_params = pruner_params
 
 
 class Subject_Group:
