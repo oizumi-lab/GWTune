@@ -172,6 +172,7 @@ class RunOptuna():
         
         2023.4.12 佐々木
         ・grid searchの問題はoptunaの仕様らしい
+        ・tqdmのバグは、各processごとにprintを噛ませて回避できた。
         """
         
         if self.delete_study:
@@ -208,6 +209,9 @@ class RunOptuna():
 
                 for subp in processes:
                     subp.join()
+            
+            else:
+                raise ValueError('undefined parallel method. please choose "thread" or "multiprocessing".')
 
         study = self.load_study()
 
