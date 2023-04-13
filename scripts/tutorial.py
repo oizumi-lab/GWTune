@@ -101,7 +101,7 @@ init_plans_list = ['random']
 # init_plans_list = ['uniform', 'random']
 
 # set the number of trials, i.e., the number of epsilon values tested in optimization: default : 20
-num_trial = 10
+num_trial = 8
 
 # the number of random initial matrices for 'random' or 'permutation' options：default: 100
 n_iter = 1
@@ -167,8 +167,8 @@ eps_space = opt.define_eps_space(eps_list, eps_log, num_trial)
 search_space = {"eps": eps_space, "initialize": init_plans}
 
 # 2. run optimzation
-# parallel = 'thread' or 'multiprocessing', 
-study = opt.run_study(test_gw, device, parallel = 'thread', init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log, search_space = search_space)
+# parallel = 'thread' or 'multiprocessing', default is 'multiprocessing'
+study = opt.run_study(test_gw, device, parallel = 'multiprocessing', init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log, search_space = search_space)
 
 #%%
 ### View Results
