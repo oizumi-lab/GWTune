@@ -9,6 +9,7 @@ import ot
 import matplotlib.pyplot as plt
 import optuna
 from joblib import parallel_backend
+from scipy.spatial import distance
 import warnings
 # warnings.simplefilter("ignore")
 import seaborn as sns
