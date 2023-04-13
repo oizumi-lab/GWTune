@@ -99,7 +99,7 @@ class Test():
 
         # 使用するsamplerを指定
         # 現状使えるのは['random', 'grid', 'tpe']
-        sampler_name = 'random'
+        sampler_name = 'tpe'
 
         # 使用するprunerを指定
         # 現状使えるのは['median', 'hyperband', 'nop']
