@@ -13,10 +13,14 @@ Set the parameters for the optimazation of GWOT
 config = Optimization_Config(delete_study = True, 
                              device = 'cpu',
                              to_types = 'numpy',
-                             n_jobs = 4,init_plans_list = ['random'],
-                             num_trial = 4,n_iter = 1,
-                             max_iter = 200,sampler_name = 'tpe',
-                             eps_list = [1, 10],eps_log = True,
+                             n_jobs = 4,
+                             init_plans_list = ['random'],
+                             num_trial = 4,
+                             n_iter = 1,
+                             max_iter = 200,
+                             sampler_name = 'tpe',
+                             eps_list = [1, 10],
+                             eps_log = True,
                              pruner_name = 'hyperband',
                              pruner_params = {'n_startup_trials': 1, 'n_warmup_steps': 2, 'min_resource': 2, 'reduction_factor' : 3}
                              )
