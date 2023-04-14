@@ -18,6 +18,12 @@ from tqdm.auto import tqdm
 import torch.multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor
 
+import asyncio
+import concurrent
+# 以下の二行があると、Jupyterでasyncio.run()が動くようになる。 
+import nest_asyncio
+nest_asyncio.apply()
+
 # %%
 from utils.backend import Backend
 from utils.init_matrix import InitMatrix
@@ -348,8 +354,6 @@ if __name__ == '__main__':
     # %%
     study = optuna.create_study(direction = "minimize",
                                 study_name = "test",
-                                sampler = optuna.samplers.TPESampler(seed = 42),
-                                pruner = optuna.pruners.MedianPruner(),
                                 storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db', #この辺のパス設定は一度議論した方がいいかも。
                                 load_if_exists = True)
 
@@ -357,7 +361,6 @@ if __name__ == '__main__':
         seed = 42 + subp_id
         load_study = optuna.load_study(study_name = "test",
                                        sampler = optuna.samplers.RandomSampler(seed = seed),
-                                       # sampler = optuna.samplers.GridSampler(search_space, seed = seed),
                                        pruner = optuna.pruners.MedianPruner(),
                                        storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db')
         
@@ -369,20 +372,30 @@ if __name__ == '__main__':
     search_space = {'eps':np.logspace(np.log10(eps_list[0]), np.log10(eps_list[1]), num = n_trials)}
     
     # %%
-    # processes = []
-    # for i in range(n_jobs):
-    #     device = 'cuda' # + str(i % 4)
-    #     subp = mp.Process(target=multi_run, args=(dataset, i, device, n_trials // n_jobs))
-    #     processes.append(subp)
-    #     subp.start()
+    processes = []
+    for i in range(n_jobs):
+        device = 'cuda' # + str(i % 4)
+        subp = mp.Process(target=multi_run, args=(dataset, i, device, n_trials // n_jobs))
+        processes.append(subp)
+        subp.start()
         
-    # for subp in processes:
-    #     subp.join()
+    for subp in processes:
+        subp.join()
     
-    with ThreadPoolExecutor(n_jobs) as pool:
-        for i in range(n_jobs):
-            device = 'cuda'
-            pool.submit(multi_run, dataset, i, device, n_trials // n_jobs)
+    # with ThreadPoolExecutor(n_jobs) as pool:
+    #     for i in range(n_jobs):
+    #         device = 'cuda'
+    #         pool.submit(multi_run, dataset, i, device, n_trials // n_jobs)
+
+    # with concurrent.futures.ProcessPoolExecutor() as executor:
+    #     tasks = []
+    #     for i in range(4):
+    #         device = 'cuda'
+    #         task = executor.submit(multi_run, dataset, i, device, n_trials // n_jobs)
+    #         tasks.append(task)
+        
+    #     for task in concurrent.futures.as_completed(tasks):
+    #         pass
 
     #%%
     study = optuna.load_study(study_name = "test",
