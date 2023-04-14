@@ -60,7 +60,7 @@ n_group_analysis.RSA_get_corr(shuffle = False)
 
 # GW alignment
 ## If no need for computation, turn load_OT True, then OT plans calculated before is loaded.
-n_group_analysis.gw_alignment(shuffle = False, load_OT = True)
+n_group_analysis.gw_alignment(shuffle = False, load_OT = False)
 
 #%%
 '''
@@ -80,8 +80,13 @@ Visualize the aligned embeddings
 '''
 # Load the coarse categories data
 ## No need for this step if there is no coarse categories data
-category_name_list = ["bird", "insect", "plant", "clothing",  "furniture", "fruit", "drink", "vehicle"]
-category_mat = pd.read_csv("../data/category_mat_manual_preprocessed.csv", sep = ",", index_col = 0)   
-category_idx_list, category_num_list = get_category_idx(category_mat, category_name_list, show_numbers = True)  
+category_data = True
+if category_data:
+    color_labels = None
+    category_name_list = ["bird", "insect", "plant", "clothing",  "furniture", "fruit", "drink", "vehicle"]
+    category_mat = pd.read_csv("../data/category_mat_manual_preprocessed.csv", sep = ",", index_col = 0)   
+    category_idx_list, category_num_list = get_category_idx(category_mat, category_name_list, show_numbers = True)  
+else:
+    color_labels = [] # Set color labels
 
-n_group_analysis.visualize_embedding(dim = 3, category_name_list = category_name_list, category_idx_list = category_idx_list, category_num_list = category_num_list)
+n_group_analysis.visualize_embedding(dim = 3, color_labels = color_labels, category_name_list = category_name_list, category_idx_list = category_idx_list, category_num_list = category_num_list)
