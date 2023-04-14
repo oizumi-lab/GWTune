@@ -150,7 +150,7 @@ class Pairwise_Analysis:
         save_path = "../results/" + filename
 
         # generate instance solves gw_alignment　
-        test_gw = GW_Alignment(RDM_source, RDM_target, p, q, save_path, max_iter = self.config.max_iter, n_iter = self.config.n_iter, device = self.config.device, to_types = self.config.to_types, gpu_queue = None)
+        test_gw = GW_Alignment(RDM_source, RDM_target, p, q, save_path, max_iter = self.config.max_iter, n_iter = self.config.n_iter, to_types = self.config.to_types)
 
         # generate instance optimize gw_alignment　
         opt = load_optimizer(save_path,
@@ -340,14 +340,14 @@ class N_Group_Analysis:
         plt.subplots_adjust(left=0.2, right=0.9, bottom = 0.2)
         plt.show()
     
-    def visualize_embedding(self, dim = 3, category_name_list = None, category_num_list = None, category_idx_list = None):
+    def visualize_embedding(self, dim = 3, color_labels = None, category_name_list = None, category_num_list = None, category_idx_list = None):
         for i in range(len(self.pairwise_list) // 2):
             pair = self.pairwise_list[i]
             pair.procrustes()
         embedding_list = [self.subject_groups_list[i].embedding for i in range(len(self.subject_groups_list))]
         name_list = [self.subject_groups_list[i].name for i in range(len(self.subject_groups_list))]
 
-        visualize_embedding = Visualize_Embedding(embedding_list = embedding_list, name_list = name_list, category_name_list = category_name_list, category_num_list = category_num_list, category_idx_list = category_idx_list)
+        visualize_embedding = Visualize_Embedding(embedding_list = embedding_list, name_list = name_list, color_labels = color_labels, category_name_list = category_name_list, category_num_list = category_num_list, category_idx_list = category_idx_list)
         visualize_embedding.plot_embedding(dim = dim)
 
 #%%
