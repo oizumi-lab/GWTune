@@ -52,9 +52,9 @@ class Optimization_Config:
         self.pruner_params = pruner_params
 
 
-class Subject_Group:
+class Representation:
     """
-    A class object that has information of a subject(group), such as embeddings and similarity matrices
+    A class object that has information of a representation, such as embeddings and similarity matrices
     """
     def __init__(self, name, sim_mat = None, embedding = None, metric = "cosine") -> None:
         self.name = name
@@ -99,14 +99,14 @@ class Subject_Group:
 class Pairwise_Analysis:
     """
     A class object that has methods conducting gw-alignment and corresponding results
-    This object has information of a pair of subject groups.
+    This object has information of a pair of Representations.
     """
     
-    def __init__(self, target : Subject_Group, source : Subject_Group, config : Optimization_Config) -> None:
+    def __init__(self, target : Representation, source : Representation, config : Optimization_Config) -> None:
         """
         Args:
-            source (Subject_Group): instance of Subject_Group
-            target (Subject_Group): instance of Subject_Group
+            source (Representation): instance of Representation
+            target (Representation): instance of Representation
         """
         self.target = target
         self.source = source
@@ -239,17 +239,17 @@ class Pairwise_Analysis:
         visualize_embedding.plot_embedding(dim = dim)
   
   
-class N_Group_Analysis:
+class Align_Representations:
     """
     This object has methods for conducting N groups level analysis and corresponding results.
-    This has information of all pairs of subject groups.
+    This has information of all pairs of representations.
     """
-    def __init__(self, subject_groups_list : List[Subject_Group], config : Optimization_Config) -> None:
+    def __init__(self, representations_list : List[Representation], config : Optimization_Config) -> None:
         """
         Args:
-            subject_groups_list (list): a list of Subject_Groups
+            representations_list (list): a list of Representations
         """
-        self.subject_groups_list = subject_groups_list
+        self.representations_list = representations_list
         self.config = config
         self.pairwise_list = self._get_pairwise_list()
         
@@ -258,7 +258,7 @@ class N_Group_Analysis:
         self.k_nearest_matching_rate = pd.DataFrame()
 
     def _get_pairwise_list(self) -> List[Pairwise_Analysis]:
-        pairs = list(itertools.combinations(self.subject_groups_list, 2))
+        pairs = list(itertools.combinations(self.representations_list, 2))
         pairwise_list = list()
         for pair in pairs:
             pairwise = Pairwise_Analysis(target = pair[0], source = pair[1], config = self.config)
@@ -272,8 +272,8 @@ class N_Group_Analysis:
             print(f"Correlation {pairwise.pair_name} : {corr}")
     
     def show_sim_mat(self, ticks_size = None, label = None, title = None):
-        for subject_group in self.subject_groups_list:
-            subject_group.show_sim_mat(ticks_size = ticks_size, label = label)
+        for representation in self.representations_list:
+            representation.show_sim_mat(ticks_size = ticks_size, label = label)
     
     def gw_alignment(self, shuffle : bool, ticks_size = None, load_OT = False):
         for pairwise in self.pairwise_list:
@@ -344,8 +344,8 @@ class N_Group_Analysis:
         for i in range(len(self.pairwise_list) // 2):
             pair = self.pairwise_list[i]
             pair.procrustes()
-        embedding_list = [self.subject_groups_list[i].embedding for i in range(len(self.subject_groups_list))]
-        name_list = [self.subject_groups_list[i].name for i in range(len(self.subject_groups_list))]
+        embedding_list = [self.representations_list[i].embedding for i in range(len(self.representations_list))]
+        name_list = [self.representations_list[i].name for i in range(len(self.representations_list))]
 
         visualize_embedding = Visualize_Embedding(embedding_list = embedding_list, name_list = name_list, color_labels = color_labels, category_name_list = category_name_list, category_num_list = category_num_list, category_idx_list = category_idx_list)
         visualize_embedding.plot_embedding(dim = dim)
@@ -361,36 +361,36 @@ if __name__ == "__main__":
     '''
     Create subject groups list
     '''
-    group_list = []
+    representations = []
     for i in range(n_group):
         name = f"Group{i+1}"
         embedding = np.load(f"../data/THINGS_embedding_Group{i+1}.npy")[0]
-        group = Subject_Group(name = name, embedding = embedding, metric = metric)
-        group_list.append(group)
+        representation = Representation(name = name, embedding = embedding, metric = metric)
+        representations.append(representation)
     #%%
     '''
-    N_Group_Analysis
+    Unsupervised alignment between Representations
     '''
-    n_group_analysis = N_Group_Analysis(subject_groups_list = group_list, config = Optimization_Config())
+    align_representations = Align_Representations(representations_list = representations, config = Optimization_Config())
     #%%
     # RSA
-    n_group_analysis.show_sim_mat()
-    n_group_analysis.RSA_get_corr(shuffle = False)
+    align_representations.show_sim_mat()
+    align_representations.RSA_get_corr(shuffle = False)
     
     #%%
     # Run gw
-    n_group_analysis.gw_alignment(shuffle = False, load_OT = True)
+    align_representations.gw_alignment(shuffle = False, load_OT = True)
     #%%
     '''
     Evaluate the accuracy
     '''
     ## Accuracy of the optimized OT matrix
-    n_group_analysis.calc_top_k_accuracy(k_list = [1, 5, 10], shuffle = False)
-    n_group_analysis.plot_accuracy(eval_type = "ot_plan", shuffle = False, scatter = True)
+    align_representations.calc_top_k_accuracy(k_list = [1, 5, 10], shuffle = False)
+    align_representations.plot_accuracy(eval_type = "ot_plan", shuffle = False, scatter = True)
     #%%
     ## Matching rate of k-nearest neighbors 
-    n_group_analysis.calc_k_nearest_matching_rate(k_list = [1, 5, 10], metric = metric)
-    n_group_analysis.plot_accuracy(eval_type = "k_nearest", shuffle = False, scatter = True)
+    align_representations.calc_k_nearest_matching_rate(k_list = [1, 5, 10], metric = metric)
+    align_representations.plot_accuracy(eval_type = "k_nearest", shuffle = False, scatter = True)
     
     #%%
     '''
@@ -401,5 +401,5 @@ if __name__ == "__main__":
     category_mat = pd.read_csv("../data/category_mat_manual_preprocessed.csv", sep = ",", index_col = 0)   
     category_idx_list, category_num_list = get_category_idx(category_mat, category_name_list, show_numbers = True)  
     
-    n_group_analysis.visualize_embedding(dim = 3, category_name_list = category_name_list, category_idx_list = category_idx_list, category_num_list = category_num_list)
+    align_representations.visualize_embedding(dim = 3, category_name_list = category_name_list, category_idx_list = category_idx_list, category_num_list = category_num_list)
 # %%
