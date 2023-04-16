@@ -107,14 +107,14 @@ save_path = '../results/gw_alignment/' + filename
 
 # Delete previous optimization results or not
 # If the same filename has different search space, optuna may not work well.
-delete_study = False
+delete_study = True
 
 # set the device ('cuda' or 'cpu') and variable type ('torch' or 'numpy')
 device = 'cpu'
 to_types = 'numpy'
 
 # the number of jobs
-n_jobs = 8
+n_jobs = 4
 
 # Specify the RDB to use for distributed calculations
 sql_name = 'sqlite'
@@ -133,10 +133,10 @@ init_plans_list = ['random']
 # init_plans_list = ['uniform', 'random']
 
 # set the number of trials, i.e., the number of epsilon values tested in optimization: default : 20
-num_trial = 8
+num_trial = 20
 
 # the number of random initial matrices for 'random' or 'permutation' options：default: 100
-n_iter = 1
+n_iter = 10
 
 # the maximum number of iteration for GW optimization: default: 1000
 max_iter = 500
@@ -151,7 +151,7 @@ sampler_name = 'tpe'
 # set only the minimum value and maximum value for 'tpe' sampler
 # for 'grid' or 'random' sampler, you can also set the step size
 #eps_list = [1, 10] # for THINGS
-eps_list = [1e-2, 1e-1] # for colors
+eps_list = [0.02, 0.2] # for colors
 
 # eps_list = [1e-2, 1e-1, 1e-2]
 
