@@ -4,28 +4,52 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 
 import numpy as np
 import pandas as pd
+import pickle as pkl
+from sklearn.manifold import MDS
 from scripts.align_representations import Optimization_Config, Representation, Pairwise_Analysis, Align_Representations
 from src.utils.utils_functions import get_category_idx
 
 #%%
+### load data
+# you can choose the following data
+# 'DNN': representations of 2000 imagenet images in AlexNet and VGG
+# 'color': human similarity judgements of 93 colors for 5 paricipants groups
+# 'face': human similarity judgements of 16 faces, attended vs unattended condition in the same participant
+# 'THINGS' : human similarity judgements of 1854 objects for 4 paricipants groups
+data_select = "color"
+
 '''
 Set Representations
     - A Representation needs a name and either an embedding or a similarity matrix.
 '''
+
 # Parameters
-n_representations = 4
+n_representations = 3
 metric = "euclidean"
 
 # representations list that will be used in Align_Representations
 representations = list()
 
 # Load data and create representations instance
-for i in range(n_representations):
-    name = f"Group{i+1}"
-    embedding = np.load(f"../data/THINGS_embedding_Group{i+1}.npy")[0]
-    
-    representation = Representation(name = name, embedding = embedding, metric = metric)
-    representations.append(representation)
+if data_select == 'color':
+    data_path = '../data/num_groups_5_seed_0_fill_val_3.5.pickle'
+    with open(data_path, "rb") as f:
+        data = pkl.load(f)
+    sim_mat_list = data["group_ave_mat"]
+    for i in range(n_representations):
+        name = f"Group{i+1}"
+        sim_mat = sim_mat_list[i]
+        MDS_embedding = MDS(n_components = 3, dissimilarity = 'precomputed', random_state = 0)
+        embedding = MDS_embedding.fit_transform(sim_mat)
+        representation = Representation(name = name, sim_mat = sim_mat, embedding = embedding, metric = metric)
+        representations.append(representation)
+elif data_select == "THINGS":
+    for i in range(n_representations):
+        name = f"Group{i+1}"
+        embedding = np.load(f"../data/THINGS_embedding_Group{i+1}.npy")[0]
+        representation = Representation(name = name, embedding = embedding, metric = metric)
+        representations.append(representation)
+
     
 #%%
 '''
@@ -36,11 +60,11 @@ config = Optimization_Config(delete_study = True,
                              to_types = 'numpy',
                              n_jobs = 4,
                              init_plans_list = ['random'],
-                             num_trial = 4,
-                             n_iter = 1,
-                             max_iter = 200,
+                             num_trial = 20,
+                             n_iter = 10,
+                             max_iter = 500,
                              sampler_name = 'tpe',
-                             eps_list = [1, 10],
+                             eps_list = [0.02, 0.2],
                              eps_log = True,
                              pruner_name = 'hyperband',
                              pruner_params = {'n_startup_trials': 1, 'n_warmup_steps': 2, 'min_resource': 2, 'reduction_factor' : 3}
@@ -81,13 +105,15 @@ Visualize the aligned embeddings
 '''
 # Load the coarse categories data
 ## No need for this step if there is no coarse categories data
-category_data = True
-if category_data:
+if data_select == "THINGS":
     color_labels = None
     category_name_list = ["bird", "insect", "plant", "clothing",  "furniture", "fruit", "drink", "vehicle"]
     category_mat = pd.read_csv("../data/category_mat_manual_preprocessed.csv", sep = ",", index_col = 0)   
     category_idx_list, category_num_list = get_category_idx(category_mat, category_name_list, show_numbers = True)  
-else:
-    color_labels = [] # Set color labels
-
-align_representation.visualize_embedding(dim = 3, color_labels = color_labels, category_name_list = category_name_list, category_idx_list = category_idx_list, category_num_list = category_num_list)
+    align_representation.visualize_embedding(dim = 3, color_labels = color_labels, category_name_list = category_name_list, category_idx_list = category_idx_list, category_num_list = category_num_list)
+elif data_select == "color":
+    file_path = "../data/color_dict.csv"
+    data_color = pd.read_csv(file_path)
+    color_labels = data_color.columns.values
+    align_representation.visualize_embedding(dim = 3, color_labels = color_labels)
+# %%
