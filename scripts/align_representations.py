@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import itertools
 from scipy.spatial import distance
+from sklearn.manifold import MDS
 import ot
 import sys
 import os
@@ -58,11 +59,15 @@ class Representation:
     """
     def __init__(self, name, sim_mat = None, embedding = None, metric = "cosine") -> None:
         self.name = name
-        self.embedding = embedding
         self.metric = metric
         if sim_mat is None:
+            self.embedding = embedding
             self.sim_mat = self._get_sim_mat()
+        elif embedding is None:
+            self.sim_mat = sim_mat
+            self.embedding = self._get_embedding()
         else:
+            self.embedding = embedding
             self.sim_mat = sim_mat
         self.shuffled_sim_mat = self._get_shuffled_sim_mat()
 
@@ -76,6 +81,11 @@ class Representation:
     def _get_shuffled_sim_mat(self):
         return shuffle_RDM(self.sim_mat)
     
+    def _get_embedding(self):
+        MDS_embedding = MDS(n_components = 3, dissimilarity = 'precomputed', random_state = 0)
+        embedding = MDS_embedding.fit_transform(self.sim_mat)
+        return embedding
+        
     def show_sim_mat(self, ticks_size = None, label = None):
         plt.figure(figsize = (20, 20))
         ax = sns.heatmap(self.sim_mat, square = True, cbar_kws = {"shrink": .80})
@@ -84,6 +94,7 @@ class Representation:
         plt.xlabel(label, size = 40)
         plt.ylabel(label, size = 40)
         plt.title(self.name, size = 60)
+        plt.show()
         
     def show_sim_mat_distribution(self):
         pass

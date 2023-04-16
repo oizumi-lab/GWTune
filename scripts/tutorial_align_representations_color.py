@@ -39,9 +39,7 @@ if data_select == 'color':
     for i in range(n_representations):
         name = f"Group{i+1}"
         sim_mat = sim_mat_list[i]
-        MDS_embedding = MDS(n_components = 3, dissimilarity = 'precomputed', random_state = 0)
-        embedding = MDS_embedding.fit_transform(sim_mat)
-        representation = Representation(name = name, sim_mat = sim_mat, embedding = embedding, metric = metric)
+        representation = Representation(name = name, sim_mat = sim_mat, metric = metric)
         representations.append(representation)
 elif data_select == "THINGS":
     for i in range(n_representations):
