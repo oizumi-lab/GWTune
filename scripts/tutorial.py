@@ -56,8 +56,8 @@ elif data_select == 'color':
     with open(data_path, "rb") as f:
         data = pkl.load(f)
     sim_mat_list = data["group_ave_mat"]
-    C1 = sim_mat_list[1]
-    C2 = sim_mat_list[2]
+    C1 = sim_mat_list[0]
+    C2 = sim_mat_list[1]
     # color label
     file_path = "../data/color_dict.csv"
     data_color = pd.read_csv(file_path)
@@ -133,25 +133,25 @@ init_plans_list = ['random']
 # init_plans_list = ['uniform', 'random']
 
 # set the number of trials, i.e., the number of epsilon values tested in optimization: default : 20
-num_trial = 8
+num_trial = 20
 
 # the number of random initial matrices for 'random' or 'permutation' options：default: 100
-n_iter = 1
+n_iter = 10
 
 # the maximum number of iteration for GW optimization: default: 1000
-max_iter = 1000
+max_iter = 500
 
 # choose sampler
 # 'random': randomly select epsilon between the range of epsilon
 # 'grid': grid search between the range of epsilon
 # 'tpe': Bayesian sampling
-sampler_name = 'grid'
+sampler_name = 'tpe'
 
 # set the range of epsilon
 # set only the minimum value and maximum value for 'tpe' sampler
 # for 'grid' or 'random' sampler, you can also set the step size
 #eps_list = [1, 10] # for THINGS
-eps_list = [1e-2, 1e-1]
+eps_list = [0.02, 0.2] # for colors
 
 # eps_list = [1e-2, 1e-1, 1e-2]
 
