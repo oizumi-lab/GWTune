@@ -56,8 +56,8 @@ elif data_select == 'color':
     with open(data_path, "rb") as f:
         data = pkl.load(f)
     sim_mat_list = data["group_ave_mat"]
-    C1 = sim_mat_list[1]
-    C2 = sim_mat_list[2]
+    C1 = sim_mat_list[0]
+    C2 = sim_mat_list[1]
     # color label
     file_path = "../data/color_dict.csv"
     data_color = pd.read_csv(file_path)
@@ -107,14 +107,14 @@ save_path = '../results/gw_alignment/' + filename
 
 # Delete previous optimization results or not
 # If the same filename has different search space, optuna may not work well.
-delete_study = True
+delete_study = False
 
 # set the device ('cuda' or 'cpu') and variable type ('torch' or 'numpy')
 device = 'cpu'
 to_types = 'numpy'
 
 # the number of jobs
-n_jobs = 4
+n_jobs = 8
 
 # Specify the RDB to use for distributed calculations
 sql_name = 'sqlite'
@@ -139,19 +139,19 @@ num_trial = 8
 n_iter = 1
 
 # the maximum number of iteration for GW optimization: default: 1000
-max_iter = 1000
+max_iter = 500
 
 # choose sampler
 # 'random': randomly select epsilon between the range of epsilon
 # 'grid': grid search between the range of epsilon
 # 'tpe': Bayesian sampling
-sampler_name = 'grid'
+sampler_name = 'tpe'
 
 # set the range of epsilon
 # set only the minimum value and maximum value for 'tpe' sampler
 # for 'grid' or 'random' sampler, you can also set the step size
 #eps_list = [1, 10] # for THINGS
-eps_list = [1e-2, 1e-1]
+eps_list = [1e-2, 1e-1] # for colors
 
 # eps_list = [1e-2, 1e-1, 1e-2]
 
