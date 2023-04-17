@@ -288,7 +288,14 @@ class MainGromovWasserstainComputation():
 
         if trial.should_prune():
             raise optuna.TrialPruned(f"Trial was pruned at iteration {num_iter} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
-
+    
+    def _gw_compute(self, trial, eps, init_mat_plan, device):
+        seed = 42
+        gw, logv, gw_loss, acc, init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, seed = seed)
+        trial = self._save_results(gw_loss, acc, trial, init_mat_plan, seed = seed)
+        self._check_pruner_should_work(gw_loss, trial, init_mat_plan, eps)
+        return gw, logv, gw_loss, init_mat, trial
+    
     def compute_GW_with_init_plans(self, trial, eps, init_mat_plan, device):
         """
         2023.3.17 佐々木
@@ -300,37 +307,14 @@ class MainGromovWasserstainComputation():
         各条件ごとへの拡張性を考慮すると、prunerの挙動は一本化しておく方が絶対にいい。
         """
 
-        if init_mat_plan in ['uniform', 'diag']:
-            gw, logv, gw_loss, acc, init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device)
-            trial = self._save_results(gw_loss, acc, trial, init_mat_plan)
-            self._check_pruner_should_work(gw_loss, trial, init_mat_plan, eps)
-            return gw, logv, gw_loss, init_mat, trial
-
-        elif init_mat_plan in ['random', 'permutation']:
-            best_gw_loss = float('inf')
+        if init_mat_plan in ['uniform', 'diag', 'random', 'permutation']:
+            gw, logv, gw_loss, init_mat, trial = self._gw_compute(trial, eps, init_mat_plan, device)
             
-            pbar = tqdm(np.random.randint(0, 100000, self.n_iter))
-            pbar.set_description(f'trial number = {trial.number}')
-            
-            for i, seed in enumerate(pbar):
-                c_gw, c_logv, c_gw_loss, c_acc, c_init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, seed = seed)
-
-                if c_gw_loss < best_gw_loss:
-                    best_gw, best_logv, best_gw_loss, best_acc, best_init_mat = c_gw, c_logv, c_gw_loss, c_acc, c_init_mat
-                    trial = self._save_results(best_gw_loss, best_acc, trial, init_mat_plan, num_iter = i, seed = seed)
-
-                self._check_pruner_should_work(c_gw_loss, trial, init_mat_plan, eps, num_iter = i)
-
-            if best_gw_loss == float('inf'):
-                raise optuna.TrialPruned(f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
-
-            else:
-                return best_gw, best_logv, best_gw_loss, best_init_mat, trial
-
         else:
             raise ValueError('Not defined initialize matrix.')
 
-
+        return gw, logv, gw_loss, init_mat, trial
+    
 # %%
 if __name__ == '__main__':
 
@@ -352,50 +336,17 @@ if __name__ == '__main__':
     dataset = GW_Alignment(model1, model2, p, q, max_iter = 100, n_iter = 1, save_path = unittest_save_path)
 
     # %%
-    study = optuna.create_study(direction = "minimize",
-                                study_name = "test",
-                                storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db', #この辺のパス設定は一度議論した方がいいかも。
-                                load_if_exists = True)
+    seed = 42
+    load_study = optuna.create_study(
+        direction = "minimize",
+        study_name = "test",
+        sampler = optuna.samplers.TPESampler(seed = seed),
+        pruner = optuna.pruners.MedianPruner(),
+        storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db',
+        load_if_exists = True)
 
-    def multi_run(dataset, subp_id, device, num_trials):
-        seed = 42 + subp_id
-        load_study = optuna.load_study(study_name = "test",
-                                       sampler = optuna.samplers.RandomSampler(seed = seed),
-                                       pruner = optuna.pruners.MedianPruner(),
-                                       storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db')
-        
-        load_study.optimize(lambda trial: dataset(trial, device, init_mat_types, eps_list), n_trials = num_trials)
-
-
-    n_trials = 4
-    n_jobs = 4
-    search_space = {'eps':np.logspace(np.log10(eps_list[0]), np.log10(eps_list[1]), num = n_trials)}
-    
-    # %%
-    processes = []
-    for i in range(n_jobs):
-        device = 'cuda' # + str(i % 4)
-        subp = mp.Process(target=multi_run, args=(dataset, i, device, n_trials // n_jobs))
-        processes.append(subp)
-        subp.start()
-        
-    for subp in processes:
-        subp.join()
-    
-    # with ThreadPoolExecutor(n_jobs) as pool:
-    #     for i in range(n_jobs):
-    #         device = 'cuda'
-    #         pool.submit(multi_run, dataset, i, device, n_trials // n_jobs)
-
-    # with concurrent.futures.ProcessPoolExecutor() as executor:
-    #     tasks = []
-    #     for i in range(4):
-    #         device = 'cuda'
-    #         task = executor.submit(multi_run, dataset, i, device, n_trials // n_jobs)
-    #         tasks.append(task)
-        
-    #     for task in concurrent.futures.as_completed(tasks):
-    #         pass
+    device = 'cuda'
+    load_study.optimize(lambda trial: dataset(trial, device, init_mat_types, eps_list), n_trials = 20)
 
     #%%
     study = optuna.load_study(study_name = "test",
