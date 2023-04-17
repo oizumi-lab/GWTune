@@ -15,7 +15,7 @@ import seaborn as sns
 import matplotlib.style as mplstyle
 from tqdm.auto import tqdm
 #nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
-import torch.multiprocessing as mp
+import multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor
 
 import asyncio
@@ -289,14 +289,7 @@ class MainGromovWasserstainComputation():
         if trial.should_prune():
             raise optuna.TrialPruned(f"Trial was pruned at iteration {num_iter} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
     
-    def _gw_compute(self, trial, eps, init_mat_plan, device):
-        seed = 42
-        gw, logv, gw_loss, acc, init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, seed = seed)
-        trial = self._save_results(gw_loss, acc, trial, init_mat_plan, seed = seed)
-        self._check_pruner_should_work(gw_loss, trial, init_mat_plan, eps)
-        return gw, logv, gw_loss, init_mat, trial
-    
-    def compute_GW_with_init_plans(self, trial, eps, init_mat_plan, device):
+    def compute_GW_with_init_plans(self, trial, eps, init_mat_plan, device, parallel = False):
         """
         2023.3.17 佐々木
         uniform, diagでも、prunerを使うこともできるが、いまのところはコメントアウトしている。
@@ -307,13 +300,35 @@ class MainGromovWasserstainComputation():
         各条件ごとへの拡張性を考慮すると、prunerの挙動は一本化しておく方が絶対にいい。
         """
 
-        if init_mat_plan in ['uniform', 'diag', 'random', 'permutation']:
-            gw, logv, gw_loss, init_mat, trial = self._gw_compute(trial, eps, init_mat_plan, device)
+        if init_mat_plan in ['uniform', 'diag']:
+            gw, logv, gw_loss, acc, init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device)
+            trial = self._save_results(gw_loss, acc, trial, init_mat_plan)
+            self._check_pruner_should_work(gw_loss, trial, init_mat_plan, eps)
+            return gw, logv, gw_loss, init_mat, trial
+
+        elif init_mat_plan in ['random', 'permutation']:
+            best_gw_loss = float('inf')
             
+            pbar = tqdm(np.random.randint(0, 100000, self.n_iter))
+            pbar.set_description(f'trial number = {trial.number}')
+          
+            for i, seed in enumerate(pbar):
+                c_gw, c_logv, c_gw_loss, c_acc, c_init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, seed = seed)
+
+                if c_gw_loss < best_gw_loss:
+                    best_gw, best_logv, best_gw_loss, best_acc, best_init_mat = c_gw, c_logv, c_gw_loss, c_acc, c_init_mat
+                    trial = self._save_results(best_gw_loss, best_acc, trial, init_mat_plan, num_iter = i, seed = seed)
+
+                self._check_pruner_should_work(c_gw_loss, trial, init_mat_plan, eps, num_iter = i)
+                
+            if best_gw_loss == float('inf'):
+                raise optuna.TrialPruned(f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
+
+            else:
+                return best_gw, best_logv, best_gw_loss, best_init_mat, trial
+
         else:
             raise ValueError('Not defined initialize matrix.')
-
-        return gw, logv, gw_loss, init_mat, trial
     
 # %%
 if __name__ == '__main__':
@@ -333,7 +348,7 @@ if __name__ == '__main__':
     eps_list = [1e-3, 1e-2]
     eps_log = True
 
-    dataset = GW_Alignment(model1, model2, p, q, max_iter = 100, n_iter = 1, save_path = unittest_save_path)
+    dataset = GW_Alignment(model1, model2, p, q, max_iter = 100, n_iter = 10, save_path = unittest_save_path)
 
     # %%
     seed = 42
