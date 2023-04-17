@@ -289,7 +289,7 @@ class MainGromovWasserstainComputation():
         if trial.should_prune():
             raise optuna.TrialPruned(f"Trial was pruned at iteration {num_iter} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
     
-    def compute_GW_with_init_plans(self, trial, eps, init_mat_plan, device, parallel = False):
+    def compute_GW_with_init_plans(self, trial, eps, init_mat_plan, device, parallel = True):
         """
         2023.3.17 佐々木
         uniform, diagでも、prunerを使うこともできるが、いまのところはコメントアウトしている。
@@ -309,23 +309,55 @@ class MainGromovWasserstainComputation():
         elif init_mat_plan in ['random', 'permutation']:
             best_gw_loss = float('inf')
             
-            pbar = tqdm(np.random.randint(0, 100000, self.n_iter))
-            pbar.set_description(f'trial number = {trial.number}')
-          
-            for i, seed in enumerate(pbar):
-                c_gw, c_logv, c_gw_loss, c_acc, c_init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, seed = seed)
-
-                if c_gw_loss < best_gw_loss:
-                    best_gw, best_logv, best_gw_loss, best_acc, best_init_mat = c_gw, c_logv, c_gw_loss, c_acc, c_init_mat
-                    trial = self._save_results(best_gw_loss, best_acc, trial, init_mat_plan, num_iter = i, seed = seed)
-
-                self._check_pruner_should_work(c_gw_loss, trial, init_mat_plan, eps, num_iter = i)
+            pbar = np.random.randint(0, 100000, self.n_iter)
+            # pbar.set_description(f'trial number = {trial.number}')
+            
+            def computation(seeds, trial, worker, queue = None):
+                best_gw_loss = float('inf')
                 
-            if best_gw_loss == float('inf'):
-                raise optuna.TrialPruned(f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
+                print('parallel mode is True, worker_id:' + str(worker)) 
+                
+                for i, seed in enumerate(tqdm(seeds)):
+                    c_gw, c_logv, c_gw_loss, c_acc, c_init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, seed = seed)
 
-            else:
+                    if c_gw_loss < best_gw_loss:
+                        best_gw, best_logv, best_gw_loss, best_acc, best_init_mat = c_gw, c_logv, c_gw_loss, c_acc, c_init_mat
+                        trial = self._save_results(best_gw_loss, best_acc, trial, init_mat_plan, num_iter = i, seed = seed)
+
+                    self._check_pruner_should_work(c_gw_loss, trial, init_mat_plan, eps, num_iter = i)
+                    
+                if best_gw_loss == float('inf'):
+                    raise optuna.TrialPruned(f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
+
+                else:
+                    if queue is None:
+                        return best_gw, best_logv, best_gw_loss, best_init_mat, trial
+                    else:
+                        results = [best_gw, best_logv, best_gw_loss, best_init_mat, trial]
+                        queue.put(results)
+        
+            if parallel == False:
+                best_gw, best_logv, best_gw_loss, best_init_mat, trial = computation(pbar, trial)
                 return best_gw, best_logv, best_gw_loss, best_init_mat, trial
+            
+            else:
+                seed_chunk = np.array_split(pbar, 4)
+                processes = []
+                queue = mp.Queue()
+                
+                for i, chunk in enumerate(seed_chunk):
+                    subp = mp.Process(target = computation, args=(chunk, trial, i, queue))
+                    subp.start()
+                    processes.append(subp)
+
+                for subp in processes:
+                    subp.join()  
+                    
+                output_list = []
+                while not queue.empty():
+                    output_list.append(queue.get())
+                
+                print(output_list)
 
         else:
             raise ValueError('Not defined initialize matrix.')
@@ -348,7 +380,7 @@ if __name__ == '__main__':
     eps_list = [1e-3, 1e-2]
     eps_log = True
 
-    dataset = GW_Alignment(model1, model2, p, q, max_iter = 100, n_iter = 10, save_path = unittest_save_path)
+    dataset = GW_Alignment(model1, model2, p, q, max_iter = 100, n_iter = 4, save_path = unittest_save_path)
 
     # %%
     seed = 42
