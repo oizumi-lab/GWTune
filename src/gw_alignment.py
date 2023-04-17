@@ -352,7 +352,7 @@ if __name__ == '__main__':
 
     # %%
     seed = 42
-    load_study = optuna.create_study(
+    study = optuna.create_study(
         direction = "minimize",
         study_name = "test",
         sampler = optuna.samplers.TPESampler(seed = seed),
@@ -361,13 +361,9 @@ if __name__ == '__main__':
         load_if_exists = True)
 
     device = 'cuda'
-    load_study.optimize(lambda trial: dataset(trial, device, init_mat_types, eps_list), n_trials = 20)
+    study.optimize(lambda trial: dataset(trial, device, init_mat_types, eps_list), n_trials = 20)
 
     #%%
-    study = optuna.load_study(study_name = "test",
-                              storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db')
-    
-    
     df = study.trials_dataframe()
     print(df)
     # %%
