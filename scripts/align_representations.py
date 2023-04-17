@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import itertools
 from scipy.spatial import distance
+from sklearn.manifold import MDS
 import ot
 import sys
 import os
@@ -23,6 +24,7 @@ from src.utils.init_matrix import InitMatrix
 
 class Optimization_Config:
     def __init__(self, 
+                 data_name = "THINGS",
                  delete_study = True, 
                  device = 'cpu',
                  to_types = 'numpy',
@@ -37,6 +39,7 @@ class Optimization_Config:
                  pruner_name = 'hyperband',
                  pruner_params = {'n_startup_trials': 1, 'n_warmup_steps': 2, 'min_resource': 2, 'reduction_factor' : 3}
                  ) -> None:
+        self.data_name = data_name
         self.delete_study = delete_study
         self.device = device
         self.to_types = to_types
@@ -58,11 +61,15 @@ class Representation:
     """
     def __init__(self, name, sim_mat = None, embedding = None, metric = "cosine") -> None:
         self.name = name
-        self.embedding = embedding
         self.metric = metric
         if sim_mat is None:
+            self.embedding = embedding
             self.sim_mat = self._get_sim_mat()
+        elif embedding is None:
+            self.sim_mat = sim_mat
+            self.embedding = self._get_embedding()
         else:
+            self.embedding = embedding
             self.sim_mat = sim_mat
         self.shuffled_sim_mat = self._get_shuffled_sim_mat()
 
@@ -76,6 +83,11 @@ class Representation:
     def _get_shuffled_sim_mat(self):
         return shuffle_RDM(self.sim_mat)
     
+    def _get_embedding(self):
+        MDS_embedding = MDS(n_components = 3, dissimilarity = 'precomputed', random_state = 0)
+        embedding = MDS_embedding.fit_transform(self.sim_mat)
+        return embedding
+        
     def show_sim_mat(self, ticks_size = None, label = None):
         plt.figure(figsize = (20, 20))
         ax = sns.heatmap(self.sim_mat, square = True, cbar_kws = {"shrink": .80})
@@ -84,6 +96,7 @@ class Representation:
         plt.xlabel(label, size = 40)
         plt.ylabel(label, size = 40)
         plt.title(self.name, size = 60)
+        plt.show()
         
     def show_sim_mat_distribution(self):
         pass
@@ -138,7 +151,7 @@ class Pairwise_Analysis:
         self._show_OT(title = f"$\Gamma$ ({self.pair_name}) {'(shuffle)' if shuffle else ''} ", shuffle = shuffle, ticks_size = ticks_size)
         
     def _gw_alignment(self, shuffle : bool, load_OT = False):
-        filename = self.pair_name
+        filename = self.config.data_name + " " + self.pair_name
         save_path = '../results/gw_alignment/' + filename
         sql_name = 'sqlite'
         storage = "sqlite:///" + save_path +  '/' + filename + '.db'
@@ -165,7 +178,7 @@ class Pairwise_Analysis:
                                 filename = filename,
                                 sql_name = sql_name,
                                 storage = storage,
-                                delete_study = False
+                                delete_study = self.config.delete_study
         )
 
         ### optimization
@@ -260,9 +273,10 @@ class Align_Representations:
     def _get_pairwise_list(self) -> List[Pairwise_Analysis]:
         pairs = list(itertools.combinations(self.representations_list, 2))
         pairwise_list = list()
-        for pair in pairs:
+        for i, pair in enumerate(pairs):
             pairwise = Pairwise_Analysis(target = pair[0], source = pair[1], config = self.config)
-            pairwise_list.append(pairwise)
+            pairwise_list.append(pairwise)    
+            print(f"Pair number {i} : {pairwise.pair_name}")
         return pairwise_list
 
     def RSA_get_corr(self, shuffle = False):
@@ -275,8 +289,12 @@ class Align_Representations:
         for representation in self.representations_list:
             representation.show_sim_mat(ticks_size = ticks_size, label = label)
     
-    def gw_alignment(self, shuffle : bool, ticks_size = None, load_OT = False):
-        for pairwise in self.pairwise_list:
+    def gw_alignment(self, pairnumber_list = "all", shuffle = False, ticks_size = None, load_OT = False):
+        if pairnumber_list == "all":
+            pairnumber_list = [i for i in range(len(self.pairwise_list))]
+        self.pairnumber_list = pairnumber_list
+        for pairnumber in self.pairnumber_list:
+            pairwise = self.pairwise_list[pairnumber]
             pairwise.run_gw(shuffle = shuffle, ticks_size = ticks_size, load_OT = load_OT)
             
     def barycenter_alignment(self):
@@ -284,7 +302,8 @@ class Align_Representations:
        
     def calc_top_k_accuracy(self, k_list : int, shuffle : bool):
         self.top_k_accuracy["top_n"] = k_list
-        for pairwise in self.pairwise_list:
+        for pairnumber in self.pairnumber_list:
+            pairwise = self.pairwise_list[pairnumber]
             pairwise.calc_top_k_accuracy(k_list, shuffle = shuffle)
             #if shuffle:
             #    pairwise.calc_top_k_accuracy(k_list, shuffle = True)
@@ -294,7 +313,8 @@ class Align_Representations:
             
     def calc_k_nearest_matching_rate(self, k_list, metric):
         self.k_nearest_matching_rate["top_n"] = k_list
-        for pairwise in self.pairwise_list:
+        for pairnumber in self.pairnumber_list:
+            pairwise = self.pairwise_list[pairnumber]
             pairwise.calc_k_nearest_matching_rate(k_list, metric)
             self.k_nearest_matching_rate = pd.merge(self.k_nearest_matching_rate, pairwise.k_nearest_matching_rate, on = "top_n")
         print("K nearest matching rate : \n", self.k_nearest_matching_rate)
