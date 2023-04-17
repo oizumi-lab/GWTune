@@ -292,7 +292,8 @@ class Align_Representations:
     def gw_alignment(self, pairnumber_list = "all", shuffle = False, ticks_size = None, load_OT = False):
         if pairnumber_list == "all":
             pairnumber_list = [i for i in range(len(self.pairwise_list))]
-        for pairnumber in pairnumber_list:
+        self.pairnumber_list = pairnumber_list
+        for pairnumber in self.pairnumber_list:
             pairwise = self.pairwise_list[pairnumber]
             pairwise.run_gw(shuffle = shuffle, ticks_size = ticks_size, load_OT = load_OT)
             
@@ -301,7 +302,8 @@ class Align_Representations:
        
     def calc_top_k_accuracy(self, k_list : int, shuffle : bool):
         self.top_k_accuracy["top_n"] = k_list
-        for pairwise in self.pairwise_list:
+        for pairnumber in self.pairnumber_list:
+            pairwise = self.pairwise_list[pairnumber]
             pairwise.calc_top_k_accuracy(k_list, shuffle = shuffle)
             #if shuffle:
             #    pairwise.calc_top_k_accuracy(k_list, shuffle = True)
@@ -311,7 +313,8 @@ class Align_Representations:
             
     def calc_k_nearest_matching_rate(self, k_list, metric):
         self.k_nearest_matching_rate["top_n"] = k_list
-        for pairwise in self.pairwise_list:
+        for pairnumber in self.pairnumber_list:
+            pairwise = self.pairwise_list[pairnumber]
             pairwise.calc_k_nearest_matching_rate(k_list, metric)
             self.k_nearest_matching_rate = pd.merge(self.k_nearest_matching_rate, pairwise.k_nearest_matching_rate, on = "top_n")
         print("K nearest matching rate : \n", self.k_nearest_matching_rate)
