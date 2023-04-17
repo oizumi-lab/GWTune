@@ -24,6 +24,7 @@ from src.utils.init_matrix import InitMatrix
 
 class Optimization_Config:
     def __init__(self, 
+                 data_name = "THINGS",
                  delete_study = True, 
                  device = 'cpu',
                  to_types = 'numpy',
@@ -38,6 +39,7 @@ class Optimization_Config:
                  pruner_name = 'hyperband',
                  pruner_params = {'n_startup_trials': 1, 'n_warmup_steps': 2, 'min_resource': 2, 'reduction_factor' : 3}
                  ) -> None:
+        self.data_name = data_name
         self.delete_study = delete_study
         self.device = device
         self.to_types = to_types
@@ -149,7 +151,7 @@ class Pairwise_Analysis:
         self._show_OT(title = f"$\Gamma$ ({self.pair_name}) {'(shuffle)' if shuffle else ''} ", shuffle = shuffle, ticks_size = ticks_size)
         
     def _gw_alignment(self, shuffle : bool, load_OT = False):
-        filename = self.pair_name
+        filename = self.config.data_name + " " + self.pair_name
         save_path = '../results/gw_alignment/' + filename
         sql_name = 'sqlite'
         storage = "sqlite:///" + save_path +  '/' + filename + '.db'
@@ -176,7 +178,7 @@ class Pairwise_Analysis:
                                 filename = filename,
                                 sql_name = sql_name,
                                 storage = storage,
-                                delete_study = False
+                                delete_study = self.config.delete_study
         )
 
         ### optimization
@@ -271,9 +273,10 @@ class Align_Representations:
     def _get_pairwise_list(self) -> List[Pairwise_Analysis]:
         pairs = list(itertools.combinations(self.representations_list, 2))
         pairwise_list = list()
-        for pair in pairs:
+        for i, pair in enumerate(pairs):
             pairwise = Pairwise_Analysis(target = pair[0], source = pair[1], config = self.config)
-            pairwise_list.append(pairwise)
+            pairwise_list.append(pairwise)    
+            print(f"Pair number {i} : {pairwise.pair_name}")
         return pairwise_list
 
     def RSA_get_corr(self, shuffle = False):
@@ -286,8 +289,11 @@ class Align_Representations:
         for representation in self.representations_list:
             representation.show_sim_mat(ticks_size = ticks_size, label = label)
     
-    def gw_alignment(self, shuffle : bool, ticks_size = None, load_OT = False):
-        for pairwise in self.pairwise_list:
+    def gw_alignment(self, pairnumber_list = "all", shuffle = False, ticks_size = None, load_OT = False):
+        if pairnumber_list == "all":
+            pairnumber_list = [i for i in range(len(self.pairwise_list))]
+        for pairnumber in pairnumber_list:
+            pairwise = self.pairwise_list[pairnumber]
             pairwise.run_gw(shuffle = shuffle, ticks_size = ticks_size, load_OT = load_OT)
             
     def barycenter_alignment(self):

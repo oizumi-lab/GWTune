@@ -8,6 +8,14 @@ from scripts.align_representations import Optimization_Config, Representation, P
 from src.utils.utils_functions import get_category_idx
 
 #%%
+### load data
+# you can choose the following data
+# 'DNN': representations of 2000 imagenet images in AlexNet and VGG
+# 'color': human similarity judgements of 93 colors for 5 paricipants groups
+# 'face': human similarity judgements of 16 faces, attended vs unattended condition in the same participant
+# 'THINGS' : human similarity judgements of 1854 objects for 4 paricipants groups
+data_select = "THINGS"
+
 '''
 Set Representations
     - A Representation needs a name and either an embedding or a similarity matrix.
@@ -31,7 +39,8 @@ for i in range(n_representations):
 '''
 Set the parameters for the optimazation of GWOT
 '''
-config = Optimization_Config(delete_study = True, 
+config = Optimization_Config(data_name = data_select, 
+                             delete_study = True, 
                              device = 'cpu',
                              to_types = 'numpy',
                              n_jobs = 4,
@@ -62,7 +71,7 @@ align_representation.RSA_get_corr(shuffle = False)
 GW alignment
 '''
 ## If no need for computation, turn load_OT True, then OT plans calculated before is loaded.
-align_representation.gw_alignment(shuffle = False, load_OT = True)
+align_representation.gw_alignment(pairnumber_list = [1, 2], shuffle = False, load_OT = False)
 
 ## Calculate the accuracy of the optimized OT matrix
 align_representation.calc_top_k_accuracy(k_list = [1, 5, 10], shuffle = False)
