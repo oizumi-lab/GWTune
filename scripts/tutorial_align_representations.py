@@ -4,6 +4,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 
 import numpy as np
 import pandas as pd
+import pickle as pkl
 from scripts.align_representations import Optimization_Config, Representation, Pairwise_Analysis, Align_Representations
 from src.utils.utils_functions import get_category_idx
 
@@ -21,19 +22,29 @@ Set Representations
     - A Representation needs a name and either an embedding or a similarity matrix.
 '''
 # Parameters
-n_representations = 4
+n_representations = 4 # Set the number of representations. This number must be equal to or less than the number of groups.
 metric = "euclidean"
 
 # representations list that will be used in Align_Representations
 representations = list()
 
 # Load data and create representations instance
-for i in range(n_representations):
-    name = f"Group{i+1}"
-    embedding = np.load(f"../data/THINGS_embedding_Group{i+1}.npy")[0]
-    
-    representation = Representation(name = name, embedding = embedding, metric = metric)
-    representations.append(representation)
+if data_select == 'color':
+    data_path = '../data/num_groups_5_seed_0_fill_val_3.5.pickle'
+    with open(data_path, "rb") as f:
+        data = pkl.load(f)
+    sim_mat_list = data["group_ave_mat"]
+    for i in range(n_representations):
+        name = f"Group{i+1}"
+        sim_mat = sim_mat_list[i]
+        representation = Representation(name = name, sim_mat = sim_mat)
+        representations.append(representation)
+elif data_select == "THINGS":
+    for i in range(n_representations):
+        name = f"Group{i+1}"
+        embedding = np.load(f"../data/THINGS_embedding_Group{i+1}.npy")[0]
+        representation = Representation(name = name, embedding = embedding, metric = metric)
+        representations.append(representation)
     
 #%%
 '''
@@ -49,7 +60,7 @@ config = Optimization_Config(data_name = data_select,
                              n_iter = 1,
                              max_iter = 200,
                              sampler_name = 'tpe',
-                             eps_list = [1, 10],
+                             eps_list = [1, 10], # [1, 10] for THINGS data, [0.02, 0.2] for colors data
                              eps_log = True,
                              pruner_name = 'hyperband',
                              pruner_params = {'n_startup_trials': 1, 'n_warmup_steps': 2, 'min_resource': 2, 'reduction_factor' : 3}
@@ -71,7 +82,7 @@ align_representation.RSA_get_corr(shuffle = False)
 GW alignment
 '''
 ## If no need for computation, turn load_OT True, then OT plans calculated before is loaded.
-align_representation.gw_alignment(pairnumber_list = [1, 2], shuffle = False, load_OT = False)
+align_representation.gw_alignment(pairnumber_list = "all", shuffle = False, load_OT = False)
 
 ## Calculate the accuracy of the optimized OT matrix
 align_representation.calc_top_k_accuracy(k_list = [1, 5, 10], shuffle = False)
@@ -88,15 +99,15 @@ align_representation.plot_accuracy(eval_type = "k_nearest", shuffle = False, sca
 '''
 Visualize the aligned embeddings
 '''
-# Load the coarse categories data
-## No need for this step if there is no coarse categories data
-category_data = True
-if category_data:
+# Set color labels and category data if exist.
+if data_select == "THINGS":
     color_labels = None
     category_name_list = ["bird", "insect", "plant", "clothing",  "furniture", "fruit", "drink", "vehicle"]
     category_mat = pd.read_csv("../data/category_mat_manual_preprocessed.csv", sep = ",", index_col = 0)   
     category_idx_list, category_num_list = get_category_idx(category_mat, category_name_list, show_numbers = True)  
-else:
-    color_labels = [] # Set color labels
-
-align_representation.visualize_embedding(dim = 3, color_labels = color_labels, category_name_list = category_name_list, category_idx_list = category_idx_list, category_num_list = category_num_list)
+    align_representation.visualize_embedding(dim = 3, color_labels = color_labels, category_name_list = category_name_list, category_idx_list = category_idx_list, category_num_list = category_num_list)
+elif data_select == "color":
+    file_path = "../data/color_dict.csv"
+    data_color = pd.read_csv(file_path)
+    color_labels = data_color.columns.values
+    align_representation.visualize_embedding(dim = 3, color_labels = color_labels)
