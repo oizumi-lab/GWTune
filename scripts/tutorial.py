@@ -38,7 +38,7 @@ os.chdir(os.path.dirname(__file__))
 # 'DNN': representations of 2000 imagenet images in AlexNet and VGG
 # 'color': human similarity judgements of 93 colors for 5 paricipants groups
 # 'face': human similarity judgements of 16 faces, attended vs unattended condition in the same participant
-data_select = 'color'
+data_select = 'DNN'
 
 if data_select == 'DNN':
     path1 = '../data/model1.pt'
@@ -75,11 +75,11 @@ save_path = '../results/gw_alignment/' + filename
 
 # Delete previous optimization results or not
 # If the same filename has different search space, optuna may not work well.
-delete_study = True
+delete_study = False
 
 # set the device ('cuda' or 'cpu') and variable type ('torch' or 'numpy')
-device = 'cpu'
-to_types = 'numpy'
+device = 'cuda:3'
+to_types = 'torch'
 
 # the number of jobs
 n_jobs = 4
@@ -113,7 +113,7 @@ max_iter = 200
 # 'random': randomly select epsilon between the range of epsilon
 # 'grid': grid search between the range of epsilon
 # 'tpe': Bayesian sampling
-sampler_name = 'grid'
+sampler_name = 'random'
 
 # set the range of epsilon
 # set only the minimum value and maximum value for 'tpe' sampler
@@ -168,8 +168,11 @@ search_space = {"eps": eps_space, "initialize": init_plans}
 
 # 2. run optimzation
 # parallel = 'thread' or 'multiprocessing', default is 'multiprocessing'
+import time
+start = time.time()
 study = opt.run_study(test_gw, device, parallel = 'multiprocessing', init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log, search_space = search_space)
-
+end = time.time() - start
+print(end)
 #%%
 ### View Results
 print(study.trials_dataframe().sort_values('params_eps')) # jupyterだと、displayでもいいが、vscodeでは警告がでるので、printに変えます。(2023.4.10 佐々木)
