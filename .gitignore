@@ -1,4 +1,5 @@
 results
+*.vscode
 *.lock
 *.pyc
 .python-version
@@ -15,3 +16,8 @@ src/GW_alignment.py
 *.python-version
 pyproject.toml
 scripts/res.txt
+
+.DS_Store
+
+# Local History for Visual Studio Code
+.history/
