@@ -1,0 +1,22 @@
+results
+*.vscode
+*.lock
+*.pyc
+.python-version
+.venv
+poetry.lock
+pyproject.toml
+scripts/dm_scaling.ipynb
+scripts/Histogram_alignment/dm_scaling_abe.py
+databases/
+*.pt
+*.db
+src/GW_alignment_abe.py
+src/GW_alignment.py
+*.python-version
+pyproject.toml
+
+.history/
+.vscode/
+
+ .history/
