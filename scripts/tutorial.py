@@ -38,7 +38,7 @@ os.chdir(os.path.dirname(__file__))
 # 'DNN': representations of 2000 imagenet images in AlexNet and VGG
 # 'color': human similarity judgements of 93 colors for 5 paricipants groups
 # 'face': human similarity judgements of 16 faces, attended vs unattended condition in the same participant
-data_select = 'color'
+data_select = 'DNN'
 
 if data_select == 'DNN':
     path1 = '../data/model1.pt'
@@ -113,7 +113,7 @@ max_iter = 200
 # 'random': randomly select epsilon between the range of epsilon
 # 'grid': grid search between the range of epsilon
 # 'tpe': Bayesian sampling
-sampler_name = 'grid'
+sampler_name = 'tpe'
 
 # set the range of epsilon
 # set only the minimum value and maximum value for 'tpe' sampler
@@ -167,8 +167,8 @@ eps_space = opt.define_eps_space(eps_list, eps_log, num_trial)
 search_space = {"eps": eps_space, "initialize": init_plans}
 
 # 2. run optimzation
-# parallel = 'thread' or 'multiprocessing', default is 'multiprocessing'
-study = opt.run_study(test_gw, device, parallel = 'multiprocessing', init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log, search_space = search_space)
+# parallelは無意味だということがわかった, default is None
+study = opt.run_study(test_gw, device, parallel = None, init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log, search_space = search_space)
 
 #%%
 ### View Results

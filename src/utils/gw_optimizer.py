@@ -154,7 +154,7 @@ class RunOptuna():
             raise ValueError('This db does not exist.')
         return study
 
-    def _run_study(self, objective, device = 'cuda:0', forced_run = True, parallel = 'multiprocessing'):
+    def _run_study(self, objective, device = 'cuda:0', forced_run = True, parallel = None):
         """
         
         2023.4.11 佐々木
@@ -173,6 +173,9 @@ class RunOptuna():
         2023.4.12 佐々木
         ・grid searchの問題はoptunaの仕様らしい
         ・tqdmのバグは、各processごとにprintを噛ませて回避できた。
+        
+        2024.4.18 佐々木
+        parallelでの計算は全てコメントアウトにした。
         """
         
         if self.delete_study:
@@ -181,37 +184,40 @@ class RunOptuna():
         if forced_run:
             self.create_study() #dbファイルがない場合、ここでloadをさせないとmulti_runが正しく動かなくなってしまう。
             
-            def multi_run(objective, worker_id, num_trials, device):
-                # if worker_id == 0:
-                print('parallel method is ' + parallel + ', worker_id:' + str(worker_id) + '\n') # 完全に苦肉の策。tqdmの表示バグ対策。
-                
+            if parallel is None:
                 seed = 42
                 tt = functools.partial(objective, device = device)
-                study = self.load_study(seed = seed + worker_id)
-                study.optimize(tt, n_trials = num_trials)
+                study = self.load_study(seed = seed)
+                study.optimize(tt, n_trials = self.num_trial)
+                
+            # def multi_run(objective, worker_id, num_trials, device):
+            #     # if worker_id == 0:
+            #     print('parallel method is ' + parallel + ', worker_id:' + str(worker_id) + '\n') # 完全に苦肉の策。tqdmの表示バグ対策。
+                
+            #     seed = 42
+            #     tt = functools.partial(objective, device = device)
+            #     study = self.load_study(seed = seed + worker_id)
+            #     study.optimize(tt, n_trials = num_trials)
 
-            if parallel == 'thread':
-                with ThreadPoolExecutor(self.n_jobs) as pool:
-                    for i in range(self.n_jobs):
-                        if device == 'multi':
-                            device = 'cuda:' + str(i % 4)
-                        pool.submit(multi_run, objective, i, self.num_trial // self.n_jobs, device)
+            # if parallel == 'thread':
+            #     with ThreadPoolExecutor(self.n_jobs) as pool:
+            #         for i in range(self.n_jobs):
+            #             if device == 'multi':
+            #                 device = 'cuda:' + str(i % 4)
+            #             pool.submit(multi_run, objective, i, self.num_trial // self.n_jobs, device)
             
-            elif parallel == 'multiprocessing':
-                processes = []
-                for i in range(self.n_jobs):
-                    if device == 'multi':
-                        device = 'cuda:' + str(i % 4)
+            # elif parallel == 'multiprocessing':
+            #     processes = []
+            #     for i in range(self.n_jobs):
+            #         if device == 'multi':
+            #             device = 'cuda:' + str(i % 4)
 
-                    subp = mp.Process(target=multi_run, args=(objective, i, self.num_trial // self.n_jobs, device))
-                    subp.start()
-                    processes.append(subp)
+            #         subp = mp.Process(target=multi_run, args=(objective, i, self.num_trial // self.n_jobs, device))
+            #         subp.start()
+            #         processes.append(subp)
 
-                for subp in processes:
-                    subp.join()
-            
-            else:
-                raise ValueError('undefined parallel method. please choose "thread" or "multiprocessing".')
+            #     for subp in processes:
+            #         subp.join()
 
         study = self.load_study()
 
