@@ -1,14 +1,16 @@
 #%%
 import os, sys, gc, math, time
+import jax
+import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 import torch
 import ot
 import matplotlib.pyplot as plt
 import optuna
-import warnings
 from joblib import parallel_backend
 from scipy.spatial import distance
+import warnings
 # warnings.simplefilter("ignore")
 import seaborn as sns
 import matplotlib.style as mplstyle
