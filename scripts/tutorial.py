@@ -38,7 +38,7 @@ os.chdir(os.path.dirname(__file__))
 # 'DNN': representations of 2000 imagenet images in AlexNet and VGG
 # 'color': human similarity judgements of 93 colors for 5 paricipants groups
 # 'face': human similarity judgements of 16 faces, attended vs unattended condition in the same participant
-data_select = 'DNN'
+data_select = 'color'
 
 if data_select == 'DNN':
     path1 = '../data/model1.pt'

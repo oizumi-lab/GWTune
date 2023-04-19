@@ -7,6 +7,8 @@ import ot
 import matplotlib.pyplot as plt
 import optuna
 import warnings
+from joblib import parallel_backend
+from scipy.spatial import distance
 # warnings.simplefilter("ignore")
 import seaborn as sns
 import matplotlib.style as mplstyle
