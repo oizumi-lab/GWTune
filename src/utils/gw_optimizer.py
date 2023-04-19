@@ -201,6 +201,8 @@ class RunOptuna():
                     raise ValueError("Do not use n_jobs = -1 in this library, please use 'os.cpu_count()' instead of it.")
                 
                 elif self.n_jobs > 1:
+                    if self.to_types == 'numpy':
+                        warnings.warn('parallel computation may be slower than single computation for numpy...', UserWarning)
                     worker_arr = np.array_split(np.arange(self.num_trial), self.n_jobs)
 
                     with ThreadPoolExecutor(self.n_jobs) as pool:
