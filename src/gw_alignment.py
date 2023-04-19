@@ -1,29 +1,17 @@
 #%%
 import os, sys, gc, math, time
-import jax
-import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 import torch
 import ot
 import matplotlib.pyplot as plt
 import optuna
-from joblib import parallel_backend
 import warnings
 # warnings.simplefilter("ignore")
 import seaborn as sns
 import matplotlib.style as mplstyle
 from tqdm.auto import tqdm
 #nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
-import multiprocessing as mp
-from concurrent.futures import ThreadPoolExecutor
-from joblib import parallel_backend
-
-import asyncio
-import concurrent
-# 以下の二行があると、Jupyterでasyncio.run()が動くようになる。 
-import nest_asyncio
-nest_asyncio.apply()
 
 # %%
 from utils.backend import Backend
@@ -72,7 +60,7 @@ class GW_Alignment():
 
         return trial, eps
 
-    def __call__(self, trial, device, init_plans_list, eps_list, eps_log=True):
+    def __call__(self, trial, device, init_plans_list, eps_list, eps_log = True):
         if self.to_types == 'numpy':
             assert device == 'cpu', "numpy does not run in CUDA."
 
@@ -173,6 +161,9 @@ class MainGromovWasserstainComputation():
 
         # 初期値のiteration回数, かつ hyperbandのparameter
         self.n_iter = n_iter
+        
+        self.back_end = Backend('cpu', self.to_types) # 並列計算をしない場合は、こちらにおいた方がはやい。(2023.4.19 佐々木)
+        
 
     def entropic_gw(self, device, epsilon, T, max_iter = 1000, tol = 1e-9, trial = None, log = True, verbose = False):
         '''
@@ -188,9 +179,8 @@ class MainGromovWasserstainComputation():
         一回しかできないのに、途中で(安全のため、同じものであっても)何回もdeviceの切り替えを行っていたことが原因だった。
         '''
         
-        self.back_end = Backend(device, self.to_types)
-        
         # ここで、全ての変数をto_typesのdeviceに変更している。
+        self.back_end.device = device
         C1, C2, p, q, T = self.back_end(self.pred_dist, self.target_dist, self.p, self.q, T) 
   
         constC, hC1, hC2 = ot.gromov.init_matrix(C1, C2, p, q, loss_fun = "square_loss")
@@ -290,7 +280,7 @@ class MainGromovWasserstainComputation():
         if trial.should_prune():
             raise optuna.TrialPruned(f"Trial was pruned at iteration {num_iter} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
     
-    def compute_GW_with_init_plans(self, trial, eps, init_mat_plan, device, parallel = False):
+    def compute_GW_with_init_plans(self, trial, eps, init_mat_plan, device):
         """
         2023.3.17 佐々木
         uniform, diagでも、prunerを使うこともできるが、いまのところはコメントアウトしている。
@@ -314,49 +304,23 @@ class MainGromovWasserstainComputation():
         elif init_mat_plan in ['random', 'permutation']:
             best_gw_loss = float('inf')
             
-            pbar = np.random.randint(0, 100000, self.n_iter)
+            pbar = tqdm(np.random.randint(0, 100000, self.n_iter))
+            pbar.set_description("trial number : " + str(trial.number))
             
-            def computation(seeds, trial):
-                best_gw_loss = float('inf')
+            for i, seed in enumerate(pbar):
+                c_gw, c_logv, c_gw_loss, c_acc, c_init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, seed = seed)
+
+                if c_gw_loss < best_gw_loss:
+                    best_gw, best_logv, best_gw_loss, best_acc, best_init_mat = c_gw, c_logv, c_gw_loss, c_acc, c_init_mat
+                    trial = self._save_results(best_gw_loss, best_acc, trial, init_mat_plan, num_iter = i, seed = seed)
+
+                self._check_pruner_should_work(c_gw_loss, trial, init_mat_plan, eps, num_iter = i)
                 
-                for i, seed in enumerate(tqdm(seeds)):
-                    c_gw, c_logv, c_gw_loss, c_acc, c_init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, seed = seed)
+            if best_gw_loss == float('inf'):
+                raise optuna.TrialPruned(f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
 
-                    if c_gw_loss < best_gw_loss:
-                        best_gw, best_logv, best_gw_loss, best_acc, best_init_mat = c_gw, c_logv, c_gw_loss, c_acc, c_init_mat
-                        trial = self._save_results(best_gw_loss, best_acc, trial, init_mat_plan, num_iter = i, seed = seed)
-
-                    self._check_pruner_should_work(c_gw_loss, trial, init_mat_plan, eps, num_iter = i)
-                    
-                if best_gw_loss == float('inf'):
-                    raise optuna.TrialPruned(f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
-
-                else:
-                    return best_gw, best_logv, best_gw_loss, best_init_mat, trial
-                   
-            if parallel == False:
-                best_gw, best_logv, best_gw_loss, best_init_mat, trial = computation(pbar, trial)
+            else:
                 return best_gw, best_logv, best_gw_loss, best_init_mat, trial
-            
-            # else:
-            #     seed_chunk = np.array_split(pbar, 4)
-            
-            #     with ThreadPoolExecutor(4) as pool:
-            #         tasks = []
-                    
-            #         for i, seeds in enumerate(seed_chunk):
-            #             if device == 'multi':
-            #                 device = 'cuda:' + str(i % 4)
-            #             tasks.append(pool.submit(computation, seeds, trial))
-                        
-            #         min_ind = [future.result()[2] for future in tasks]
-                    
-            #         results = tasks[min_ind.index(min(min_ind))].result()
-                    
-            #         end = time.time() - start
-            #         print('Multi-Thread Time', end)
-                
-            #     return results
     
         else:
             raise ValueError('Not defined initialize matrix.')
