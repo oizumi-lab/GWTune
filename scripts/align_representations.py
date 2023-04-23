@@ -60,6 +60,14 @@ class Representation:
     A class object that has information of a representation, such as embeddings and similarity matrices
     """
     def __init__(self, name, sim_mat = None, embedding = None, metric = "cosine") -> None:
+        """_summary_
+
+        Args:
+            name (_type_): The name of Representation (e.g. "Group 1")
+            sim_mat (_type_, optional): RDM (Representational Dissimilarity Matrix) of the representation. Defaults to None.
+            embedding (_type_, optional): The embedding of the representaion. Defaults to None.
+            metric (str, optional): The distance metric for computing dissimilarity matrix. Defaults to "cosine".
+        """
         self.name = name
         self.metric = metric
         if sim_mat is None:
@@ -89,14 +97,7 @@ class Representation:
         return embedding
         
     def show_sim_mat(self, ticks_size = None, label = None):
-        plt.figure(figsize = (20, 20))
-        ax = sns.heatmap(self.sim_mat, square = True, cbar_kws = {"shrink": .80})
-        cbar = ax.collections[0].colorbar
-        cbar.ax.tick_params(labelsize = ticks_size)    
-        plt.xlabel(label, size = 40)
-        plt.ylabel(label, size = 40)
-        plt.title(self.name, size = 60)
-        plt.show()
+        show_heatmap(self.sim_mat, title = self.name, ticks_size = ticks_size, xlabel = label, ylabel = label)
         
     def show_sim_mat_distribution(self):
         pass
@@ -107,6 +108,9 @@ class Representation:
     
     def procrustes(self, target, Pi):
         Q, self.embedding = procrustes(target.embedding, self.embedding, Pi)  
+        
+    def RSA(self, target):
+        return RSA_get_corr(self.sim_mat, target.sim_mat)
     
     
 class Pairwise_Analysis:
@@ -120,6 +124,7 @@ class Pairwise_Analysis:
         Args:
             source (Representation): instance of Representation
             target (Representation): instance of Representation
+            config (Optimization_Config) : instance of Optimization_Config
         """
         self.target = target
         self.source = source
@@ -204,14 +209,7 @@ class Pairwise_Analysis:
     
     def _show_OT(self, title, shuffle : bool, ticks_size = None):
         OT = self.OT if not shuffle else self.shuffled_OT
-        plt.figure(figsize = (20, 20))
-        ax = sns.heatmap(OT, square = True, cbar_kws = {"shrink": .80})
-        cbar = ax.collections[0].colorbar
-        cbar.ax.tick_params(labelsize = ticks_size)    
-        plt.xlabel(self.target.name, size = 40)
-        plt.ylabel(self.source.name, size = 40)
-        plt.title(title, size = 60)
-        plt.show()
+        show_heatmap(matrix = OT, title = title, ticks_size = ticks_size)
     
     def calc_top_k_accuracy(self, k_list, shuffle : bool):
         OT = self.OT if not shuffle else self.shuffled_OT
@@ -344,14 +342,6 @@ class Align_Representations:
             df = self._get_dataframe(eval_type, shuffle = shuffle, concat = False)
             for group in df.columns:
                 plt.plot(df.index, df[group], c = "blue")
-                         
-        #if shuffle:    
-        #    df = self._get_dataframe(eval_type, shuffle = True, concat = False)
-        #    y_mean = df.mean(axis = "columns")
-        #    y_std = df.std(axis = "columns")
-        #    plt.plot(df.index, y_mean, label = "shuffle", linewidth = 2)
-        #    plt.fill_between(df.index, (y_mean - y_std), (y_mean + y_std), alpha = 0.3)
-        #plt.xticks(ticks = [i + 1 for i in range(10)], labels = [i + 1 for i in range(10)])
         plt.ylim(0, 100)
         plt.xlabel("k")
         plt.ylabel("Matching rate")
