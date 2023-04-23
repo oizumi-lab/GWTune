@@ -46,6 +46,7 @@ elif data_select == "THINGS":
         representation = Representation(name = name, embedding = embedding, metric = metric)
         representations.append(representation)
     
+    
 #%%
 '''
 Set the parameters for the optimazation of GWOT
@@ -82,7 +83,7 @@ align_representation.RSA_get_corr(shuffle = False)
 GW alignment
 '''
 ## If no need for computation, turn load_OT True, then OT plans calculated before is loaded.
-align_representation.gw_alignment(pairnumber_list = "all", shuffle = False, load_OT = False)
+align_representation.gw_alignment(pairnumber_list = "all", shuffle = False, load_OT = True)
 
 ## Calculate the accuracy of the optimized OT matrix
 align_representation.calc_top_k_accuracy(k_list = [1, 5, 10], shuffle = False)
