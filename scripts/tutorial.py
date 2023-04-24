@@ -102,7 +102,7 @@ storage = "sqlite:///" + save_path + "/" + filename + ".db"
 # initialization of transportation plan
 # 'uniform': uniform matrix, 'diag': diagonal matrix
 # 'random': random matrix, 'permutation': permutation matrix
-init_plans_list = ["random"]
+init_plans_list = ["random"]a
 
 # you can select multiple options
 # init_plans_list = ['uniform', 'random']
