@@ -107,11 +107,11 @@ save_path = '../results/gw_alignment/' + filename
 
 # Delete previous optimization results or not
 # If the same filename has different search space, optuna may not work well.
-delete_study = True
+delete_study = False
 
 # set the device ('cuda' or 'cpu') and variable type ('torch' or 'numpy')
-device = 'cpu'
-to_types = 'numpy'
+device = 'cuda:3'
+to_types = 'torch'
 
 # the number of jobs
 n_jobs = 4
@@ -201,8 +201,8 @@ eps_space = opt.define_eps_space(eps_list, eps_log, num_trial)
 search_space = {"eps": eps_space, "initialize": init_plans}
 
 # 2. run optimzation
-# parallel = 'thread' or 'multiprocessing', default is 'multiprocessing'
-study = opt.run_study(test_gw, device, parallel = 'multiprocessing', init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log, search_space = search_space)
+# parallelは無意味だということがわかった, default is None
+study = opt.run_study(test_gw, device, parallel = None, init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log, search_space = search_space)
 
 #%%
 ### View Results

@@ -1,5 +1,5 @@
 #%%
-import os, sys, gc, math
+import os, sys, gc, math, time
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -16,8 +16,6 @@ import seaborn as sns
 import matplotlib.style as mplstyle
 from tqdm.auto import tqdm
 #nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
-import torch.multiprocessing as mp
-from concurrent.futures import ThreadPoolExecutor
 
 # %%
 from utils.backend import Backend
@@ -66,7 +64,7 @@ class GW_Alignment():
 
         return trial, eps
 
-    def __call__(self, trial, device, init_plans_list, eps_list, eps_log=True):
+    def __call__(self, trial, device, init_plans_list, eps_list, eps_log = True):
         if self.to_types == 'numpy':
             assert device == 'cpu', "numpy does not run in CUDA."
 
@@ -95,7 +93,7 @@ class GW_Alignment():
             If not, set the result of accuracy and gw_loss as float('nan'), respectively. This will be used as a handy marker as bad results to be removed in the evaluation analysis.
         '''
 
-        self.main_compute.backend.save_computed_results(gw, init_mat, file_path, trial.number)
+        self.main_compute.back_end.save_computed_results(gw, init_mat, file_path, trial.number)
 
         '''
         4. delete unnecessary memory for next computation. If not, memory error would happen especially when using CUDA.
@@ -167,6 +165,9 @@ class MainGromovWasserstainComputation():
 
         # 初期値のiteration回数, かつ hyperbandのparameter
         self.n_iter = n_iter
+        
+        self.back_end = Backend('cpu', self.to_types) # 並列計算をしない場合は、こちらにおいた方がはやい。(2023.4.19 佐々木)
+        
 
     def entropic_gw(self, device, epsilon, T, max_iter = 1000, tol = 1e-9, trial = None, log = True, verbose = False):
         '''
@@ -182,10 +183,9 @@ class MainGromovWasserstainComputation():
         一回しかできないのに、途中で(安全のため、同じものであっても)何回もdeviceの切り替えを行っていたことが原因だった。
         '''
         
-        self.backend = Backend(device, self.to_types)
-        
         # ここで、全ての変数をto_typesのdeviceに変更している。
-        C1, C2, p, q, T = self.backend(self.pred_dist, self.target_dist, self.p, self.q, T) 
+        self.back_end.device = device
+        C1, C2, p, q, T = self.back_end(self.pred_dist, self.target_dist, self.p, self.q, T) 
   
         constC, hC1, hC2 = ot.gromov.init_matrix(C1, C2, p, q, loss_fun = "square_loss")
 
@@ -203,7 +203,7 @@ class MainGromovWasserstainComputation():
 
             if cpt % 10 == 0:
                 # err_prev = copy.copy(err)　#ここは使われていないようなので、一旦コメントアウトしました (2023.3.16 佐々木)
-                err = self.backend.nx.norm(T - Tprev)
+                err = self.back_end.nx.norm(T - Tprev)
                 if log:
                     log['err'].append(err)
                 if verbose:
@@ -230,20 +230,20 @@ class MainGromovWasserstainComputation():
         gw, logv = self.entropic_gw(device, eps, init_mat, max_iter = max_iter, trial = trial)
         gw_loss = logv['gw_dist']
 
-        if self.backend.check_zeros(gw):
+        if self.back_end.check_zeros(gw):
             gw_loss = float('nan')
             acc = float('nan')
 
         else:
-            pred = self.backend.nx.argmax(gw, 1)
-            correct = (pred == self.backend.nx.arange(len(gw), type_as = gw)).sum()
+            pred = self.back_end.nx.argmax(gw, 1)
+            correct = (pred == self.back_end.nx.arange(len(gw), type_as = gw)).sum()
             acc = correct / len(gw)
 
         return gw, logv, gw_loss, acc, init_mat
 
     def _save_results(self, gw_loss, acc, trial, init_mat_plan, num_iter = None, seed = None):
 
-        gw_loss, acc = self.backend.get_item_from_torch_or_jax(gw_loss, acc)
+        gw_loss, acc = self.back_end.get_item_from_torch_or_jax(gw_loss, acc)
 
         if init_mat_plan in ['random', 'permutation']:
             trial.set_user_attr('best_acc', acc)
@@ -283,7 +283,7 @@ class MainGromovWasserstainComputation():
 
         if trial.should_prune():
             raise optuna.TrialPruned(f"Trial was pruned at iteration {num_iter} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
-
+    
     def compute_GW_with_init_plans(self, trial, eps, init_mat_plan, device):
         """
         2023.3.17 佐々木
@@ -293,6 +293,10 @@ class MainGromovWasserstainComputation():
         2023.3.28 佐々木
         全条件において、正しくprunerを動かすメソッドを作成。
         各条件ごとへの拡張性を考慮すると、prunerの挙動は一本化しておく方が絶対にいい。
+        
+        2023.4.18 佐々木
+        並行・並列計算による高速化は、Numpy環境だと全く意味がない。
+        CUDAであっても、高速化は高々20%弱しか速くならず、よくわからないエラーも出るので、中止にします。
         """
 
         if init_mat_plan in ['uniform', 'diag']:
@@ -305,7 +309,7 @@ class MainGromovWasserstainComputation():
             best_gw_loss = float('inf')
             
             pbar = tqdm(np.random.randint(0, 100000, self.n_iter))
-            pbar.set_description(f'trial number = {trial.number}')
+            pbar.set_description("trial number : " + str(trial.number))
             
             for i, seed in enumerate(pbar):
                 c_gw, c_logv, c_gw_loss, c_acc, c_init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device, seed = seed)
@@ -315,17 +319,16 @@ class MainGromovWasserstainComputation():
                     trial = self._save_results(best_gw_loss, best_acc, trial, init_mat_plan, num_iter = i, seed = seed)
 
                 self._check_pruner_should_work(c_gw_loss, trial, init_mat_plan, eps, num_iter = i)
-
+                
             if best_gw_loss == float('inf'):
                 raise optuna.TrialPruned(f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}")
 
             else:
                 return best_gw, best_logv, best_gw_loss, best_init_mat, trial
-
+    
         else:
             raise ValueError('Not defined initialize matrix.')
-
-
+    
 # %%
 if __name__ == '__main__':
 
@@ -344,52 +347,25 @@ if __name__ == '__main__':
     eps_list = [1e-3, 1e-2]
     eps_log = True
 
-    dataset = GW_Alignment(model1, model2, p, q, max_iter = 100, n_iter = 1, save_path = unittest_save_path)
+    dataset = GW_Alignment(model1, model2, p, q, max_iter = 100, n_iter = 4, save_path = unittest_save_path)
 
     # %%
-    study = optuna.create_study(direction = "minimize",
-                                study_name = "test",
-                                sampler = optuna.samplers.TPESampler(seed = 42),
-                                pruner = optuna.pruners.MedianPruner(),
-                                storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db', #この辺のパス設定は一度議論した方がいいかも。
-                                load_if_exists = True)
+    seed = 42
+    study = optuna.create_study(
+        direction = "minimize",
+        study_name = "test",
+        sampler = optuna.samplers.TPESampler(seed = seed),
+        pruner = optuna.pruners.MedianPruner(),
+        storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db',
+        load_if_exists = True)
 
-    def multi_run(dataset, subp_id, device, num_trials):
-        seed = 42 + subp_id
-        load_study = optuna.load_study(study_name = "test",
-                                       sampler = optuna.samplers.RandomSampler(seed = seed),
-                                       # sampler = optuna.samplers.GridSampler(search_space, seed = seed),
-                                       pruner = optuna.pruners.MedianPruner(),
-                                       storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db')
-        
-        load_study.optimize(lambda trial: dataset(trial, device, init_mat_types, eps_list), n_trials = num_trials)
+    device = 'cuda'
 
-
-    n_trials = 4
-    n_jobs = 4
-    search_space = {'eps':np.logspace(np.log10(eps_list[0]), np.log10(eps_list[1]), num = n_trials)}
-    
-    # %%
-    # processes = []
-    # for i in range(n_jobs):
-    #     device = 'cuda' # + str(i % 4)
-    #     subp = mp.Process(target=multi_run, args=(dataset, i, device, n_trials // n_jobs))
-    #     processes.append(subp)
-    #     subp.start()
-        
-    # for subp in processes:
-    #     subp.join()
-    
-    with ThreadPoolExecutor(n_jobs) as pool:
-        for i in range(n_jobs):
-            device = 'cuda'
-            pool.submit(multi_run, dataset, i, device, n_trials // n_jobs)
-
+    start = time.time()
+    study.optimize(lambda trial: dataset(trial, device, init_mat_types, eps_list), n_trials = 20)
+    end = time.time() - start
+    print('Time', end)
     #%%
-    study = optuna.load_study(study_name = "test",
-                              storage = 'sqlite:///' + unittest_save_path + '/' + init_mat_types[0] + '.db')
-    
-    
     df = study.trials_dataframe()
     print(df)
     # %%
