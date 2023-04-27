@@ -142,11 +142,14 @@ n_iter = 10
 # the maximum number of iteration for GW optimization: default: 1000
 max_iter = 500
 
+# the maximum number of iteration for sinkhorn: default: 1000
+numItermax = 1000
+
 # choose sampler
 # 'random': randomly select epsilon between the range of epsilon
 # 'grid': grid search between the range of epsilon
 # 'tpe': Bayesian sampling
-sampler_name = "tpe"
+sampler_name = "random"
 
 # set the range of epsilon
 # set only the minimum value and maximum value for 'tpe' sampler
@@ -167,7 +170,7 @@ eps_log = True  # use log scale if True
 #   reduction_factor: How often to check for pruning. Smaller values result in more frequent pruning checks. Between 2 to 6.
 # 'nop': no pruning
 pruner_name = "hyperband"
-pruner_params = {"n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3}
+pruner_params = {"n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 3, "reduction_factor": 2}
 
 #%%
 # distribution in the source space, and target space
@@ -175,7 +178,9 @@ p = ot.unif(len(C1))
 q = ot.unif(len(C2))
 
 # generate instance solves gw_alignment
-test_gw = GW_Alignment(C1, C2, p, q, save_path, max_iter=max_iter, n_iter=n_iter, to_types=to_types)
+test_gw = GW_Alignment(
+    C1, C2, p, q, save_path, max_iter=max_iter, numItermax=numItermax, n_iter=n_iter, to_types=to_types
+)
 
 # generate instance optimize gw_alignment
 opt = load_optimizer(
@@ -207,7 +212,6 @@ search_space = {"eps": eps_space, "initialize": init_plans}
 study = opt.run_study(
     test_gw,
     device,
-    parallel=None,
     init_plans_list=init_plans,
     eps_list=eps_list,
     eps_log=eps_log,

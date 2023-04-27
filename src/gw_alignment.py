@@ -34,7 +34,9 @@ from utils.init_matrix import InitMatrix
 
 # %%
 class GW_Alignment:
-    def __init__(self, pred_dist, target_dist, p, q, save_path, max_iter=1000, n_iter=100, to_types="torch"):
+    def __init__(
+        self, pred_dist, target_dist, p, q, save_path, max_iter=1000, numItermax=1000, n_iter=100, to_types="torch"
+    ):
         """
         2023/3/6 大泉先生
 
@@ -56,7 +58,7 @@ class GW_Alignment:
         self.n_iter = n_iter
 
         self.main_compute = MainGromovWasserstainComputation(
-            pred_dist, target_dist, p, q, self.to_types, max_iter=max_iter, n_iter=n_iter
+            pred_dist, target_dist, p, q, self.to_types, max_iter=max_iter, numItermax=numItermax, n_iter=n_iter
         )
 
     def define_eps_range(self, trial, eps_list, eps_log):
@@ -172,7 +174,7 @@ class GW_Alignment:
 
 
 class MainGromovWasserstainComputation:
-    def __init__(self, pred_dist, target_dist, p, q, to_types, max_iter=1000, n_iter=100) -> None:
+    def __init__(self, pred_dist, target_dist, p, q, to_types, max_iter=1000, numItermax=1000, n_iter=100) -> None:
         self.to_types = to_types
 
         self.pred_dist, self.target_dist, self.p, self.q = pred_dist, target_dist, p, q
@@ -184,12 +186,17 @@ class MainGromovWasserstainComputation:
         # gw alignmentに関わるparameter
         self.max_iter = max_iter
 
+        # sinkhornに関わるparameter
+        self.numItermax = numItermax
+
         # 初期値のiteration回数, かつ hyperbandのparameter
         self.n_iter = n_iter
 
         self.back_end = Backend("cpu", self.to_types)  # 並列計算をしない場合は、こちらにおいた方がはやい。(2023.4.19 佐々木)
 
-    def entropic_gw(self, device, epsilon, T, max_iter=1000, tol=1e-9, trial=None, log=True, verbose=False):
+    def entropic_gw(
+        self, device, epsilon, T, max_iter=1000, numItermax=1000, tol=1e-9, trial=None, log=True, verbose=False
+    ):
         """
         2023.3.16 佐々木
         backendに実装した "change_device" で、全型を想定した変数のdevice切り替えを行う。
@@ -219,7 +226,7 @@ class MainGromovWasserstainComputation:
             Tprev = T
             # compute the gradient
             tens = ot.gromov.gwggrad(constC, hC1, hC2, T)
-            T = ot.bregman.sinkhorn(p, q, tens, epsilon, method="sinkhorn")
+            T = ot.bregman.sinkhorn(p, q, tens, epsilon, method="sinkhorn", numItermax=numItermax)
 
             if cpt % 10 == 0:
                 # err_prev = copy.copy(err)　#ここは使われていないようなので、一旦コメントアウトしました (2023.3.16 佐々木)
@@ -239,7 +246,7 @@ class MainGromovWasserstainComputation:
         else:
             return T
 
-    def gw_alignment_computation(self, init_mat_plan, eps, max_iter, device, trial=None, seed=42):
+    def gw_alignment_computation(self, init_mat_plan, eps, max_iter, numItermax, device, trial=None, seed=42):
         """
         2023.3.17 佐々木
         gw_alignmentの計算を行う。ここのメソッドは変更しない方がいいと思う。
@@ -247,7 +254,7 @@ class MainGromovWasserstainComputation:
         """
 
         init_mat = self.init_mat_builder.make_initial_T(init_mat_plan, seed)
-        gw, logv = self.entropic_gw(device, eps, init_mat, max_iter=max_iter, trial=trial)
+        gw, logv = self.entropic_gw(device, eps, init_mat, max_iter=max_iter, numItermax=numItermax, trial=trial)
         gw_loss = logv["gw_dist"]
 
         if self.back_end.check_zeros(gw):
@@ -322,7 +329,9 @@ class MainGromovWasserstainComputation:
         """
 
         if init_mat_plan in ["uniform", "diag"]:
-            gw, logv, gw_loss, acc, init_mat = self.gw_alignment_computation(init_mat_plan, eps, self.max_iter, device)
+            gw, logv, gw_loss, acc, init_mat = self.gw_alignment_computation(
+                init_mat_plan, eps, self.max_iter, self.numItermax, device
+            )
             trial = self._save_results(gw_loss, acc, trial, init_mat_plan)
             self._check_pruner_should_work(gw_loss, trial, init_mat_plan, eps)
             return gw, logv, gw_loss, init_mat, trial
@@ -335,7 +344,7 @@ class MainGromovWasserstainComputation:
 
             for i, seed in enumerate(pbar):
                 c_gw, c_logv, c_gw_loss, c_acc, c_init_mat = self.gw_alignment_computation(
-                    init_mat_plan, eps, self.max_iter, device, seed=seed
+                    init_mat_plan, eps, self.max_iter, self.numItermax, device, seed=seed
                 )
 
                 if c_gw_loss < best_gw_loss:
