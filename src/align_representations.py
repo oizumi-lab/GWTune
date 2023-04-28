@@ -14,45 +14,11 @@ import sys
 import os
 from typing import List
 
-from src.utils.utils_functions import procrustes, shuffle_RDM, RSA_get_corr, get_category_idx, shuffle_symmetric_block_mat
-from src.utils.visualize_functions import show_heatmap, Visualize_Embedding
-from src.utils.evaluation import pairwise_k_nearest_matching_rate, calc_correct_rate_ot_plan
-from src.gw_alignment import GW_Alignment
-from src.utils.gw_optimizer import load_optimizer
-from src.utils.init_matrix import InitMatrix
-
-
-class Optimization_Config:
-    def __init__(self, 
-                 data_name = "THINGS",
-                 delete_study = True, 
-                 device = 'cpu',
-                 to_types = 'numpy',
-                 n_jobs = 4,
-                 init_plans_list = ['random'],
-                 num_trial = 4,
-                 n_iter = 1,
-                 max_iter = 200,
-                 sampler_name = 'tpe',
-                 eps_list = [1, 10],
-                 eps_log = True,
-                 pruner_name = 'hyperband',
-                 pruner_params = {'n_startup_trials': 1, 'n_warmup_steps': 2, 'min_resource': 2, 'reduction_factor' : 3}
-                 ) -> None:
-        self.data_name = data_name
-        self.delete_study = delete_study
-        self.device = device
-        self.to_types = to_types
-        self.n_jobs = n_jobs
-        self.init_plans_list = init_plans_list
-        self.num_trial = num_trial
-        self.n_iter = n_iter
-        self.max_iter = max_iter
-        self.sampler_name = sampler_name
-        self.eps_list = eps_list
-        self.eps_log = eps_log
-        self.pruner_name = pruner_name
-        self.pruner_params = pruner_params
+from utils.utils_functions import procrustes, shuffle_RDM, RSA_get_corr, get_category_idx, shuffle_symmetric_block_mat
+from utils.visualize_functions import show_heatmap, Visualize_Embedding, plot_lower_triangular_histogram
+from utils.evaluation import pairwise_k_nearest_matching_rate, calc_correct_rate_ot_plan
+from utils.histogram_matching import histogram_matching
+from gw_alignment import run_main_gw, Optimization_Config
 
 
 class Representation:
@@ -100,7 +66,7 @@ class Representation:
         show_heatmap(self.sim_mat, title = self.name, ticks_size = ticks_size, xlabel = label, ylabel = label)
         
     def show_sim_mat_distribution(self):
-        pass
+        plot_lower_triangular_histogram(self.sim_mat, title = f"Distribution of RDM ({self.name})")
     
     def show_embedding(self, dim = 3):
         visualize_embedding = Visualize_Embedding(embedding_list = [self.embedding], name_list = [self.name])
@@ -111,6 +77,9 @@ class Representation:
         
     def RSA(self, target):
         return RSA_get_corr(self.sim_mat, target.sim_mat)
+    
+    def histogram_matching(self, target):
+        self.sim_mat = histogram_matching(target.sim_mat, self.sim_mat)
     
     
 class Pairwise_Analysis:
@@ -143,7 +112,7 @@ class Pairwise_Analysis:
         return corr
     
     def match_sim_mat_distribution(self):
-        pass
+        self.source.histogram_matching(self.target)
     
     def run_gw(self, shuffle, ticks_size = None, load_OT = False):
         """
@@ -155,53 +124,10 @@ class Pairwise_Analysis:
                 self.OT = self._gw_alignment(shuffle = shuffle, load_OT = load_OT)
         self._show_OT(title = f"$\Gamma$ ({self.pair_name}) {'(shuffle)' if shuffle else ''} ", shuffle = shuffle, ticks_size = ticks_size)
         
-    def _gw_alignment(self, shuffle : bool, load_OT = False):
+    def _gw_alignment(self, results_dir = "../results/", shuffle = False, load_OT = False):
         filename = self.config.data_name + " " + self.pair_name
-        save_path = '../results/gw_alignment/' + filename
-        sql_name = 'sqlite'
-        storage = "sqlite:///" + save_path +  '/' + filename + '.db'
         RDM_source, RDM_target = (self.source.sim_mat, self.target.sim_mat) if not shuffle else (self.source.shuffled_sim_mat, self.target.shuffled_sim_mat)
-
-        # distribution in the source space, and target space
-        p = ot.unif(len(RDM_source))
-        q = ot.unif(len(RDM_target))
-        save_path = "../results/" + filename
-
-        # generate instance solves gw_alignment　
-        test_gw = GW_Alignment(RDM_source, RDM_target, p, q, save_path, max_iter = self.config.max_iter, n_iter = self.config.n_iter, to_types = self.config.to_types)
-
-        # generate instance optimize gw_alignment　
-        opt = load_optimizer(save_path,
-                                n_jobs = self.config.n_jobs,
-                                num_trial = self.config.num_trial,
-                                to_types = self.config.device,
-                                method = 'optuna',
-                                sampler_name = self.config.sampler_name,
-                                pruner_name = self.config.pruner_name,
-                                pruner_params = self.config.pruner_params,
-                                n_iter = self.config.n_iter,
-                                filename = filename,
-                                sql_name = sql_name,
-                                storage = storage,
-                                delete_study = self.config.delete_study
-        )
-
-        ### optimization
-        # 1. 初期値の選択。実装済みの初期値条件の抽出をgw_optimizer.pyからinit_matrix.pyに移動しました。
-        init_plans = InitMatrix().implemented_init_plans(self.config.init_plans_list)
-
-        # used only in grid search sampler below the two lines
-        eps_space = opt.define_eps_space(self.config.eps_list, self.config.eps_log, self.config.num_trial)
-        search_space = {"eps": eps_space, "initialize": init_plans}
-        if not load_OT:
-            # 2. run optimzation
-            study = opt.run_study(test_gw, self.config.device, init_plans_list = init_plans, eps_list = self.config.eps_list, eps_log = self.config.eps_log, search_space = search_space)
-            best_trial = study.best_trial
-            OT = np.load(save_path+f'/{self.config.init_plans_list[0]}/gw_{best_trial.number}.npy')
-        else:
-            study = opt.load_study()
-            best_trial = study.best_trial
-            OT = np.load(save_path+f'/{self.config.init_plans_list[0]}/gw_{best_trial.number}.npy')
+        OT = run_main_gw(self.config, RDM_source, RDM_target, results_dir, filename, load_OT)
         return OT
           
     def _get_optimization_log(self):
@@ -283,9 +209,11 @@ class Align_Representations:
             self.RSA_corr[pairwise.pair_name] = corr
             print(f"Correlation {pairwise.pair_name} : {corr}")
     
-    def show_sim_mat(self, ticks_size = None, label = None, title = None):
+    def show_sim_mat(self, ticks_size = None, label = None, title = None, show_distribution = True):
         for representation in self.representations_list:
             representation.show_sim_mat(ticks_size = ticks_size, label = label)
+            if show_distribution:
+                representation.show_sim_mat_distribution()
     
     def gw_alignment(self, pairnumber_list = "all", shuffle = False, ticks_size = None, load_OT = False):
         if pairnumber_list == "all":
