@@ -304,7 +304,7 @@ class MainGromovWasserstainComputation:
             raise optuna.TrialPruned(f"Trial for '{init_mat_plan}' was pruned with parameters: {{'eps': {eps}}}")
 
         if num_iter is None:  # uniform, diagにおいて、nanにならなかったがprunerが動くときのためのifブロック。
-            num_iter = trial.number
+            num_iter = self.n_iter
 
         trial.report(gw_loss, num_iter)
 
