@@ -5,8 +5,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 import numpy as np
 import pandas as pd
 import pickle as pkl
-from scripts.align_representations import Optimization_Config, Representation, Pairwise_Analysis, Align_Representations
+from src.align_representations import Representation, Pairwise_Analysis, Align_Representations
 from src.utils.utils_functions import get_category_idx
+from src.gw_alignment import Optimization_Config
 
 #%%
 ### load data
@@ -112,3 +113,4 @@ elif data_select == "color":
     data_color = pd.read_csv(file_path)
     color_labels = data_color.columns.values
     align_representation.visualize_embedding(dim = 3, color_labels = color_labels)
+# %%
