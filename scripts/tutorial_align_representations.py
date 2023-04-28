@@ -47,7 +47,6 @@ elif data_select == "THINGS":
         representation = Representation(name = name, embedding = embedding, metric = metric)
         representations.append(representation)
     
-    
 #%%
 '''
 Set the parameters for the optimazation of GWOT

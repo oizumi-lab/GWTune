@@ -162,7 +162,15 @@ def show_heatmap(matrix, title, category_name_list = None, num_category_list = N
         plt.savefig(file_name)
     plt.show() 
     
-    
+
+def plot_lower_triangular_histogram(matrix, title):
+    lower_triangular = np.tril(matrix)
+    lower_triangular = lower_triangular.flatten()
+    plt.hist(lower_triangular)
+    plt.title(title)
+    plt.show()
+
+
 class Visualize_Embedding():
     def __init__(self, embedding_list : List[np.ndarray], name_list = None, color_labels = None, category_name_list = None, category_num_list = None, category_idx_list = None) -> None:
         self.embedding_list = embedding_list

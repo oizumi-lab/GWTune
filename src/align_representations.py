@@ -15,8 +15,9 @@ import os
 from typing import List
 
 from utils.utils_functions import procrustes, shuffle_RDM, RSA_get_corr, get_category_idx, shuffle_symmetric_block_mat
-from utils.visualize_functions import show_heatmap, Visualize_Embedding
+from utils.visualize_functions import show_heatmap, Visualize_Embedding, plot_lower_triangular_histogram
 from utils.evaluation import pairwise_k_nearest_matching_rate, calc_correct_rate_ot_plan
+from utils.histogram_matching import histogram_matching
 from gw_alignment import run_main_gw, Optimization_Config
 
 
@@ -65,7 +66,7 @@ class Representation:
         show_heatmap(self.sim_mat, title = self.name, ticks_size = ticks_size, xlabel = label, ylabel = label)
         
     def show_sim_mat_distribution(self):
-        pass
+        plot_lower_triangular_histogram(self.sim_mat, title = f"Distribution of RDM ({self.name})")
     
     def show_embedding(self, dim = 3):
         visualize_embedding = Visualize_Embedding(embedding_list = [self.embedding], name_list = [self.name])
@@ -76,6 +77,9 @@ class Representation:
         
     def RSA(self, target):
         return RSA_get_corr(self.sim_mat, target.sim_mat)
+    
+    def histogram_matching(self, target):
+        self.sim_mat = histogram_matching(target.sim_mat, self.sim_mat)
     
     
 class Pairwise_Analysis:
@@ -108,7 +112,7 @@ class Pairwise_Analysis:
         return corr
     
     def match_sim_mat_distribution(self):
-        pass
+        self.source.histogram_matching(self.target)
     
     def run_gw(self, shuffle, ticks_size = None, load_OT = False):
         """
@@ -205,9 +209,11 @@ class Align_Representations:
             self.RSA_corr[pairwise.pair_name] = corr
             print(f"Correlation {pairwise.pair_name} : {corr}")
     
-    def show_sim_mat(self, ticks_size = None, label = None, title = None):
+    def show_sim_mat(self, ticks_size = None, label = None, title = None, show_distribution = True):
         for representation in self.representations_list:
             representation.show_sim_mat(ticks_size = ticks_size, label = label)
+            if show_distribution:
+                representation.show_sim_mat_distribution()
     
     def gw_alignment(self, pairnumber_list = "all", shuffle = False, ticks_size = None, load_OT = False):
         if pairnumber_list == "all":
