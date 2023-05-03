@@ -52,7 +52,7 @@ elif data_select == "THINGS":
 Set the parameters for the optimazation of GWOT
 '''
 config = Optimization_Config(data_name = data_select, 
-                             delete_study = True, 
+                             delete_study = False, 
                              device = 'cpu',
                              to_types = 'numpy',
                              n_jobs = 4,
@@ -76,18 +76,18 @@ Unsupervised alignment between Representations
 align_representation = Align_Representations(representations_list = representations, config = config)
 
 # RSA
-align_representation.show_sim_mat()
+align_representation.show_sim_mat(fig_dir = "../figures")
 align_representation.RSA_get_corr(shuffle = False)
 
 '''
 GW alignment
 '''
 ## If no need for computation, turn load_OT True, then OT plans calculated before is loaded.
-align_representation.gw_alignment(pairnumber_list = "all", shuffle = False, load_OT = True)
+align_representation.gw_alignment(pairnumber_list = "all", shuffle = False, load_OT = True, fig_dir = "../figures")
 
 ## Calculate the accuracy of the optimized OT matrix
 align_representation.calc_top_k_accuracy(k_list = [1, 5, 10], shuffle = False)
-align_representation.plot_accuracy(eval_type = "ot_plan", shuffle = False, scatter = True) # If scatter is True, the scatter plot is employed.
+align_representation.plot_accuracy(eval_type = "ot_plan", shuffle = False, scatter = True, fig_dir = "../figures") # If scatter is True, the scatter plot is employed.
 
 #%%
 '''
@@ -95,7 +95,7 @@ Align embeddings with OT plans
 '''
 ## Calculate the matching rate of k-nearest neighbors of embeddings
 align_representation.calc_k_nearest_matching_rate(k_list = [1, 5, 10], metric = metric)
-align_representation.plot_accuracy(eval_type = "k_nearest", shuffle = False, scatter = True)
+align_representation.plot_accuracy(eval_type = "k_nearest", shuffle = False, scatter = True, fig_dir = "../figures")
 
 '''
 Visualize the aligned embeddings
@@ -106,10 +106,10 @@ if data_select == "THINGS":
     category_name_list = ["bird", "insect", "plant", "clothing",  "furniture", "fruit", "drink", "vehicle"]
     category_mat = pd.read_csv("../data/category_mat_manual_preprocessed.csv", sep = ",", index_col = 0)   
     category_idx_list, category_num_list = get_category_idx(category_mat, category_name_list, show_numbers = True)  
-    align_representation.visualize_embedding(dim = 3, color_labels = color_labels, category_name_list = category_name_list, category_idx_list = category_idx_list, category_num_list = category_num_list)
+    align_representation.visualize_embedding(dim = 3, color_labels = color_labels, category_name_list = category_name_list, category_idx_list = category_idx_list, category_num_list = category_num_list, fig_dir = "../figures")
 elif data_select == "color":
     file_path = "../data/color_dict.csv"
     data_color = pd.read_csv(file_path)
     color_labels = data_color.columns.values
-    align_representation.visualize_embedding(dim = 3, color_labels = color_labels)
+    align_representation.visualize_embedding(dim = 3, color_labels = color_labels, fig_dir = "../figures")
 # %%

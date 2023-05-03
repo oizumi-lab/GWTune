@@ -62,8 +62,9 @@ class Representation:
         embedding = MDS_embedding.fit_transform(self.sim_mat)
         return embedding
         
-    def show_sim_mat(self, ticks_size = None, label = None):
-        show_heatmap(self.sim_mat, title = self.name, ticks_size = ticks_size, xlabel = label, ylabel = label)
+    def show_sim_mat(self, ticks_size = None, label = None, fig_dir = None):
+        fig_path = os.path.join(fig_dir, f"RDM_{self.name}.png") if fig_dir is not None else None
+        show_heatmap(self.sim_mat, title = self.name, ticks_size = ticks_size, xlabel = label, ylabel = label, file_name = fig_path)
         
     def show_sim_mat_distribution(self):
         plot_lower_triangular_histogram(self.sim_mat, title = f"Distribution of RDM ({self.name})")
@@ -114,7 +115,7 @@ class Pairwise_Analysis:
     def match_sim_mat_distribution(self):
         self.source.histogram_matching(self.target)
     
-    def run_gw(self, shuffle, ticks_size = None, load_OT = False):
+    def run_gw(self, shuffle, ticks_size = None, load_OT = False, fig_dir = None):
         """
         Main computation
         """            
@@ -122,7 +123,7 @@ class Pairwise_Analysis:
                 self.shuffled_OT = self._gw_alignment(shuffle = shuffle, load_OT = load_OT)
         else:
                 self.OT = self._gw_alignment(shuffle = shuffle, load_OT = load_OT)
-        self._show_OT(title = f"$\Gamma$ ({self.pair_name}) {'(shuffle)' if shuffle else ''} ", shuffle = shuffle, ticks_size = ticks_size)
+        self._show_OT(title = f"$\Gamma$ ({self.pair_name}) {'(shuffle)' if shuffle else ''} ", shuffle = shuffle, ticks_size = ticks_size, fig_dir = fig_dir)
         
     def _gw_alignment(self, results_dir = "../results/", shuffle = False, load_OT = False):
         filename = self.config.data_name + " " + self.pair_name
@@ -133,9 +134,10 @@ class Pairwise_Analysis:
     def _get_optimization_log(self):
         pass
     
-    def _show_OT(self, title, shuffle : bool, ticks_size = None):
+    def _show_OT(self, title, shuffle : bool, ticks_size = None, fig_dir = None):
         OT = self.OT if not shuffle else self.shuffled_OT
-        show_heatmap(matrix = OT, title = title, ticks_size = ticks_size)
+        fig_path = os.path.join(fig_dir, f"OT_{self.pair_name}.png") if fig_dir is not None else None
+        show_heatmap(matrix = OT, title = title, ticks_size = ticks_size, file_name = fig_path)
     
     def calc_top_k_accuracy(self, k_list, shuffle : bool):
         OT = self.OT if not shuffle else self.shuffled_OT
@@ -209,19 +211,19 @@ class Align_Representations:
             self.RSA_corr[pairwise.pair_name] = corr
             print(f"Correlation {pairwise.pair_name} : {corr}")
     
-    def show_sim_mat(self, ticks_size = None, label = None, title = None, show_distribution = True):
+    def show_sim_mat(self, ticks_size = None, label = None, fig_dir = None, show_distribution = True):
         for representation in self.representations_list:
-            representation.show_sim_mat(ticks_size = ticks_size, label = label)
+            representation.show_sim_mat(ticks_size = ticks_size, label = label, fig_dir = fig_dir)
             if show_distribution:
                 representation.show_sim_mat_distribution()
     
-    def gw_alignment(self, pairnumber_list = "all", shuffle = False, ticks_size = None, load_OT = False):
+    def gw_alignment(self, pairnumber_list = "all", shuffle = False, ticks_size = None, load_OT = False, fig_dir = None):
         if pairnumber_list == "all":
             pairnumber_list = [i for i in range(len(self.pairwise_list))]
         self.pairnumber_list = pairnumber_list
         for pairnumber in self.pairnumber_list:
             pairwise = self.pairwise_list[pairnumber]
-            pairwise.run_gw(shuffle = shuffle, ticks_size = ticks_size, load_OT = load_OT)
+            pairwise.run_gw(shuffle = shuffle, ticks_size = ticks_size, load_OT = load_OT, fig_dir = fig_dir)
             
     def barycenter_alignment(self):
         pass
@@ -259,7 +261,7 @@ class Align_Representations:
             df = df.rename("matching rate")
         return df
         
-    def plot_accuracy(self, eval_type = "ot_plan", shuffle = False, save_fig = True, scatter = True):
+    def plot_accuracy(self, eval_type = "ot_plan", shuffle = False, fig_dir = None, scatter = True):
         plt.figure(figsize = (5, 3)) 
         if scatter:
             df = self._get_dataframe(eval_type, shuffle = shuffle, concat = True)
@@ -276,17 +278,20 @@ class Align_Representations:
         #plt.legend(loc = "best")
         plt.tick_params(axis = "both", which = "major")
         plt.subplots_adjust(left=0.2, right=0.9, bottom = 0.2)
+        if fig_dir is not None:
+            plt.savefig(os.path.join(fig_dir, f"Accuracy_{eval_type}.png"))
         plt.show()
     
-    def visualize_embedding(self, dim = 3, color_labels = None, category_name_list = None, category_num_list = None, category_idx_list = None):
+    def visualize_embedding(self, dim = 3, color_labels = None, category_name_list = None, category_num_list = None, category_idx_list = None, fig_dir = None):
         for i in range(len(self.pairwise_list) // 2):
             pair = self.pairwise_list[i]
             pair.procrustes()
         embedding_list = [self.representations_list[i].embedding for i in range(len(self.representations_list))]
         name_list = [self.representations_list[i].name for i in range(len(self.representations_list))]
-
+        fig_path = os.path.join(fig_dir, "Aligned_embedding.png") if fig_dir is not None else None
+        
         visualize_embedding = Visualize_Embedding(embedding_list = embedding_list, name_list = name_list, color_labels = color_labels, category_name_list = category_name_list, category_num_list = category_num_list, category_idx_list = category_idx_list)
-        visualize_embedding.plot_embedding(dim = dim)
+        visualize_embedding.plot_embedding(dim = dim, save_dir = fig_path)
 
 #%%
 if __name__ == "__main__":
