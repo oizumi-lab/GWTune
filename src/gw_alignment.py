@@ -408,7 +408,7 @@ def run_main_gw(config : Optimization_Config,
             best_trial = study.best_trial
             OT = np.load(save_path+f'/{config.init_plans_list[0]}/gw_{best_trial.number}.npy')
         else:
-            study = opt.load_study()
+            study = opt.run_study(test_gw, config.device, init_plans_list = init_plans, eps_list = config.eps_list, eps_log = config.eps_log, search_space = search_space, forced_run = False)
             best_trial = study.best_trial
             OT = np.load(save_path+f'/{config.init_plans_list[0]}/gw_{best_trial.number}.npy')
         return OT
