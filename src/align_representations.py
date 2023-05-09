@@ -59,8 +59,10 @@ class Representation:
         """
         # Get the lower triangular elements of the matrix
         lower_tri = self.sim_mat[np.tril_indices(self.sim_mat.shape[0], k=-1)]
+        
         # Shuffle the lower triangular elements
         np.random.shuffle(lower_tri)
+        
         # Create a new matrix with the shuffled lower triangular elements
         shuffled_matrix = np.zeros_like(self.sim_mat)
         shuffled_matrix[np.tril_indices(shuffled_matrix.shape[0], k=-1)] = lower_tri
@@ -169,9 +171,12 @@ class Pairwise_Analysis:
             if eval_type == "k_nearest":
                 Q, new_embedding_source = procrustes(self.target.embedding, self.source.embedding, OT)
                 acc = evaluation.pairwise_k_nearest_matching_rate(self.target.embedding, new_embedding_source, top_n = k, metric = metric)
+            
             elif eval_type == "ot_plan":
                 acc = evaluation.calc_correct_rate_ot_plan(OT, top_n = k)
+            
             acc_list.append(acc)
+        
         return acc_list
     
     def procrustes(self):
