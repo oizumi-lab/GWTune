@@ -7,7 +7,7 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 from scipy.spatial.distance import cdist
 from scipy.stats import wasserstein_distance
-
+import ot
 
 if __name__ == "__main__":
     n = 10
@@ -16,12 +16,15 @@ if __name__ == "__main__":
     
     np.random.seed(44)
     x2 = np.random.rand(10)
+    
+    x1_prob = ot.unif(len(x1))
+    x2_prob = ot.unif(len(x2))
 
     # make distance matrix
     dist = cdist(x1[:,np.newaxis], x2[:,np.newaxis])
     
     # EMD Loss from pot libraray
-    ot_emd = ot.emd2(x1, x2, dist)
+    ot_emd = ot.emd2(x1_prob, x2_prob, dist)
     print(ot_emd)
     
     # EMD Loss from pot libraray

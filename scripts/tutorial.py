@@ -20,6 +20,8 @@ import ot
 import pandas as pd
 import pymysql
 import scipy.io
+from scipy.spatial import distance
+from sklearn.manifold import MDS
 import seaborn as sns
 import torch
 
@@ -27,6 +29,9 @@ import torch
 from src.gw_alignment import GW_Alignment
 from src.utils.gw_optimizer import load_optimizer
 from src.utils.init_matrix import InitMatrix
+from src.utils.evaluation import calc_correct_rate_ot_plan, pairwise_k_nearest_matching_rate
+from src.utils.utils_functions import procrustes, get_category_idx
+from src.utils.visualize_functions import Visualize_Embedding
 os.chdir(os.path.dirname(__file__))
 
 # %load_ext autoreload
@@ -38,7 +43,8 @@ os.chdir(os.path.dirname(__file__))
 # 'DNN': representations of 2000 imagenet images in AlexNet and VGG
 # 'color': human similarity judgements of 93 colors for 5 paricipants groups
 # 'face': human similarity judgements of 16 faces, attended vs unattended condition in the same participant
-data_select = 'color'
+# 'THINGS' : human similarity judgements of 1854 objects for 4 paricipants groups
+data_select = "color"
 
 if data_select == 'DNN':
     path1 = '../data/model1.pt'
@@ -50,14 +56,40 @@ elif data_select == 'color':
     with open(data_path, "rb") as f:
         data = pkl.load(f)
     sim_mat_list = data["group_ave_mat"]
-    C1 = sim_mat_list[1]
-    C2 = sim_mat_list[2]
+    C1 = sim_mat_list[0]
+    C2 = sim_mat_list[1]
+    # color label
+    file_path = "../data/color_dict.csv"
+    data_color = pd.read_csv(file_path)
+    color_labels = data_color.columns.values
 elif data_select == 'face':
     data_path = '../data/faces_GROUP_interp.mat'
     mat_dic = scipy.io.loadmat(data_path)
     C1 = mat_dic["group_mean_ATTENDED"]
     C2 = mat_dic["group_mean_UNATTENDED"]
+elif data_select == "THINGS":
+    path1 = "../data/THINGS_embedding_Group1.npy"
+    path2 = "../data/THINGS_embedding_Group2.npy"
+    embedding1 = np.load(path1)[0]
+    embedding2 = np.load(path2)[0]
+    C1 = distance.cdist(embedding1, embedding1, metric = "euclidean")
+    C2 = distance.cdist(embedding2, embedding2, metric = "euclidean")
+    # Category data
+    category_name_list = ["bird", "insect", "plant", "clothing",  "furniture", "fruit", "drink", "vehicle"]
+    category_mat = pd.read_csv("../data/category_mat_manual_preprocessed.csv", sep = ",", index_col = 0)   
+    category_idx_list, category_num_list = get_category_idx(category_mat, category_name_list, show_numbers = True)  
+    
+### Get the embeddings
+# Set the embedding dimension
+dim = 3
 
+# Get embeddings with MDS
+if data_select != "THINGS": # THINGS-data already has embeddings
+    MDS_embedding = MDS(n_components = dim, dissimilarity = 'precomputed', random_state = 0)
+    embedding1 = MDS_embedding.fit_transform(C1)
+    embedding2 = MDS_embedding.fit_transform(C2)
+    
+# Show dissimilarity matrices
 fig, axes = plt.subplots(1, 2, figsize=(10, 5))
 im1 = axes[0].imshow(C1, cmap='viridis')
 cbar1 = fig.colorbar(im1, ax=axes[0])
@@ -101,13 +133,13 @@ init_plans_list = ['random']
 # init_plans_list = ['uniform', 'random']
 
 # set the number of trials, i.e., the number of epsilon values tested in optimization: default : 20
-num_trial = 8
+num_trial = 20
 
 # the number of random initial matrices for 'random' or 'permutation' options：default: 100
-n_iter = 1
+n_iter = 10
 
 # the maximum number of iteration for GW optimization: default: 1000
-max_iter = 200
+max_iter = 500
 
 # choose sampler
 # 'random': randomly select epsilon between the range of epsilon
@@ -118,7 +150,9 @@ sampler_name = 'tpe'
 # set the range of epsilon
 # set only the minimum value and maximum value for 'tpe' sampler
 # for 'grid' or 'random' sampler, you can also set the step size
-eps_list = [1e-2, 1e-1]
+#eps_list = [1, 10] # for THINGS
+eps_list = [0.02, 0.2] # for colors
+
 # eps_list = [1e-2, 1e-1, 1e-2]
 
 eps_log = True # use log scale if True
@@ -195,10 +229,20 @@ plt.show()
 
 df_trial = study.trials_dataframe()
 
-# evaluate accuracy of unsupervised alignment
-max_indices = np.argmax(OT, axis=1)
-accuracy = np.mean(max_indices == np.arange(OT.shape[0])) * 100
-print(f'accuracy={accuracy}%')
+## Evaluate the accuracy of OT plan
+# Calculate the top k accuracy (Count when the diagonal component of each row is equal to or greater than the kth largest value in that row)
+top_k_list = [1, 5, 10]
+accuracy_list = []
+for k in top_k_list:
+    acc = calc_correct_rate_ot_plan(OT, top_n = k)
+    accuracy_list.append(acc)
+# Plot
+plt.scatter(x = top_k_list, y = accuracy_list)
+plt.xlabel("k")
+plt.ylabel("Accuracy")
+plt.ylim(0, 100)
+plt.grid()
+plt.show()
 
 # figure plotting epsilon as x-axis and GWD as y-axis
 sns.scatterplot(data = df_trial, x = 'params_eps', y = 'value', s = 50)
@@ -211,4 +255,38 @@ sns.scatterplot(data = df_trial, x = 'value', y = 'user_attrs_best_acc', s = 50)
 plt.xlabel('GWD')
 plt.ylabel('accuracy')
 plt.show()
+# %%
+## Procrustes alignment
+# Move embedding2 closer to embedding1 using OT plan
+Q, new_embedding2 = procrustes(embedding1, embedding2, OT)
+
+# Evaluate the accuracy in terms of the proximity of embeddings
+top_k_list = [1, 5, 10]
+matching_rate_list = []
+for k in top_k_list:
+    acc = pairwise_k_nearest_matching_rate(embedding1, new_embedding2, top_n = k, metric = "euclidean")
+    matching_rate_list.append(acc)
+# Plot
+plt.scatter(x = top_k_list, y = matching_rate_list)
+plt.xlabel("k")
+plt.ylabel("Matching rate")
+plt.ylim(0, 100)
+plt.grid()
+plt.show()
+
+## Visualize the aligned embeddings
+embedding_list = [embedding1, new_embedding2]
+name_list = ["Group1", "Group2"]
+
+# Color data
+if data_select != "color":
+    color_labels = None
+# Category data
+if data_select != "THINGS":
+    category_name_list, category_num_list, category_idx_list = None, None, None
+    
+# Visualize
+visualize = Visualize_Embedding(embedding_list, name_list, color_labels, category_name_list, category_num_list, category_idx_list)
+visualize.plot_embedding(dim = 3)
+
 # %%
