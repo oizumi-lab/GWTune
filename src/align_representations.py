@@ -287,7 +287,7 @@ class Align_Representations:
         plt.tick_params(axis = "both", which = "major")
         plt.subplots_adjust(left=0.2, right=0.9, bottom = 0.2)
         if fig_dir is not None:
-            plt.savefig(os.path.join(fig_dir, f"Accuracy_{eval_type}.png"))
+            plt.savefig(os.path.join(fig_dir, f"Accuracy_{eval_type}_{self.config.data_name}.png"))
         plt.show()
     
     def visualize_embedding(self, dim = 3, color_labels = None, category_name_list = None, category_num_list = None, category_idx_list = None, fig_dir = None):
