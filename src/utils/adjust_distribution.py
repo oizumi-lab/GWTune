@@ -44,7 +44,7 @@ class Adjust_Distribution():
         return lim_min.item(), lim_max.item()
 
     def make_limit(self):
-        if self.fix_method == 'pred':
+        if self.fix_method == 'source':
             lim_min, lim_max = self._extract_min_and_max(self.model1)
 
         elif self.fix_method == 'target':
@@ -118,7 +118,7 @@ class Adjust_Distribution():
         # ind1 = self.backend.nx.arange(len(hist1), type_as = hist1).float()
         # ind2 = self.backend.nx.arange(len(hist2), type_as = hist2).float()
         # cost_matrix = torch.cdist(ind1.unsqueeze(dim=1), ind2.unsqueeze(dim=1), p = 1).to(hist1.device)
-        # res = ot.emd2(h1_prob, h2_prob, cost_matrix, center_dual = False)
+        # res = ot.emd2(h1_prob, h2_prob, cost_matrix)
         
         return res
     
@@ -130,7 +130,7 @@ class Adjust_Distribution():
         self.backend = Backend(device, self.to_types)
         self.model1, self.model2 = self.backend(self.model1, self.model2)
         
-        if self.fix_method == 'pred':
+        if self.fix_method == 'source':
             alpha = trial.suggest_float("alpha", 1e-6, 1e1, log = True)
             lam = trial.suggest_float("lam", 1e-6, 1e1, log = True)
         
@@ -173,7 +173,7 @@ class Adjust_Distribution():
     def best_parameters(self, study):
         best_trial = study.best_trial
         
-        if self.fix_method == 'pred':
+        if self.fix_method == 'source':
             a1 = 1
             lam1 = 1
             
