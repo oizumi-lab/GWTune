@@ -112,8 +112,13 @@ delete_study = False
 
 # set the device ('cuda' or 'cpu') and variable type ('torch' or 'numpy')
 <<<<<<< HEAD
+<<<<<<< HEAD
 device = "cpu"
 to_types = "numpy"
+=======
+device = 'cuda:3'
+to_types = 'torch'
+>>>>>>> f4d5dc57853a99a733f864a4a0e5f43c4d09e582
 =======
 device = 'cuda:3'
 to_types = 'torch'
@@ -209,6 +214,7 @@ search_space = {"eps": eps_space, "initialize": init_plans}
 
 # 2. run optimzation
 <<<<<<< HEAD
+<<<<<<< HEAD
 # parallel = 'thread' or 'multiprocessing', default is 'multiprocessing'
 study = opt.run_study(
     test_gw,
@@ -220,6 +226,10 @@ study = opt.run_study(
     eps_log=eps_log,
     search_space=search_space,
 )
+=======
+# parallelは無意味だということがわかった, default is None
+study = opt.run_study(test_gw, device, parallel = None, init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log, search_space = search_space)
+>>>>>>> f4d5dc57853a99a733f864a4a0e5f43c4d09e582
 =======
 # parallelは無意味だということがわかった, default is None
 study = opt.run_study(test_gw, device, parallel = None, init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log, search_space = search_space)
