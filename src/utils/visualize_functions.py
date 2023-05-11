@@ -82,53 +82,6 @@ def get_color_labels_for_category(n_category_list, min_saturation, show_labels =
         plt.show()
 
     return color_labels, main_colors
-
-    
-def plot_embedding_2d(embedding_list, markers_list, color_label = None, group_color = None, marker_size = 30, name_list = None, category_list = None, main_colors = None, title = None, title_fontsize = 20, legend = True, legend_fontsize = 12, save_dir = None):
-    """plot embedding list
-
-    Args:
-        embedding_list (list): list of embeddings
-        markers_list (list): list of markers for each groups
-        color_label (list): color labels for each objects
-        group_color (list): color labels for each groups. Defaults to None.
-        name_list (list, optional): list of names for each groups. Defaults to None.
-        category_list (list, optional): list of names for each categories. Defaults to None.
-        main_colors (list, optional): list of representative color labels for each categories. Defaults to None.
-        title (string, optional): title of the figure. Defaults to None.
-        save_dir (string, optional): directory path for saving the figure. Defaults to None.
-    """
-    fig = plt.figure(figsize=(15, 15))
-    ax = fig.add_subplot(1, 1, 1)
-
-    if name_list == None:
-        name_list = [f"Group {i+1}" for i in range(len(embedding_list))]
-        
-    for i in range(len(embedding_list)):
-        if color_label is not None:
-            color = color_label
-        else: 
-            color = group_color[i]
-        coords_i = embedding_list[i]
-        ax.scatter(x=coords_i[:, 0], y=coords_i[:, 1],
-               marker=markers_list[i], color=color, s = marker_size, alpha = 1,label = name_list[i])
-        ax.set_xticks([])
-        ax.set_yticks([])
-        ax.set_xlabel("PC1", fontsize=14)
-        ax.set_ylabel("PC2", fontsize=14)
-        if legend == True:
-            ax.legend(fontsize=legend_fontsize, loc= "best")
-            if category_list is not None:
-                for i, category in enumerate(category_list):
-                    ax.scatter([], [], marker = "o", color = main_colors[i], s = 30, alpha = 1, label = category)
-                    ax.legend(fontsize=legend_fontsize, loc= "best")
-
-    if title is not  None:
-        plt.title(title, fontsize = title_fontsize)
-    if save_dir is not None:
-        plt.savefig(save_dir)
-        
-    plt.show()
         
 
 def show_heatmap(matrix, title, category_name_list = None, num_category_list = None, object_labels = None, ticks = None, ticks_size = None, xlabel = None, ylabel = None, file_name = None):
@@ -162,7 +115,15 @@ def show_heatmap(matrix, title, category_name_list = None, num_category_list = N
         plt.savefig(file_name)
     plt.show() 
     
-    
+
+def plot_lower_triangular_histogram(matrix, title):
+    lower_triangular = np.tril(matrix)
+    lower_triangular = lower_triangular.flatten()
+    plt.hist(lower_triangular)
+    plt.title(title)
+    plt.show()
+
+
 class Visualize_Embedding():
     def __init__(self, embedding_list : List[np.ndarray], name_list = None, color_labels = None, category_name_list = None, category_num_list = None, category_idx_list = None) -> None:
         self.embedding_list = embedding_list

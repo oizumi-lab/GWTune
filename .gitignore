@@ -18,6 +18,10 @@ pyproject.toml
 
 .history/
 .vscode/
+<<<<<<< HEAD
 
  .history/
 .mypy_cache/
+=======
+*.png
+>>>>>>> f4d5dc57853a99a733f864a4a0e5f43c4d09e582
