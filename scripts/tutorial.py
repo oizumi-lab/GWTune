@@ -111,15 +111,15 @@ save_path = "../results/gw_alignment/" + filename
 delete_study = False
 
 # set the device ('cuda' or 'cpu') and variable type ('torch' or 'numpy')
-device = "cuda:3"
-to_types = "torch"
+device = 'cuda:3'
+to_types = 'torch'
 
 # the number of jobs
 n_jobs = 4
 
 # Specify the RDB to use for distributed calculations
-sql_name = "sqlite"
-storage = "sqlite:///" + save_path + "/" + filename + ".db"
+sql_name = 'sqlite'
+storage = "sqlite:///" + save_path +  '/' + filename + '.db'
 # sql_name = 'mysql'
 # storage = 'mysql+pymysql://root:olabGPU61@localhost/GridTest'
 
@@ -134,7 +134,7 @@ init_plans_list = ["random"]
 # init_plans_list = ['uniform', 'random']
 
 # set the number of trials, i.e., the number of epsilon values tested in optimization: default : 20
-num_trial = 20
+num_trial = 10
 
 # the number of random initial matrices for 'random' or 'permutation' options：default: 100
 n_iter = 10
@@ -149,7 +149,7 @@ numItermax = 1000
 # 'random': randomly select epsilon between the range of epsilon
 # 'grid': grid search between the range of epsilon
 # 'tpe': Bayesian sampling
-sampler_name = "random"
+sampler_name = 'tpe'
 
 # set the range of epsilon
 # set only the minimum value and maximum value for 'tpe' sampler
@@ -169,18 +169,16 @@ eps_log = True  # use log scale if True
 #   min_resource: Do not activate the pruner for each trial below this step
 #   reduction_factor: How often to check for pruning. Smaller values result in more frequent pruning checks. Between 2 to 6.
 # 'nop': no pruning
-pruner_name = "hyperband"
-pruner_params = {"n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 3, "reduction_factor": 2}
+pruner_name = 'hyperband'
+pruner_params = {'n_startup_trials': 1, 'n_warmup_steps': 2, 'min_resource': 2, 'reduction_factor' : 3}
 
 #%%
 # distribution in the source space, and target space
 p = ot.unif(len(C1))
 q = ot.unif(len(C2))
 
-# generate instance solves gw_alignment
-test_gw = GW_Alignment(
-    C1, C2, p, q, save_path, max_iter=max_iter, numItermax=numItermax, n_iter=n_iter, to_types=to_types
-)
+# generate instance solves gw_alignment　
+test_gw = GW_Alignment(C1, C2, p, q, save_path, max_iter = max_iter, n_iter = n_iter, to_types = to_types)
 
 # generate instance optimize gw_alignment
 opt = load_optimizer(
@@ -208,15 +206,26 @@ eps_space = opt.define_eps_space(eps_list, eps_log, num_trial)
 search_space = {"eps": eps_space, "initialize": init_plans}
 
 # 2. run optimzation
-# parallelは無意味だということがわかった, default is None
+<<<<<<< HEAD
+<<<<<<< HEAD
+# parallel = 'thread' or 'multiprocessing', default is 'multiprocessing'
 study = opt.run_study(
     test_gw,
     device,
+    # parallel="multiprocessing",
+    parallel="thread",
     init_plans_list=init_plans,
     eps_list=eps_list,
     eps_log=eps_log,
     search_space=search_space,
 )
+=======
+# parallelは無意味だということがわかった, default is None
+study = opt.run_study(test_gw, device, parallel = None, init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log, search_space = search_space)
+>>>>>>> f4d5dc57853a99a733f864a4a0e5f43c4d09e582
+=======
+# parallelは無意味だということがわかった, default is None
+study = opt.run_study(test_gw, device, parallel = None, init_plans_list = init_plans, eps_list = eps_list, eps_log = eps_log, search_space = search_space)
 
 #%%
 ### View Results

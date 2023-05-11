@@ -8,16 +8,15 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import itertools
 from scipy.spatial import distance
-from sklearn.manifold import MDS
+from scipy.stats import spearmanr, pearsonr
+from sklearn import manifold
 import ot
 import sys
 import os
 from typing import List
 
-from utils.utils_functions import procrustes, shuffle_RDM, RSA_get_corr, get_category_idx, shuffle_symmetric_block_mat
-from utils.visualize_functions import show_heatmap, Visualize_Embedding, plot_lower_triangular_histogram
-from utils.evaluation import pairwise_k_nearest_matching_rate, calc_correct_rate_ot_plan
-from utils.histogram_matching import histogram_matching
+from utils.utils_functions import procrustes, get_category_idx
+from utils import visualize_functions, evaluation
 from gw_alignment import run_main_gw, Optimization_Config
 
 
@@ -25,7 +24,7 @@ class Representation:
     """
     A class object that has information of a representation, such as embeddings and similarity matrices
     """
-    def __init__(self, name, sim_mat = None, embedding = None, metric = "cosine") -> None:
+    def __init__(self, name, sim_mat = None, get_embedding = True, embedding = None, metric = "cosine") -> None:
         """_summary_
 
         Args:
@@ -41,7 +40,8 @@ class Representation:
             self.sim_mat = self._get_sim_mat()
         elif embedding is None:
             self.sim_mat = sim_mat
-            self.embedding = self._get_embedding()
+            if get_embedding:
+                self.embedding = self._get_embedding()
         else:
             self.embedding = embedding
             self.sim_mat = sim_mat
@@ -55,31 +55,38 @@ class Representation:
         return distance.cdist(self.embedding, self.embedding, metric = metric)
     
     def _get_shuffled_sim_mat(self):
-        return shuffle_RDM(self.sim_mat)
+        """ 
+        The function for shuffling the lower trianglar matrix.
+        """
+        # Get the lower triangular elements of the matrix
+        lower_tri = self.sim_mat[np.tril_indices(self.sim_mat.shape[0], k=-1)]
+        # Shuffle the lower triangular elements
+        np.random.shuffle(lower_tri)
+        # Create a new matrix with the shuffled lower triangular elements
+        shuffled_matrix = np.zeros_like(self.sim_mat)
+        shuffled_matrix[np.tril_indices(shuffled_matrix.shape[0], k=-1)] = lower_tri
+        shuffled_matrix = shuffled_matrix + shuffled_matrix.T
+        return shuffled_matrix
     
     def _get_embedding(self):
-        MDS_embedding = MDS(n_components = 3, dissimilarity = 'precomputed', random_state = 0)
+        MDS_embedding = manifold.MDS(n_components = 3, dissimilarity = 'precomputed', random_state = 0)
         embedding = MDS_embedding.fit_transform(self.sim_mat)
         return embedding
         
-    def show_sim_mat(self, ticks_size = None, label = None):
-        show_heatmap(self.sim_mat, title = self.name, ticks_size = ticks_size, xlabel = label, ylabel = label)
+    def show_sim_mat(self, ticks_size = None, label = None, fig_dir = None):
+        fig_path = os.path.join(fig_dir, f"RDM_{self.name}.png") if fig_dir is not None else None
+        visualize_functions.show_heatmap(self.sim_mat, title = self.name, ticks_size = ticks_size, xlabel = label, ylabel = label, file_name = fig_path)
         
     def show_sim_mat_distribution(self):
-        plot_lower_triangular_histogram(self.sim_mat, title = f"Distribution of RDM ({self.name})")
-    
-    def show_embedding(self, dim = 3):
-        visualize_embedding = Visualize_Embedding(embedding_list = [self.embedding], name_list = [self.name])
-        visualize_embedding.plot_embedding(dim = dim)
-    
-    def procrustes(self, target, Pi):
-        Q, self.embedding = procrustes(target.embedding, self.embedding, Pi)  
+        lower_triangular = np.tril(self.sim_mat)
+        lower_triangular = lower_triangular.flatten()
+        plt.hist(lower_triangular)
+        plt.title(f"Distribution of RDM ({self.name})")
+        plt.show()
         
-    def RSA(self, target):
-        return RSA_get_corr(self.sim_mat, target.sim_mat)
-    
-    def histogram_matching(self, target):
-        self.sim_mat = histogram_matching(target.sim_mat, self.sim_mat)
+    def show_embedding(self, dim = 3):
+        visualize_embedding = visualize_functions.Visualize_Embedding(embedding_list = [self.embedding], name_list = [self.name])
+        visualize_embedding.plot_embedding(dim = dim)
     
     
 class Pairwise_Analysis:
@@ -104,17 +111,20 @@ class Pairwise_Analysis:
         self.k_nearest_matching_rate = pd.DataFrame()
         self.pair_name = f"{target.name} vs {source.name}"
     
-    def RSA(self, shuffle = False):
-        if not shuffle:
-            corr = RSA_get_corr(self.source.sim_mat, self.target.sim_mat)
-        else:
-            corr = RSA_get_corr(self.source.shuffled_sim_mat, self.target.shuffled_sim_mat)
+    def RSA(self, shuffle = False, metric = "spearman"):
+        RDM_source, RDM_target = (self.source.sim_mat, self.target.sim_mat) if not shuffle else (self.source.shuffled_sim_mat, self.target.shuffled_sim_mat)
+        upper_tri_source = RDM_source[np.triu_indices(RDM_source.shape[0], k=1)]
+        upper_tri_target = RDM_target[np.triu_indices(RDM_target.shape[0], k=1)]
+        if metric == "spearman":
+            corr, _ = spearmanr(upper_tri_source, upper_tri_target)
+        elif metric == "pearson":
+            corr, _ = pearsonr(upper_tri_source, upper_tri_target)
         return corr
     
     def match_sim_mat_distribution(self):
-        self.source.histogram_matching(self.target)
+        pass
     
-    def run_gw(self, shuffle, ticks_size = None, load_OT = False):
+    def run_gw(self, shuffle, ticks_size = None, load_OT = False, fig_dir = None):
         """
         Main computation
         """            
@@ -122,7 +132,7 @@ class Pairwise_Analysis:
                 self.shuffled_OT = self._gw_alignment(shuffle = shuffle, load_OT = load_OT)
         else:
                 self.OT = self._gw_alignment(shuffle = shuffle, load_OT = load_OT)
-        self._show_OT(title = f"$\Gamma$ ({self.pair_name}) {'(shuffle)' if shuffle else ''} ", shuffle = shuffle, ticks_size = ticks_size)
+        self._show_OT(title = f"$\Gamma$ ({self.pair_name}) {'(shuffle)' if shuffle else ''} ", shuffle = shuffle, ticks_size = ticks_size, fig_dir = fig_dir)
         
     def _gw_alignment(self, results_dir = "../results/", shuffle = False, load_OT = False):
         filename = self.config.data_name + " " + self.pair_name
@@ -133,9 +143,10 @@ class Pairwise_Analysis:
     def _get_optimization_log(self):
         pass
     
-    def _show_OT(self, title, shuffle : bool, ticks_size = None):
+    def _show_OT(self, title, shuffle : bool, ticks_size = None, fig_dir = None):
         OT = self.OT if not shuffle else self.shuffled_OT
-        show_heatmap(matrix = OT, title = title, ticks_size = ticks_size)
+        fig_path = os.path.join(fig_dir, f"OT_{self.pair_name}.png") if fig_dir is not None else None
+        visualize_functions.show_heatmap(matrix = OT, title = title, ticks_size = ticks_size, file_name = fig_path)
     
     def calc_top_k_accuracy(self, k_list, shuffle : bool):
         OT = self.OT if not shuffle else self.shuffled_OT
@@ -153,26 +164,26 @@ class Pairwise_Analysis:
     def _eval_accuracy(self, OT, k_list, eval_type = "ot_plan", supervised = False, metric = "cosine"):
         top_n_list = k_list
 
-        OT = OT if not supervised else np.diag([1/1854 for i in range(1854)])
+        OT = OT if not supervised else np.diag([1/len(self.target.sim_mat) for i in range(len(self.target.sim_mat))])
         acc_list = list()
         for k in top_n_list:
             if eval_type == "k_nearest":
                 Q, new_embedding_source = procrustes(self.target.embedding, self.source.embedding, OT)
-                acc = pairwise_k_nearest_matching_rate(self.target.embedding, new_embedding_source, top_n = k, metric = metric)
+                acc = evaluation.pairwise_k_nearest_matching_rate(self.target.embedding, new_embedding_source, top_n = k, metric = metric)
             elif eval_type == "ot_plan":
-                acc = calc_correct_rate_ot_plan(OT, top_n = k)
+                acc = evaluation.calc_correct_rate_ot_plan(OT, top_n = k)
             acc_list.append(acc)
         return acc_list
     
     def procrustes(self):
-        self.source.procrustes(self.target, self.OT)
+        Q, self.source.embedding = procrustes(self.target.embedding, self.source.embedding, self.OT)
         
     def visualize_embedding(self, dim = 3, category_name_list = None, category_num_list = None, category_idx_list = None):
         self.procrustes()
         embedding_list = [self.target.embedding, self.source.embedding]
         name_list = [self.target.name, self.source.name]
         
-        visualize_embedding = Visualize_Embedding(embedding_list = embedding_list, name_list = name_list, category_name_list = category_name_list, category_num_list = category_num_list, category_idx_list = category_idx_list)
+        visualize_embedding = visualize_functions.Visualize_Embedding(embedding_list = embedding_list, name_list = name_list, category_name_list = category_name_list, category_num_list = category_num_list, category_idx_list = category_idx_list)
         visualize_embedding.plot_embedding(dim = dim)
   
   
@@ -203,25 +214,25 @@ class Align_Representations:
             print(f"Pair number {i} : {pairwise.pair_name}")
         return pairwise_list
 
-    def RSA_get_corr(self, shuffle = False):
+    def RSA_get_corr(self, shuffle = False, metric = "spearman"):
         for pairwise in self.pairwise_list:
-            corr = pairwise.RSA(shuffle)
+            corr = pairwise.RSA(shuffle = shuffle, metric = metric)
             self.RSA_corr[pairwise.pair_name] = corr
             print(f"Correlation {pairwise.pair_name} : {corr}")
     
-    def show_sim_mat(self, ticks_size = None, label = None, title = None, show_distribution = True):
+    def show_sim_mat(self, ticks_size = None, label = None, fig_dir = None, show_distribution = True):
         for representation in self.representations_list:
-            representation.show_sim_mat(ticks_size = ticks_size, label = label)
+            representation.show_sim_mat(ticks_size = ticks_size, label = label, fig_dir = fig_dir)
             if show_distribution:
                 representation.show_sim_mat_distribution()
     
-    def gw_alignment(self, pairnumber_list = "all", shuffle = False, ticks_size = None, load_OT = False):
+    def gw_alignment(self, pairnumber_list = "all", shuffle = False, ticks_size = None, load_OT = False, fig_dir = None):
         if pairnumber_list == "all":
             pairnumber_list = [i for i in range(len(self.pairwise_list))]
         self.pairnumber_list = pairnumber_list
         for pairnumber in self.pairnumber_list:
             pairwise = self.pairwise_list[pairnumber]
-            pairwise.run_gw(shuffle = shuffle, ticks_size = ticks_size, load_OT = load_OT)
+            pairwise.run_gw(shuffle = shuffle, ticks_size = ticks_size, load_OT = load_OT, fig_dir = fig_dir)
             
     def barycenter_alignment(self):
         pass
@@ -259,7 +270,7 @@ class Align_Representations:
             df = df.rename("matching rate")
         return df
         
-    def plot_accuracy(self, eval_type = "ot_plan", shuffle = False, save_fig = True, scatter = True):
+    def plot_accuracy(self, eval_type = "ot_plan", shuffle = False, fig_dir = None, fig_name = None, scatter = True):
         plt.figure(figsize = (5, 3)) 
         if scatter:
             df = self._get_dataframe(eval_type, shuffle = shuffle, concat = True)
@@ -276,17 +287,20 @@ class Align_Representations:
         #plt.legend(loc = "best")
         plt.tick_params(axis = "both", which = "major")
         plt.subplots_adjust(left=0.2, right=0.9, bottom = 0.2)
+        if fig_dir is not None:
+            plt.savefig(os.path.join(fig_dir, fig_name))
         plt.show()
     
-    def visualize_embedding(self, dim = 3, color_labels = None, category_name_list = None, category_num_list = None, category_idx_list = None):
+    def visualize_embedding(self, dim = 3, color_labels = None, category_name_list = None, category_num_list = None, category_idx_list = None, fig_dir = None):
         for i in range(len(self.pairwise_list) // 2):
             pair = self.pairwise_list[i]
             pair.procrustes()
         embedding_list = [self.representations_list[i].embedding for i in range(len(self.representations_list))]
         name_list = [self.representations_list[i].name for i in range(len(self.representations_list))]
-
-        visualize_embedding = Visualize_Embedding(embedding_list = embedding_list, name_list = name_list, color_labels = color_labels, category_name_list = category_name_list, category_num_list = category_num_list, category_idx_list = category_idx_list)
-        visualize_embedding.plot_embedding(dim = dim)
+        fig_path = os.path.join(fig_dir, "Aligned_embedding.png") if fig_dir is not None else None
+        
+        visualize_embedding = visualize_functions.Visualize_Embedding(embedding_list = embedding_list, name_list = name_list, color_labels = color_labels, category_name_list = category_name_list, category_num_list = category_num_list, category_idx_list = category_idx_list)
+        visualize_embedding.plot_embedding(dim = dim, save_dir = fig_path)
 
 #%%
 if __name__ == "__main__":

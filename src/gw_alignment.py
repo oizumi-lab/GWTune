@@ -468,6 +468,26 @@ def run_main_gw(config: Optimization_Config, RDM_source, RDM_target, results_dir
         OT = np.load(save_path + f"/{config.init_plans_list[0]}/gw_{best_trial.number}.npy")
     return OT
 
+<<<<<<< HEAD
+=======
+        ### optimization
+        # 1. 初期値の選択。実装済みの初期値条件の抽出をgw_optimizer.pyからinit_matrix.pyに移動しました。
+        init_plans = InitMatrix().implemented_init_plans(config.init_plans_list)
+
+        # used only in grid search sampler below the two lines
+        eps_space = opt.define_eps_space(config.eps_list, config.eps_log, config.num_trial)
+        search_space = {"eps": eps_space, "initialize": init_plans}
+        if not load_OT:
+            # 2. run optimzation
+            study = opt.run_study(test_gw, config.device, init_plans_list = init_plans, eps_list = config.eps_list, eps_log = config.eps_log, search_space = search_space)
+            best_trial = study.best_trial
+            OT = np.load(save_path+f'/{config.init_plans_list[0]}/gw_{best_trial.number}.npy')
+        else:
+            study = opt.run_study(test_gw, config.device, init_plans_list = init_plans, eps_list = config.eps_list, eps_log = config.eps_log, search_space = search_space, forced_run = False)
+            best_trial = study.best_trial
+            OT = np.load(save_path+f'/{config.init_plans_list[0]}/gw_{best_trial.number}.npy')
+        return OT
+>>>>>>> f7f16b544546c7ec5faa51c6e4ef7feec113c1b1
 
 # %%
 if __name__ == "__main__":
