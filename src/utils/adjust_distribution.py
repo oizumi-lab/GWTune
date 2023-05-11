@@ -217,12 +217,12 @@ class Adjust_Distribution():
         # np.fill_diagonal(model_numpy2, np.nan)
         mappable = ScalarMappable(cmap=plt.cm.jet, norm = colors.Normalize(vmin = 0, vmax = 1))
         
-        plt.title('model1 (a:{:.3g}, lam:{:.3g})'.format(a1, lam1))
+        plt.title('source (a:{:.3g}, lam:{:.3g})'.format(a1, lam1))
         plt.imshow(model_numpy1, cmap=plt.cm.jet)
         plt.colorbar(orientation='horizontal')
 
         plt.subplot(122)
-        plt.title('model2 (a:{:.3g}, lam:{:.3g})'.format(a2, lam2))
+        plt.title('target (a:{:.3g}, lam:{:.3g})'.format(a2, lam2))
         plt.imshow(model_numpy2, cmap=plt.cm.jet)
         plt.colorbar(orientation='horizontal')
 
@@ -241,8 +241,8 @@ class Adjust_Distribution():
         x = np.linspace(lim_min, lim_max, len(hist1))
         plt.figure()
         plt.title('histogram')
-        plt.bar(x, hist1.to('cpu').numpy(), label = 'model1 : AlexNet', alpha = 0.6, width = 9e-3)
-        plt.bar(x, hist2.to('cpu').numpy(), label = 'model2 : VGG19', alpha = 0.6, width = 9e-3)
+        plt.bar(x, hist1.to('cpu').numpy(), label = 'source', alpha = 0.6, width = 9e-3)
+        plt.bar(x, hist2.to('cpu').numpy(), label = 'target', alpha = 0.6, width = 9e-3)
     
         plt.legend()
         plt.xlabel('dis-similarity value')
