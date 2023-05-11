@@ -24,7 +24,7 @@ class Representation:
     """
     A class object that has information of a representation, such as embeddings and similarity matrices
     """
-    def __init__(self, name, sim_mat = None, embedding = None, metric = "cosine") -> None:
+    def __init__(self, name, sim_mat = None, get_embedding = True, embedding = None, metric = "cosine") -> None:
         """_summary_
 
         Args:
@@ -40,7 +40,8 @@ class Representation:
             self.sim_mat = self._get_sim_mat()
         elif embedding is None:
             self.sim_mat = sim_mat
-            self.embedding = self._get_embedding()
+            if get_embedding:
+                self.embedding = self._get_embedding()
         else:
             self.embedding = embedding
             self.sim_mat = sim_mat
