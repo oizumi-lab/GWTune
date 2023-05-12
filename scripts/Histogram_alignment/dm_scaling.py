@@ -2,8 +2,8 @@
 import sys
 sys.path.append("../../")
 
-from GW_alignment_abe import my_entropic_gromov_wasserstein, Entropic_GW
-from utils.histogram_matching import initialize_matrix
+# from GW_alignment_abe import my_entropic_gromov_wasserstein, Entropic_GW
+# from utils.histogram_matching import initialize_matrix
 
 import numpy as np
 import ot
@@ -61,10 +61,11 @@ def gw_alignment(X, Y, epsilon, random_init=False):
     """
     n = X.shape[0]
     if random_init:
-        T = initialize_matrix(n)
-        p,q = ot.unif(n), ot.unif(n)
-        gw, log = my_entropic_gromov_wasserstein(
-            C1=X, C2=Y, p=p, q=q, T=T, epsilon=epsilon, loss_fun="square_loss", verbose=True, log=True,stopping_rounds=5)
+        pass
+        # T = initialize_matrix(n)
+        # p,q = ot.unif(n), ot.unif(n)
+        # gw, log = my_entropic_gromov_wasserstein(
+        #     C1=X, C2=Y, p=p, q=q, T=T, epsilon=epsilon, loss_fun="square_loss", verbose=True, log=True,stopping_rounds=5)
     else:
         p = ot.unif(n)
         q = ot.unif(n)
