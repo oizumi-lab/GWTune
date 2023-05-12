@@ -558,7 +558,8 @@ if __name__ == "__main__":
     '''
     Unsupervised alignment between Representations
     '''
-    align_representations = Align_Representations(config = Optimization_Config(), representations_list = representations)
+    test_config = Optimization_Config(delete_study=False, n_jobs=1)
+    align_representations = Align_Representations(config = test_config, representations_list = representations)
     
     #%%
     # RSA
