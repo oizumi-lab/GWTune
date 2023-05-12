@@ -57,9 +57,6 @@ class HistogramMatching():
         y_t = x_sorted[y_inverse_idx]
         Y_t = sp.spatial.distance.squareform(y_t)
         return Y_t
-
-    def yeojohnson_transform(self, v, alpha, lam):
-        return alpha * ((np.power(1 + v, lam) - 1) / lam)
         
 
 # %%
