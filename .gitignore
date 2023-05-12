@@ -16,6 +16,5 @@ src/GW_alignment.py
 *.python-version
 pyproject.toml
 
-.history/
+.history
 .vscode/
-*.png

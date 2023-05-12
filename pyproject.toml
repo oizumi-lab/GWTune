@@ -35,6 +35,8 @@ torchvision = "^0.15.1"
 torchaudio = "^2.0.1"
 rsatoolbox = "^0.1.2"
 cryptography = "^40.0.1"
+sqlalchemy = "^2.0.9"
+django = "^4.2"
 
 [poetry.group.dev.dependencies]
 autopep8 = "^2.0.1"
