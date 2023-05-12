@@ -16,16 +16,5 @@ src/GW_alignment.py
 *.python-version
 pyproject.toml
 
-.history/
+.history
 .vscode/
-<<<<<<< HEAD
-<<<<<<< HEAD
-
- .history/
-.mypy_cache/
-=======
-*.png
->>>>>>> f4d5dc57853a99a733f864a4a0e5f43c4d09e582
-=======
-*.png
->>>>>>> f4d5dc57853a99a733f864a4a0e5f43c4d09e582
