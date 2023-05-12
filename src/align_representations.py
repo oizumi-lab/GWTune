@@ -22,7 +22,7 @@ class Optimization_Config:
     def __init__(
         self,
         data_name="THINGS",
-        delete_study=True,
+        delete_study=False,
         device="cpu",
         to_types="numpy",
         n_jobs=1,
@@ -114,8 +114,19 @@ class Representation():
         return embedding
         
     def show_sim_mat(self, ticks_size = None, label = None, fig_dir = None):
-        fig_path = os.path.join(fig_dir, f"RDM_{self.name}.png") if fig_dir is not None else None
-        visualize_functions.show_heatmap(self.sim_mat, title = self.name, ticks_size = ticks_size, xlabel = label, ylabel = label, file_name = fig_path)
+        if fig_dir is not None:
+            fig_path = os.path.join(fig_dir, f"RDM_{self.name}.png")
+        else:
+            fig_path = None
+        
+        visualize_functions.show_heatmap(
+            self.sim_mat, 
+            title = self.name, 
+            ticks_size = ticks_size, 
+            xlabel = label, 
+            ylabel = label, 
+            file_name = fig_path,
+        )
         
     def show_sim_mat_distribution(self):
         lower_triangular = np.tril(self.sim_mat)
@@ -125,7 +136,11 @@ class Representation():
         plt.show()
         
     def show_embedding(self, dim = 3):
-        visualize_embedding = visualize_functions.Visualize_Embedding(embedding_list = [self.embedding], name_list = [self.name])
+        visualize_embedding = visualize_functions.Visualize_Embedding(
+            embedding_list = [self.embedding], 
+            name_list = [self.name],
+        )
+        
         visualize_embedding.plot_embedding(dim = dim)
     
 class Pairwise_Analysis():
@@ -275,11 +290,13 @@ class Pairwise_Analysis():
     def _eval_accuracy(self, OT, k_list, eval_type = "ot_plan", supervised = False, metric = "cosine"):
         top_n_list = k_list
 
-        OT = OT if not supervised else np.diag([1/len(self.target.sim_mat) for i in range(len(self.target.sim_mat))])
+        if supervised:
+            OT = np.diag([1/len(self.target.sim_mat) for i in range(len(self.target.sim_mat))])
+        
         acc_list = list()
         for k in top_n_list:
             if eval_type == "k_nearest":
-                new_embedding_source = self.procrustes(self.target.embedding, self.source.embedding, OT)
+                new_embedding_source = self._procrustes(self.target.embedding, self.source.embedding, OT)
                 acc = self.pairwise_k_nearest_matching_rate(self.target.embedding, new_embedding_source, top_n = k, metric = metric)
             
             elif eval_type == "ot_plan":
@@ -469,7 +486,14 @@ class Align_Representations():
             plt.savefig(os.path.join(fig_dir, fig_name))
         plt.show()
     
-    def visualize_embedding(self, dim = 3, color_labels = None, category_name_list = None, category_num_list = None, category_idx_list = None, fig_dir = None):
+    def visualize_embedding(self, 
+                            dim = 3, 
+                            color_labels = None, 
+                            category_name_list = None, 
+                            category_num_list = None, 
+                            category_idx_list = None, 
+                            fig_dir = None):
+        
         for i in range(len(self.pairwise_list) // 2):
             pair = self.pairwise_list[i]
             pair.procrustes()
@@ -478,7 +502,15 @@ class Align_Representations():
         name_list = [self.representations_list[i].name for i in range(len(self.representations_list))]
         fig_path = os.path.join(fig_dir, "Aligned_embedding.png") if fig_dir is not None else None
         
-        visualize_embedding = visualize_functions.Visualize_Embedding(embedding_list = embedding_list, name_list = name_list, color_labels = color_labels, category_name_list = category_name_list, category_num_list = category_num_list, category_idx_list = category_idx_list)
+        visualize_embedding = visualize_functions.Visualize_Embedding(
+            embedding_list = embedding_list,
+            name_list = name_list,
+            color_labels = color_labels,
+            category_name_list = category_name_list,
+            category_num_list = category_num_list,
+            category_idx_list = category_idx_list
+        )
+        
         visualize_embedding.plot_embedding(dim = dim, save_dir = fig_path)
 
 
@@ -535,7 +567,7 @@ if __name__ == "__main__":
     
     #%%
     # Run gw
-    align_representations.gw_alignment(load_OT = False)
+    align_representations.gw_alignment(load_OT = True)
     #%%
     '''
     Evaluate the accuracy
