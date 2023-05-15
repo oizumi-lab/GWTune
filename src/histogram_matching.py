@@ -30,22 +30,15 @@ from utils.backend import Backend
 
 # %%
 class HistogramMatching():
-    def __init__(self, source, target, matching_compute_path, fixed_array = 'target', to_types = 'torch'):
+    def __init__(self, source, target, to_types = 'torch'):
         self.source = source
         self.target = target
-        
-        self.matching_compute_path = matching_compute_path
-        self.fixed_array = fixed_array
   
         self.to_types = to_types
 
-        # hyperparameter
-        self.alpha1, self.alpha2 = 1, 1
-        self.lam1, self.lam2 = 1, 1
-        self.fixed_array = "X"
-
     def sort_for_scaling(self, data):
-        x = sp.spatial.distance.squareform(data)
+        # x = sp.spatial.distance.squareform(data)
+        x = data.flatten()
         x_sorted = np.sort(x)
         x_inverse_idx = np.argsort(x).argsort()
         return x, x_sorted, x_inverse_idx
@@ -55,7 +48,7 @@ class HistogramMatching():
         y, y_sorted, y_inverse_idx = self.sort_for_scaling(Y)
     
         y_t = x_sorted[y_inverse_idx]
-        Y_t = sp.spatial.distance.squareform(y_t)
+        Y_t = y_t.reshape(Y.shape) #= sp.spatial.distance.squareform(y_t)
         return Y_t
         
 

@@ -18,6 +18,7 @@ from typing import List
 from utils.utils_functions import get_category_idx
 from utils import visualize_functions, backend, init_matrix, gw_optimizer
 from gw_alignment import GW_Alignment
+from histogram_matching import HistogramMatching
 
 class Optimization_Config:
     def __init__(
@@ -85,7 +86,7 @@ class Representation():
         if self.shuffle:
             self.shuffled_sim_mat = self._get_shuffled_sim_mat()
 
-    def _get_shuffled_sim_mat(self):
+    def _get_shuffled_sim_mat(self):# ここも、torchでも対応できるようにする必要がある。
         """ 
         The function for shuffling the lower trianglar matrix.
         """
@@ -107,9 +108,9 @@ class Representation():
         else:
             metric = self.metric
         
-        return distance.cdist(self.embedding, self.embedding, metric = metric)
+        return distance.cdist(self.embedding, self.embedding, metric = metric)# ここも、torchでも対応できるようにする必要がある。backendにdistを定義すたら良いと思う。
     
-    def _get_embedding(self):
+    def _get_embedding(self):# ここも、torchでも対応できるようにする必要がある。sklearnはtorchで使えない。
         MDS_embedding = manifold.MDS(n_components = 3, dissimilarity = 'precomputed', random_state = 0)
         embedding = MDS_embedding.fit_transform(self.sim_mat)
         return embedding
@@ -129,7 +130,7 @@ class Representation():
             file_name = fig_path,
         )
         
-    def show_sim_mat_distribution(self):
+    def show_sim_mat_distribution(self):# ここも、torchでも対応できるようにする必要がある。
         lower_triangular = np.tril(self.sim_mat)
         lower_triangular = lower_triangular.flatten()
         plt.hist(lower_triangular)
@@ -171,8 +172,28 @@ class Pairwise_Analysis():
             self.RDM_source = self.source.sim_mat
             self.RDM_target = self.target.sim_mat
             self.pair_name = f"{target.name} vs {source.name}"
+            
+        assert self.RDM_source.shape == self.RDM_target.shape, "the shape of sim_mat is not the same."
     
-    def RSA(self, metric = "spearman"):
+    def show_both_sim_mats(self):
+        
+        plt.figure()
+        plt.subplot(121)
+
+        plt.title('source : ' + self.source.name)
+        plt.imshow(self.RDM_source, cmap=plt.cm.jet)
+        plt.colorbar(orientation='horizontal')
+
+        plt.subplot(122)
+        plt.title('target : ' + self.target.name)
+        plt.imshow(self.RDM_target , cmap=plt.cm.jet)
+        plt.colorbar(orientation='horizontal')
+
+        plt.tight_layout()
+        plt.show()
+        
+    
+    def RSA(self, metric = "spearman"):# ここも、torchでも対応できるようにする必要がある。
         upper_tri_source = self.RDM_source[np.triu_indices(self.RDM_source.shape[0], k=1)]
         upper_tri_target = self.RDM_target[np.triu_indices(self.RDM_target.shape[0], k=1)]
         
@@ -184,7 +205,17 @@ class Pairwise_Analysis():
         return corr
     
     def match_sim_mat_distribution(self):
-        pass
+        
+        # source = self.RDM_source
+        # source[range(len(source)), range(len(source))] = 0
+        
+        # target = self.RDM_target
+        # target[range(len(target)), range(len(target))] = 0
+        
+        matching = HistogramMatching(self.RDM_source, self.RDM_target)
+        
+        self.RDM_target = matching.pointwise_matching(self.RDM_source, self.RDM_target)
+        
     
     def run_gw(self, ticks_size = None, load_OT = False, fig_dir = None):
         """
@@ -281,17 +312,22 @@ class Pairwise_Analysis():
         df["top_n"] = top_n_list
 
         if supervised:
-            OT = np.diag([1/len(self.target.sim_mat) for _ in range(len(self.target.sim_mat))])
+            OT = np.diag([1/len(self.target.sim_mat) for _ in range(len(self.target.sim_mat))]) # ここも、torchでも対応できるようにする必要がある。
         else:
             OT = self.OT
         
         acc_list = list()
         for k in top_n_list:
             if eval_type == "k_nearest":
+                """
+                2023.5.15 佐々木
+                ここのtop_kの算出方法は直すべき箇所で間違いないが、
+                全く本質的ではないので、全部公開するときに直した方がいい。
+                """
                 new_embedding_source = self.procrustes(self.target.embedding, self.source.embedding, OT)
                 
                 # Compute distances between each points
-                dist_mat = distance.cdist(self.target.embedding, new_embedding_source, metric)
+                dist_mat = distance.cdist(self.target.embedding, new_embedding_source, metric) # ここも、torchでも対応できるようにする必要がある。
 
                 # Get sorted indices 
                 sorted_idx = np.argsort(dist_mat, axis = 1)
@@ -335,6 +371,8 @@ class Pairwise_Analysis():
             new_embedding_2 : shape (n_2, m)
         """
         assert self.source.shuffle == False, "you cannot use procrustes method if 'shuffle' is True."
+        
+        # ここも、torchでも対応できるようにする必要がある。
         U, S, Vt = np.linalg.svd(np.matmul(embedding_2.T, np.matmul(Pi, embedding_1)))
         Q = np.matmul(U, Vt)
         new_embedding_2 = np.matmul(embedding_2, Q)
