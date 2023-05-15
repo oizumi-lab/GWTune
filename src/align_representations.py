@@ -16,7 +16,7 @@ import os
 from typing import List
 
 from utils.utils_functions import procrustes, get_category_idx
-from utils import visualize_functions, evaluation
+from utils import visualize_functions, evaluation, histogram_matching
 from gw_alignment import run_main_gw, Optimization_Config
 
 def get_category_idx(category_mat, category_name_list, show_numbers = False):
@@ -86,6 +86,7 @@ class Representation:
             self.embedding = embedding
             self.sim_mat = sim_mat
         self.shuffled_sim_mat = self._get_shuffled_sim_mat()
+        self.adjusted_sim_mat = 0
         
         self.category_mat = category_mat
         self.object_labels, self.category_idx_list, self.num_category_list, self.category_name_list = self._get_index_data(category_mat, category_name_list)
@@ -190,23 +191,29 @@ class Pairwise_Analysis:
             corr, _ = pearsonr(upper_tri_source, upper_tri_target)
         return corr
     
-    def match_sim_mat_distribution(self):
-        pass
+    def _match_sim_mat_distribution(self):
+        self.target.adjusted_sim_mat = histogram_matching.histogram_matching(self.source.sim_mat, self.target.sim_mat)
     
-    def run_gw(self, shuffle, ticks_size = None, load_OT = False, fig_dir = None):
+    def run_gw(self, histogram_matching = False, shuffle = False, ticks_size = None, load_OT = False, results_dir = "../results/", fig_dir = None):
         """
         Main computation
         """            
-        if shuffle:     
-            self.shuffled_OT = self._gw_alignment(shuffle = shuffle, load_OT = load_OT)
-        else:
-            self.OT = self._gw_alignment(shuffle = shuffle, load_OT = load_OT)
-        
+        self.OT = self._gw_alignment(histogram_matching = histogram_matching, shuffle = shuffle, load_OT = load_OT)
         self._show_OT(title = f"$\Gamma$ ({self.pair_name}) {'(shuffle)' if shuffle else ''} ", shuffle = shuffle, ticks_size = ticks_size, fig_dir = fig_dir)
         
-    def _gw_alignment(self, results_dir = "../results/", shuffle = False, load_OT = False):
+    def _gw_alignment(self, histogram_matching, results_dir = "../results/", shuffle = False, load_OT = False):
         filename = self.config.data_name + " " + self.pair_name
-        RDM_source, RDM_target = (self.source.sim_mat, self.target.sim_mat) if not shuffle else (self.source.shuffled_sim_mat, self.target.shuffled_sim_mat)
+        if histogram_matching:
+            self._match_sim_mat_distribution()
+            RDM_source = self.source.sim_mat
+            RDM_target = self.adjusted_sim_mat
+        else:
+            if shuffle:
+                RDM_source = self.source.shuffled_sim_mat
+                RDM_target = self.target.shuffled_sim_mat
+            else:
+                RDM_source = self.source.sim_mat
+                RDM_target = self.target.sim_mat
         OT = run_main_gw(self.config, RDM_source, RDM_target, results_dir, filename, load_OT)
         return OT
           
@@ -347,13 +354,13 @@ class Align_Representations:
             if show_distribution:
                 representation.show_sim_mat_distribution()
     
-    def gw_alignment(self, pairnumber_list = "all", shuffle = False, ticks_size = None, load_OT = False, fig_dir = None):
+    def gw_alignment(self, pairnumber_list = "all", histogram_matching = False, shuffle = False, ticks_size = None, load_OT = False, fig_dir = None):
         if pairnumber_list == "all":
             pairnumber_list = [i for i in range(len(self.pairwise_list))]
         self.pairnumber_list = pairnumber_list
         for pairnumber in self.pairnumber_list:
             pairwise = self.pairwise_list[pairnumber]
-            pairwise.run_gw(shuffle = shuffle, ticks_size = ticks_size, load_OT = load_OT, fig_dir = fig_dir)
+            pairwise.run_gw(histogram_matching = histogram_matching, shuffle = shuffle, ticks_size = ticks_size, load_OT = load_OT, fig_dir = fig_dir)
             
     def barycenter_alignment(self):
         pass
@@ -378,11 +385,20 @@ class Align_Representations:
         print("K nearest matching rate : \n", self.k_nearest_matching_rate)
         print("Mean : \n", self.k_nearest_matching_rate.iloc[:, 1:].mean(axis = "columns"))
         
-    def calc_category_level_accuracy(self):
+    def calc_category_level_accuracy(self, make_hist = False, fig_dir = None, fig_name = "Category_level_accuracy.png"):
+        acc_list = []
         for pairnumber in self.pairnumber_list:
             pairwise = self.pairwise_list[pairnumber]
             acc = pairwise.calc_category_level_accuracy()
             print(f"{pairwise.pair_name} :  {acc}")
+            acc_list.append(acc)
+        
+        if make_hist:
+            plt.figure()
+            plt.hist(acc_list)
+            plt.xlabel("Accuracy")
+            plt.savefig(os.path.join(fig_dir, fig_name))
+            plt.show()
     
     def _get_dataframe(self, eval_type = "ot_plan", shuffle = False, concat = True):
         df = self.top_k_accuracy if eval_type == "ot_plan" else self.k_nearest_matching_rate         
