@@ -15,6 +15,7 @@ import sys
 import os
 from typing import List
 
+from utils.utils_functions import get_category_idx
 from utils import visualize_functions, backend, init_matrix, gw_optimizer
 from gw_alignment import GW_Alignment
 
@@ -159,9 +160,6 @@ class Pairwise_Analysis():
         self.source = source
         self.target = target
         
-        self.top_k_accuracy = pd.DataFrame()
-        self.k_nearest_matching_rate = pd.DataFrame()
-        
         assert self.source.shuffle == self.target.shuffle, "please use the same 'shuffle' both for source and target."
         
         if self.source.shuffle:
@@ -277,40 +275,53 @@ class Pairwise_Analysis():
             
         visualize_functions.show_heatmap(matrix = self.OT, title = title, ticks_size = ticks_size, file_name = fig_path)
     
-    def calc_top_k_accuracy(self, k_list):
-        self.top_k_accuracy["top_n"] = k_list
-        acc_list = self._eval_accuracy(OT = self.OT, k_list = k_list, eval_type = "ot_plan")
-        self.top_k_accuracy[self.pair_name] = acc_list
-    
-    def calc_k_nearest_matching_rate(self, k_list, metric):
-        self.k_nearest_matching_rate["top_n"] = k_list
-        acc_list = self._eval_accuracy(OT = self.OT, k_list = k_list, eval_type = "k_nearest", metric = metric)
-        self.k_nearest_matching_rate[self.pair_name] = acc_list
+    def eval_accuracy(self, top_n_list, eval_type = "ot_plan",  metric = "cosine", supervised = False):
+        df = pd.DataFrame()
         
-    def _eval_accuracy(self, OT, k_list, eval_type = "ot_plan", supervised = False, metric = "cosine"):
-        top_n_list = k_list
+        df["top_n"] = top_n_list
 
         if supervised:
-            OT = np.diag([1/len(self.target.sim_mat) for i in range(len(self.target.sim_mat))])
+            OT = np.diag([1/len(self.target.sim_mat) for _ in range(len(self.target.sim_mat))])
+        else:
+            OT = self.OT
         
         acc_list = list()
         for k in top_n_list:
             if eval_type == "k_nearest":
-                new_embedding_source = self._procrustes(self.target.embedding, self.source.embedding, OT)
-                acc = self.pairwise_k_nearest_matching_rate(self.target.embedding, new_embedding_source, top_n = k, metric = metric)
+                new_embedding_source = self.procrustes(self.target.embedding, self.source.embedding, OT)
+                
+                # Compute distances between each points
+                dist_mat = distance.cdist(self.target.embedding, new_embedding_source, metric)
+
+                # Get sorted indices 
+                sorted_idx = np.argsort(dist_mat, axis = 1)
+                # sorted_idx = np.argpartition(dist_mat, )
+
+                # Get the same colors and count k-nearest
+                acc = 0
+                for i in range(self.target.embedding.shape[0]):
+                    acc += (sorted_idx[i, :k]  == i).sum() 
+                acc /= self.target.embedding.shape[0]
+                acc *= 100
             
             elif eval_type == "ot_plan":
-                acc = self.calc_correct_rate_ot_plan(OT, top_n = k)
+                acc = 0
+                for i in range(OT.shape[0]):
+                    idx = np.argsort(-OT[i, :])
+                    acc += (idx[:k] == i).sum()    
+                acc /= OT.shape[0]
+                acc *= 100
             
             acc_list.append(acc)
         
-        return acc_list
+        df[self.pair_name] = acc_list
+        
+        return df
     
-    def procrustes(self):
-        assert self.source.shuffle == False, "you cannot use procrustes method if 'shuffle' is True."
-        self.source.embedding = self._procrustes(self.target.embedding, self.source.embedding, self.OT)
+    # def procrustes(self):
+    #     self.source.embedding = self._procrustes(self.target.embedding, self.source.embedding, self.OT)
 
-    def _procrustes(self, embedding_1, embedding_2, Pi):
+    def procrustes(self, embedding_1, embedding_2, Pi):
         """
         embedding_2をembedding_1に最も近づける回転行列Qを求める
 
@@ -323,48 +334,15 @@ class Pairwise_Analysis():
         Returns:
             new_embedding_2 : shape (n_2, m)
         """
+        assert self.source.shuffle == False, "you cannot use procrustes method if 'shuffle' is True."
         U, S, Vt = np.linalg.svd(np.matmul(embedding_2.T, np.matmul(Pi, embedding_1)))
         Q = np.matmul(U, Vt)
         new_embedding_2 = np.matmul(embedding_2, Q)
         
         return new_embedding_2
     
-    def calc_correct_rate_ot_plan(self, Pi, top_n):
-        count = 0
-        for i in range(Pi.shape[0]):
-            idx = np.argsort(-Pi[i, :])
-            count += (idx[:top_n] == i).sum()    
-        count /= Pi.shape[0]
-        count *= 100
-        
-        return count
-
-    def pairwise_k_nearest_matching_rate(self, embedding_1, embedding_2, top_n, metric = "cosine"):
-        """
-        Count it if a point of embedding_1 is in k-nearest neighbors of a corresponding point of embedding_2
-
-        Args:
-            embedding1 (_type_): _description_
-            embedding2 (_type_): _description_
-            top_n (_type_): _description_
-
-        Returns:
-            _type_: _description_
-        """
-        # Compute distances between each points
-        dist_mat = distance.cdist(embedding_1, embedding_2, metric)
-
-        # Get sorted indices 
-        sorted_idx = np.argsort(dist_mat, axis = 1)
-
-        # Get the same colors and count k-nearest
-        count = 0
-        for i in range(embedding_1.shape[0]):
-            count += (sorted_idx[i, :top_n]  == i).sum() 
-        count /= embedding_1.shape[0]
-        count *= 100 # return percentage
-
-        return count
+    def get_new_source_embedding(self):
+        return self.procrustes(self.target.embedding, self.source.embedding, self.OT)
 
 
 
@@ -373,20 +351,25 @@ class Align_Representations():
     This object has methods for conducting N groups level analysis and corresponding results.
     This has information of all pairs of representations.
     """
-    def __init__(self, config : Optimization_Config, representations_list : List[Representation], shuffle = False) -> None:
+    def __init__(self, config : Optimization_Config, representations_list : List[Representation], pair_number_list = "all", metric = 'cosine', shuffle = False) -> None:
         """
         Args:
             representations_list (list): a list of Representations
         """
         self.config = config
+        
+        self.metric = metric
         self.representations_list = representations_list
         self.pairwise_list = self._get_pairwise_list()
         
         self.RSA_corr = dict()
-        self.top_k_accuracy = pd.DataFrame()
-        self.k_nearest_matching_rate = pd.DataFrame()
         
         self.shuffle = shuffle
+        
+        if pair_number_list == "all":
+            pair_number_list = range(len(self.pairwise_list))
+        
+        self.pair_number_list = pair_number_list
 
     def _get_pairwise_list(self) -> List[Pairwise_Analysis]:
         pairs = list(itertools.combinations(self.representations_list, 2))
@@ -411,45 +394,39 @@ class Align_Representations():
             if show_distribution:
                 representation.show_sim_mat_distribution()
     
-    def gw_alignment(self, pairnumber_list = "all", ticks_size = None, load_OT = False, fig_dir = None):
-        if pairnumber_list == "all":
-            pairnumber_list = range(len(self.pairwise_list))
-        
-        self.pairnumber_list = pairnumber_list
-        
-        for pairnumber in self.pairnumber_list:
-            pairwise = self.pairwise_list[pairnumber]
+    def gw_alignment(self, ticks_size = None, load_OT = False, fig_dir = None):
+        for pair_number in self.pair_number_list:
+            pairwise = self.pairwise_list[pair_number]
             pairwise.run_gw(ticks_size = ticks_size, load_OT = load_OT, fig_dir = fig_dir)
             
     def barycenter_alignment(self):
         pass
        
-    def calc_top_k_accuracy(self, k_list : int):
-        self.top_k_accuracy["top_n"] = k_list
+    def calc_accuracy(self, top_k_list, eval_type = "ot_plan"):
+        accuracy = pd.DataFrame()
+        accuracy["top_n"] = top_k_list
         
-        for pairnumber in self.pairnumber_list:
-            pairwise = self.pairwise_list[pairnumber]
-            pairwise.calc_top_k_accuracy(k_list)
+        for pair_number in self.pair_number_list:
+            pairwise = self.pairwise_list[pair_number]
+            df = pairwise.eval_accuracy(top_k_list, eval_type = eval_type, metric = self.metric)
 
-            self.top_k_accuracy = pd.merge(self.top_k_accuracy, pairwise.top_k_accuracy, on = "top_n")
+            accuracy = pd.merge(accuracy, df, on = "top_n")
         
-        print("Top k accuracy : \n", self.top_k_accuracy)
-        print("Mean : \n", self.top_k_accuracy.iloc[:, 1:].mean(axis = "columns"))
-            
-    def calc_k_nearest_matching_rate(self, k_list, metric):
-        self.k_nearest_matching_rate["top_n"] = k_list
+        accuracy = accuracy.set_index("top_n")
         
-        for pairnumber in self.pairnumber_list:
-            pairwise = self.pairwise_list[pairnumber]
-            pairwise.calc_k_nearest_matching_rate(k_list, metric)
-            self.k_nearest_matching_rate = pd.merge(self.k_nearest_matching_rate, pairwise.k_nearest_matching_rate, on = "top_n")
+        if eval_type == "ot_plan":
+            self.top_k_accuracy = accuracy
+            print("Top k accuracy : \n", accuracy)
         
-        print("K nearest matching rate : \n", self.k_nearest_matching_rate)
-        print("Mean : \n", self.k_nearest_matching_rate.iloc[:, 1:].mean(axis = "columns"))
+        elif eval_type == "k_nearest":
+            self.k_nearest_matching_rate = accuracy  
+            print("K nearest matching rate : \n", accuracy)
+        
+        print("Mean : \n", accuracy.iloc[:, 1:].mean(axis = "columns"))
+        
     
     def _get_dataframe(self, eval_type = "ot_plan", shuffle = False, concat = True):
         df = self.top_k_accuracy if eval_type == "ot_plan" else self.k_nearest_matching_rate         
-        df = df.set_index("top_n")
         
         if not shuffle:
             cols = [col for col in df.columns if "shuffle" not in col and "top_n" not in col]
@@ -494,14 +471,18 @@ class Align_Representations():
                             category_idx_list = None, 
                             fig_dir = None):
         
+        if fig_dir is not None:
+            fig_path = os.path.join(fig_dir, "Aligned_embedding.png")  
+        else: 
+            fig_path = None
+            
+        name_list = []
+        embedding_list = []
         for i in range(len(self.pairwise_list) // 2):
             pair = self.pairwise_list[i]
-            pair.procrustes()
-        
-        embedding_list = [self.representations_list[i].embedding for i in range(len(self.representations_list))]
-        name_list = [self.representations_list[i].name for i in range(len(self.representations_list))]
-        fig_path = os.path.join(fig_dir, "Aligned_embedding.png") if fig_dir is not None else None
-        
+            embedding_list.append(pair.get_new_source_embedding())
+            name_list.append(pair.pair_name)
+            
         visualize_embedding = visualize_functions.Visualize_Embedding(
             embedding_list = embedding_list,
             name_list = name_list,
@@ -512,27 +493,6 @@ class Align_Representations():
         )
         
         visualize_embedding.plot_embedding(dim = dim, save_dir = fig_path)
-
-
-def get_category_idx(category_mat, category_name_list, show_numbers = False):
-    if show_numbers:
-        object_numbers = list()
-        
-        for column in category_mat.columns:
-            num = (category_mat[column].values == 1).sum()
-            object_numbers.append(num)
-        
-        num_each_category = pd.DataFrame(object_numbers, index = category_mat.columns, columns = ["Number"])
-        print(num_each_category)
-        
-    category_idx_list = []
-    n_category_list = []
-    for category in category_name_list:
-        category_idx = category_mat[category].values == 1
-        category_idx_list.append(category_idx)
-        n_category_list.append(category_idx.sum())
-    
-    return category_idx_list, n_category_list 
 
 
 #%%
@@ -574,11 +534,14 @@ if __name__ == "__main__":
     Evaluate the accuracy
     '''
     ## Accuracy of the optimized OT matrix
-    align_representations.calc_top_k_accuracy(k_list = [1, 5, 10])
+    align_representations.calc_accuracy(top_k_list = [1, 5, 10], eval_type = "ot_plan")
+    
+    # %%
     align_representations.plot_accuracy(eval_type = "ot_plan", scatter = True)
-    #%%
+    # %%
     ## Matching rate of k-nearest neighbors 
-    align_representations.calc_k_nearest_matching_rate(k_list = [1, 5, 10], metric = metric)
+    align_representations.calc_accuracy(top_k_list = [1, 5, 10], eval_type = "k_nearest")
+    # %%
     align_representations.plot_accuracy(eval_type = "k_nearest", scatter = True)
     
     #%%
