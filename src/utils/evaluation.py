@@ -37,3 +37,15 @@ def pairwise_k_nearest_matching_rate(embedding_1, embedding_2, top_n, metric = "
     count *= 100 # return percentage
 
     return count
+
+def category_level_correct_rate(OT, category_mat):
+    count = 0
+    for i in range(OT.shape[0]):
+        row = OT[i]
+        max_index = np.argmax(OT)
+
+        if np.array_equal(category_mat[row], category_mat[max_index]):
+            count += 1
+        
+    accuracy = count / OT.shape[0]
+    return accuracy

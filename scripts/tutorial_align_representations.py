@@ -44,7 +44,8 @@ elif data_select == "THINGS":
     for i in range(n_representations):
         name = f"Group{i+1}"
         embedding = np.load(f"../data/THINGS_embedding_Group{i+1}.npy")[0]
-        representation = Representation(name = name, embedding = embedding, metric = metric)
+        category_mat = pd.read_csv("../data/category_mat_manual_preprocessed.csv", sep = ",", index_col = 0)  
+        representation = Representation(name = name, embedding = embedding, metric = metric, category_mat = category_mat)
         representations.append(representation)
     
 #%%
@@ -79,6 +80,7 @@ align_representation = Align_Representations(representations_list = representati
 align_representation.show_sim_mat(fig_dir = "../figures")
 align_representation.RSA_get_corr(shuffle = False)
 
+#%%
 '''
 GW alignment
 '''
@@ -89,6 +91,8 @@ align_representation.gw_alignment(pairnumber_list = "all", shuffle = False, load
 align_representation.calc_top_k_accuracy(k_list = [1, 5, 10], shuffle = False)
 align_representation.plot_accuracy(eval_type = "ot_plan", shuffle = False, scatter = True, fig_dir = "../figures") # If scatter is True, the scatter plot is employed.
 
+## Calclate the category level accuracy
+align_representation.calc_category_level_accuracy()
 #%%
 '''
 Align embeddings with OT plans

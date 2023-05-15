@@ -19,12 +19,52 @@ from utils.utils_functions import procrustes, get_category_idx
 from utils import visualize_functions, evaluation
 from gw_alignment import run_main_gw, Optimization_Config
 
+def get_category_idx(category_mat, category_name_list, show_numbers = False):
+    if show_numbers:
+        object_numbers = list()
+        for column in category_mat.columns:
+            num = (category_mat[column].values == 1).sum()
+            object_numbers.append(num)
+        num_each_category = pd.DataFrame(object_numbers, index = category_mat.columns, columns = ["Number"])
+        print(num_each_category)
+        
+    category_idx_list = []
+    n_category_list = []
+    for category in category_name_list:
+        category_idx = category_mat[category].values == 1
+        category_idx_list.append(category_idx)
+        n_category_list.append(category_idx.sum())
+    
+    return category_idx_list, n_category_list 
+
+
+def procrustes(embedding_1, embedding_2, Pi):
+    """
+    embedding_2をembedding_1に最も近づける回転行列Qを求める
+
+    Args:
+        embedding_1 : shape (n_1, m)
+        embedding_2 : shape (n_2, m)
+        Pi : shape (n_2, n_1) 
+            Transportation matrix of 2→1
+        
+    Returns:
+        Q : shape (m, m) 
+            Orthogonal matrix 
+        new_embedding_2 : shape (n_2, m)
+    """
+    U, S, Vt = np.linalg.svd(np.matmul(embedding_2.T, np.matmul(Pi, embedding_1)))
+    Q = np.matmul(U, Vt)
+    new_embedding_2 = np.matmul(embedding_2, Q)
+    
+    return Q, new_embedding_2
+
 
 class Representation:
     """
     A class object that has information of a representation, such as embeddings and similarity matrices
     """
-    def __init__(self, name, sim_mat = None, get_embedding = True, embedding = None, metric = "cosine") -> None:
+    def __init__(self, name, sim_mat = None, get_embedding = True, embedding = None, metric = "cosine", category_mat : pd.DataFrame = None, category_name_list = ["all"]) -> None:
         """_summary_
 
         Args:
@@ -46,6 +86,9 @@ class Representation:
             self.embedding = embedding
             self.sim_mat = sim_mat
         self.shuffled_sim_mat = self._get_shuffled_sim_mat()
+        
+        self.category_mat = category_mat
+        self.object_labels, self.category_idx_list, self.num_category_list, self.category_name_list = self._get_index_data(category_mat, category_name_list)
 
     def _get_sim_mat(self):
         if self.metric == "dot":
@@ -59,23 +102,50 @@ class Representation:
         The function for shuffling the lower trianglar matrix.
         """
         # Get the lower triangular elements of the matrix
-        lower_tri = self.sim_mat[np.tril_indices(self.sim_mat.shape[0], k=-1)]
+        lower_tri = self.sim_mat[np.tril_indices(self.sim_mat.shape[0], k = -1)]
+        
         # Shuffle the lower triangular elements
         np.random.shuffle(lower_tri)
+        
         # Create a new matrix with the shuffled lower triangular elements
         shuffled_matrix = np.zeros_like(self.sim_mat)
-        shuffled_matrix[np.tril_indices(shuffled_matrix.shape[0], k=-1)] = lower_tri
+        shuffled_matrix[np.tril_indices(shuffled_matrix.shape[0], k = -1)] = lower_tri
         shuffled_matrix = shuffled_matrix + shuffled_matrix.T
+        
         return shuffled_matrix
     
     def _get_embedding(self):
         MDS_embedding = manifold.MDS(n_components = 3, dissimilarity = 'precomputed', random_state = 0)
         embedding = MDS_embedding.fit_transform(self.sim_mat)
         return embedding
+    
+    def _get_index_data(self, category_mat : pd.DataFrame = None, category_name_list = None):
+        if category_mat is None:
+            object_labels, category_idx_list, category_num_list, new_category_name_list = None
+        
+        else:
+            if category_name_list == ["all"]:
+                new_category_name_list = category_mat.columns.tolist()
+            else:
+                new_category_name_list = category_name_list
+            
+            category_idx_list, category_num_list = get_category_idx(category_mat, new_category_name_list, show_numbers = True)  
+            
+            object_labels = list()
+            for i in range(len(category_idx_list)):           
+                object_labels += category_mat.index[category_idx_list[i]].tolist()
+        
+        return object_labels, category_idx_list, category_num_list, new_category_name_list
         
     def show_sim_mat(self, ticks_size = None, label = None, fig_dir = None):
         fig_path = os.path.join(fig_dir, f"RDM_{self.name}.png") if fig_dir is not None else None
-        visualize_functions.show_heatmap(self.sim_mat, title = self.name, ticks_size = ticks_size, xlabel = label, ylabel = label, file_name = fig_path)
+        
+        if self.category_idx_list is None:
+            sim_mat = self.sim_mat
+        else:
+            sim_mat = np.concatenate([np.concatenate([self.sim_mat[self.category_idx_list[i]] for i in range(len(self.category_idx_list))], axis = 0)[:, self.category_idx_list[i]] for i in range(len(self.category_idx_list))], axis = 1)
+        
+        visualize_functions.show_heatmap(sim_mat, title = self.name, ticks_size = ticks_size, xlabel = label, ylabel = label, file_name = fig_path)
         
     def show_sim_mat_distribution(self):
         lower_triangular = np.tril(self.sim_mat)
@@ -105,8 +175,7 @@ class Pairwise_Analysis:
         self.target = target
         self.source = source
         self.config = config
-        self.OT = 0
-        self.shuffled_OT = 0
+
         self.top_k_accuracy = pd.DataFrame()
         self.k_nearest_matching_rate = pd.DataFrame()
         self.pair_name = f"{target.name} vs {source.name}"
@@ -129,9 +198,10 @@ class Pairwise_Analysis:
         Main computation
         """            
         if shuffle:     
-                self.shuffled_OT = self._gw_alignment(shuffle = shuffle, load_OT = load_OT)
+            self.shuffled_OT = self._gw_alignment(shuffle = shuffle, load_OT = load_OT)
         else:
-                self.OT = self._gw_alignment(shuffle = shuffle, load_OT = load_OT)
+            self.OT = self._gw_alignment(shuffle = shuffle, load_OT = load_OT)
+        
         self._show_OT(title = f"$\Gamma$ ({self.pair_name}) {'(shuffle)' if shuffle else ''} ", shuffle = shuffle, ticks_size = ticks_size, fig_dir = fig_dir)
         
     def _gw_alignment(self, results_dir = "../results/", shuffle = False, load_OT = False):
@@ -146,6 +216,8 @@ class Pairwise_Analysis:
     def _show_OT(self, title, shuffle : bool, ticks_size = None, fig_dir = None):
         OT = self.OT if not shuffle else self.shuffled_OT
         fig_path = os.path.join(fig_dir, f"OT_{self.pair_name}.png") if fig_dir is not None else None
+        if self.source.category_name_list is not None:
+            OT = np.concatenate([np.concatenate([OT[self.source.category_idx_list[i]] for i in range(len(self.source.category_idx_list))], axis = 0)[:, self.source.category_idx_list[i]] for i in range(len(self.source.category_idx_list))], axis = 1)
         visualize_functions.show_heatmap(matrix = OT, title = title, ticks_size = ticks_size, file_name = fig_path)
     
     def calc_top_k_accuracy(self, k_list, shuffle : bool):
@@ -160,6 +232,20 @@ class Pairwise_Analysis:
         self.k_nearest_matching_rate["top_n"] = k_list
         acc_list = self._eval_accuracy(OT = self.OT, k_list = k_list, eval_type = "k_nearest", metric = metric)
         self.k_nearest_matching_rate[self.pair_name] = acc_list
+        
+    def calc_category_level_accuracy(self):
+        category_mat = self.source.category_mat.values
+        count = 0
+        
+        for i in range(self.OT.shape[0]):
+            max_index = np.argmax(self.OT[i])
+
+            if np.array_equal(category_mat[i], category_mat[max_index]):
+                count += 1
+                
+        accuracy = count / self.OT.shape[0]
+        
+        return accuracy
         
     def _eval_accuracy(self, OT, k_list, eval_type = "ot_plan", supervised = False, metric = "cosine"):
         top_n_list = k_list
@@ -185,8 +271,43 @@ class Pairwise_Analysis:
         
         visualize_embedding = visualize_functions.Visualize_Embedding(embedding_list = embedding_list, name_list = name_list, category_name_list = category_name_list, category_num_list = category_num_list, category_idx_list = category_idx_list)
         visualize_embedding.plot_embedding(dim = dim)
-  
-  
+    
+    def calc_correct_rate_ot_plan(self, Pi, top_n):
+        count = 0
+        for i in range(Pi.shape[0]):
+            idx = np.argsort(-Pi[i, :])
+            count += (idx[:top_n] == i).sum()    
+        count /= Pi.shape[0]
+        count *= 100
+
+        return count
+
+    def pairwise_k_nearest_matching_rate(self, embedding_1, embedding_2, top_n, metric = "cosine"):
+        """Count it if a point of embedding_1 is in k-nearest neighbors of a corresponding point of embedding_2
+
+        Args:
+            embedding1 (_type_): _description_
+            embedding2 (_type_): _description_
+            top_n (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        # Compute distances between each points
+        dist_mat = distance.cdist(embedding_1, embedding_2, metric)
+
+        # Get sorted indices 
+        sorted_idx = np.argsort(dist_mat, axis = 1)
+
+        # Get the same colors and count k-nearest
+        count = 0
+        for i in range(embedding_1.shape[0]):
+            count += (sorted_idx[i, :top_n]  == i).sum() 
+        count /= embedding_1.shape[0]
+        count *= 100 # return percentage
+
+        return count
+    
 class Align_Representations:
     """
     This object has methods for conducting N groups level analysis and corresponding results.
@@ -256,6 +377,12 @@ class Align_Representations:
             self.k_nearest_matching_rate = pd.merge(self.k_nearest_matching_rate, pairwise.k_nearest_matching_rate, on = "top_n")
         print("K nearest matching rate : \n", self.k_nearest_matching_rate)
         print("Mean : \n", self.k_nearest_matching_rate.iloc[:, 1:].mean(axis = "columns"))
+        
+    def calc_category_level_accuracy(self):
+        for pairnumber in self.pairnumber_list:
+            pairwise = self.pairwise_list[pairnumber]
+            acc = pairwise.calc_category_level_accuracy()
+            print(f"{pairwise.pair_name} :  {acc}")
     
     def _get_dataframe(self, eval_type = "ot_plan", shuffle = False, concat = True):
         df = self.top_k_accuracy if eval_type == "ot_plan" else self.k_nearest_matching_rate         
@@ -270,7 +397,7 @@ class Align_Representations:
             df = df.rename("matching rate")
         return df
         
-    def plot_accuracy(self, eval_type = "ot_plan", shuffle = False, fig_dir = None, fig_name = None, scatter = True):
+    def plot_accuracy(self, eval_type = "ot_plan", shuffle = False, fig_dir = None, fig_name = "Accuracy_ot_plan.png", scatter = True):
         plt.figure(figsize = (5, 3)) 
         if scatter:
             df = self._get_dataframe(eval_type, shuffle = shuffle, concat = True)
