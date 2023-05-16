@@ -7,6 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import itertools
+import torch
 from scipy.spatial import distance
 from scipy.stats import spearmanr, pearsonr
 from sklearn import manifold
@@ -176,19 +177,13 @@ class Pairwise_Analysis():
         assert self.RDM_source.shape == self.RDM_target.shape, "the shape of sim_mat is not the same."
         
         
-        self.backend = backend.Backend(device=self.config.device, to_types=self.config)
-        
-        self.RDM_source, self.RDM_target = self.backend(self.RDM_source, self.RDM_target)
+        self.backend = backend.Backend(device=self.config.device, to_types=self.config.to_types)
         
     
     def show_both_sim_mats(self):
-        
-        if self.config.to_types == 'torch':
-            a = self.RDM_source.to('cpu').numpy()
-            b = self.RDM_target.to('cpu').numpy()
-        else:
-            a = self.RDM_source
-            b = self.RDM_target
+  
+        a = self.RDM_source
+        b = self.RDM_target
         
         plt.figure()
         plt.subplot(121)
@@ -218,7 +213,7 @@ class Pairwise_Analysis():
         return corr
     
     def match_sim_mat_distribution(self):
-        matching = SimpleHistogramMatching(self.RDM_source, self.RDM_target, self.backend)
+        matching = SimpleHistogramMatching(self.RDM_source, self.RDM_target)
         
         self.RDM_target = matching.simple_histogram_matching()
         
@@ -292,12 +287,22 @@ class Pairwise_Analysis():
             )
             
             best_trial = study.best_trial
-            OT = np.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.npy")
+            
+            if self.config.to_types == 'numpy':
+                OT = np.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.npy")
+                
+            elif self.config.to_types == 'torch':
+                OT = torch.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.pt")
         
         else:
             study = opt.load_study()
             best_trial = study.best_trial
-            OT = np.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.npy")
+            
+            if self.config.to_types == 'numpy':
+                OT = np.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.npy")
+            
+            elif self.config.to_types == 'torch':
+                OT = torch.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.pt")
         
         return OT
           
@@ -318,9 +323,12 @@ class Pairwise_Analysis():
         df["top_n"] = top_k_list
 
         if supervised:
-            OT = self.backend.nx.diag([1/len(self.target.sim_mat) for _ in range(len(self.target.sim_mat))]) # ここも、torchでも対応できるようにする必要がある。
+            OT = np.diag([1/len(self.target.sim_mat) for _ in range(len(self.target.sim_mat))]) # ここも、torchでも対応できるようにする必要がある。
         else:
-            OT = self.OT
+            if self.config.to_types == 'torch':
+                OT = self.OT.to('cpu').numpy()
+            else:
+                OT = self.OT
         
         acc_list = list()
         for k in top_k_list:
@@ -336,11 +344,11 @@ class Pairwise_Analysis():
                 dist_mat = distance.cdist(self.target.embedding, new_embedding_source, metric) # ここも、torchでも対応できるようにする必要がある。
 
                 # Get sorted indices 
-                sorted_idx = self.backend.nx.argsort(dist_mat, axis = 1)
-                # sorted_idx = np.argpartition(dist_mat, )
+                sorted_idx = np.argsort(dist_mat, axis = 1)
+                # sorted_idx = np.argpartition(dist_mat, 
 
                 # Get the same colors and count k-nearest
-                acc = 0
+                acc = 0 # ここはot_planと重複しているし、もっと簡単な関数に書き直せる直せるはず。
                 for i in range(self.target.embedding.shape[0]):
                     acc += (sorted_idx[i, :k]  == i).sum() 
                 acc /= self.target.embedding.shape[0]
@@ -349,7 +357,7 @@ class Pairwise_Analysis():
             elif eval_type == "ot_plan":
                 acc = 0
                 for i in range(OT.shape[0]):
-                    idx = self.backend.nx.argsort(-OT[i, :])
+                    idx = np.argsort(-OT[i, :])
                     acc += (idx[:k] == i).sum()    
                 acc /= OT.shape[0]
                 acc *= 100
