@@ -293,6 +293,7 @@ class Pairwise_Analysis():
                 
             elif self.config.to_types == 'torch':
                 OT = torch.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.pt")
+                OT = OT.to('cpu').numpy()
         
         else:
             study = opt.load_study()
@@ -303,6 +304,8 @@ class Pairwise_Analysis():
             
             elif self.config.to_types == 'torch':
                 OT = torch.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.pt")
+                
+                OT = OT.to('cpu').numpy()
         
         return OT
           
@@ -325,10 +328,7 @@ class Pairwise_Analysis():
         if supervised:
             OT = np.diag([1/len(self.target.sim_mat) for _ in range(len(self.target.sim_mat))]) # ここも、torchでも対応できるようにする必要がある。
         else:
-            if self.config.to_types == 'torch':
-                OT = self.OT.to('cpu').numpy()
-            else:
-                OT = self.OT
+            OT = self.OT
         
         acc_list = list()
         for k in top_k_list:
