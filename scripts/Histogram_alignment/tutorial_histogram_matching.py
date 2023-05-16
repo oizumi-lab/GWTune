@@ -16,7 +16,7 @@ import pickle as pkl
 
 # %%
 from src.gw_alignment import GW_Alignment
-from src.utils.adjust_distribution import Adjust_Distribution
+from src.histogram_matching import HistogramMatching
 from src.utils.gw_optimizer import load_optimizer
 
 # %%

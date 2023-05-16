@@ -28,44 +28,12 @@ from sklearn.metrics import confusion_matrix, accuracy_score
 # nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
 from utils.backend import Backend
 
-# %%
 class HistogramMatching():
-    def __init__(self, source, target, to_types = 'torch'):
+    def __init__(self, source, target, backend):
         self.source = source
         self.target = target
-  
-        self.to_types = to_types
-
-    def sort_for_scaling(self, data):
-        # x = sp.spatial.distance.squareform(data)
-        x = data.flatten()
-        x_sorted = np.sort(x)
-        x_inverse_idx = np.argsort(x).argsort()
-        return x, x_sorted, x_inverse_idx
-
-    def pointwise_matching(self, X, Y):
-        x, x_sorted, x_inverse_idx = self.sort_for_scaling(X)
-        y, y_sorted, y_inverse_idx = self.sort_for_scaling(Y)
-    
-        y_t = x_sorted[y_inverse_idx]
-        Y_t = y_t.reshape(Y.shape) #= sp.spatial.distance.squareform(y_t)
-        return Y_t
+        self.backend = backend
         
-
-# %%
-class Adjust_Distribution():
-    def __init__(self, model1, model2, adjust_path, fix_method = 'target', to_types = 'torch'):
-        self.adjust_path = adjust_path
-        self.model1, self.model2 = model1, model2
-        
-        self.size = len(model1)
-        self.to_types = to_types
-        
-        self.fix_method = fix_method
-    
-        if not os.path.exists(self.adjust_path):
-            os.makedirs(self.adjust_path)
-    
     def _extract_min_and_max(self, data):
         data = data.detach().clone()
         data = data.fill_diagonal_(float('nan'))
@@ -76,21 +44,21 @@ class Adjust_Distribution():
         return lim_min.item(), lim_max.item()
 
     def make_limit(self):
-        if self.fix_method == 'source':
-            lim_min, lim_max = self._extract_min_and_max(self.model1)
+        if self.fix_data == 'source':
+            lim_min, lim_max = self._extract_min_and_max(self.source)
 
-        elif self.fix_method == 'target':
-            lim_min, lim_max = self._extract_min_and_max(self.model2)
+        elif self.fix_data == 'target':
+            lim_min, lim_max = self._extract_min_and_max(self.target)
             
-        elif self.fix_method == 'both':
-            lim_min1, lim_max1 = self._extract_min_and_max(self.model1)
-            lim_min2, lim_max2 = self._extract_min_and_max(self.model2)
+        elif self.fix_data == 'both':
+            lim_min1, lim_max1 = self._extract_min_and_max(self.source)
+            lim_min2, lim_max2 = self._extract_min_and_max(self.target)
             
             lim_min = min(lim_min1, lim_min2)
             lim_max = max(lim_max1, lim_max2)
         
         else:
-            raise ValueError('Please choose the fix method')
+            raise ValueError('Please choose the fix data')
 
         return lim_min, lim_max
     
@@ -123,12 +91,59 @@ class Adjust_Distribution():
             hist[0] += counts.sum()
         
         return hist
+
+
+
+#%%    
+class SimpleHistogramMatching(HistogramMatching):
+    def __init__(self, source, target, backend) -> None:
+        super().__init__(source, target, backend)
+        pass
     
-    def model_normalize(self, data, lam, alpha):
+    def _sort_for_scaling(self, X):
+        x = X.flatten()
+        x_sorted = self.backend.nx.argsort(x)
+        x_inverse_idx = self.backend.nx.argsort(x_sorted)
+        return x, x_sorted, x_inverse_idx
+
+    def _simple_histogram_matching(self, X, Y):
+        # X, Y: dissimilarity matrices
+        x, x_sorted, x_inverse_idx = self._sort_for_scaling(X)
+        y, y_sorted, y_inverse_idx = self._sort_for_scaling(Y)
+
+        y_t = x_sorted[y_inverse_idx]
+        Y_t = y_t.reshape(Y.shape)  # transformed matrix
+        return Y_t
+    
+    def simple_histogram_matching(self):
+        new_target = self._simple_histogram_matching(self.source, self.target)
+        return new_target
+
+
+# %%
+class HistogramMatchingByTransformationWithOptuna(HistogramMatching):
+    def __init__(self, source, target, backend, save_path = None, fix_data = 'target') -> None:
+        super().__init__(source, target, backend)
+        self.save_path = save_path
+        self.fix_data = fix_data
+        
+        if self.save_path is not None:
+            if not os.path.exists(self.save_path):
+                os.makedirs(self.save_path)
+    
+        pass
+
+    def transformation(self, data, lam : float, alpha : float, method : str):
+        if method.lower() == 'yeojohnson':
+            data = self.YeoJohnson_transformation(data, lam, alpha)
+    
+        return data
+    
+    def YeoJohnson_transformation(self, data, lam, alpha):
         data = alpha * ((torch.pow(1 + data, lam) - 1) / lam)
         return data
-
-    def L2_wasserstain(self, m1, m2):
+    
+    def L2_wasserstain(self, m1, m2, method = 'sinkhorn'):
         
         # lim_max, lim_min = self.make_limit()
         # bins = 100
@@ -142,55 +157,56 @@ class Adjust_Distribution():
         h1_prob = hist1 / hist1.sum()
         h2_prob = hist2 / hist2.sum()
         
-        # sinkhornを動かすコマンド。
-        dist = ot.dist(h1_prob.unsqueeze(dim=1), h2_prob.unsqueeze(dim=1))
-        res = ot.sinkhorn2(h1_prob, h2_prob, dist, reg = 1)
+        if method == 'sinkhorn':
+            # sinkhornを動かすコマンド。
+            dist = ot.dist(h1_prob.unsqueeze(dim=1), h2_prob.unsqueeze(dim=1))
+            res = ot.sinkhorn2(h1_prob, h2_prob, dist, reg = 1)
         
-        # 以下は、EMDを動かす際のコマンド。
-        # ind1 = self.backend.nx.arange(len(hist1), type_as = hist1).float()
-        # ind2 = self.backend.nx.arange(len(hist2), type_as = hist2).float()
-        # cost_matrix = torch.cdist(ind1.unsqueeze(dim=1), ind2.unsqueeze(dim=1), p = 1).to(hist1.device)
-        # res = ot.emd2(h1_prob, h2_prob, cost_matrix)
+        elif method.lower() == 'emd':
+            # 以下は、EMDを動かす際のコマンド。
+            # ind1 = self.backend.nx.arange(len(hist1), type_as = hist1).float()
+            # ind2 = self.backend.nx.arange(len(hist2), type_as = hist2).float()
+            # cost_matrix = torch.cdist(ind1.unsqueeze(dim=1), ind2.unsqueeze(dim=1), p = 1).to(hist1.device)
+            dist = ot.dist(h1_prob.unsqueeze(dim=1), h2_prob.unsqueeze(dim=1))
+            res = ot.emd2(h1_prob, h2_prob, dist)
         
         return res
+    
     
     def __call__(self, trial, device):
         
         if self.to_types == 'numpy':
             assert device == 'cpu'
         
-        self.backend = Backend(device, self.to_types)
-        self.model1, self.model2 = self.backend(self.model1, self.model2)
-        
-        if self.fix_method == 'source':
+        if self.fix_data == 'source':
             alpha = trial.suggest_float("alpha", 1e-6, 1e1, log = True)
             lam = trial.suggest_float("lam", 1e-6, 1e1, log = True)
         
-            model1_norm = self.model_normalize(self.model1, 1.0, 1.0) 
-            model2_norm = self.model_normalize(self.model2, lam, alpha)
+            source_norm = self.YeoJohnson_transformation(self.source, 1.0, 1.0) 
+            target_norm = self.YeoJohnson_transformation(self.target, lam, alpha)
         
-        elif self.fix_method == 'target':
+        elif self.fix_data == 'target':
             alpha = trial.suggest_float("alpha", 1e-6, 1e1, log = True)
             lam = trial.suggest_float("lam", 1e-6, 1e1, log = True)
             
-            model1_norm = self.model_normalize(self.model1, lam, alpha) 
-            model2_norm = self.model_normalize(self.model2, 1.0, 1.0)
+            source_norm = self.YeoJohnson_transformation(self.source, lam, alpha) 
+            target_norm = self.YeoJohnson_transformation(self.target, 1.0, 1.0)
             
-        elif self.fix_method == 'both':
+        elif self.fix_data == 'both':
             alpha1 = trial.suggest_float("alpha1", 1e-6, 1e1, log = True)
             lam1   = trial.suggest_float("lam1", 1e-6, 1e1, log = True)
             
             alpha2 = trial.suggest_float("alpha2", 1e-6, 1e1, log = True)
             lam2   = trial.suggest_float("lam2", 1e-6, 1e1, log = True)
             
-            model1_norm = self.model_normalize(self.model1, lam1, alpha1) 
-            model2_norm = self.model_normalize(self.model2, lam2, alpha2)
+            source_norm = self.YeoJohnson_transformation(self.source, lam1, alpha1) 
+            target_norm = self.YeoJohnson_transformation(self.target, lam2, alpha2)
         
         else:
             raise ValueError('Please choose the fix method')
         
         
-        ot_cost = self.L2_wasserstain(model1_norm, model2_norm)
+        ot_cost = self.L2_wasserstain(source_norm, target_norm)
         
         if ot_cost == 0:
             ot_cost = float('nan')
@@ -205,21 +221,21 @@ class Adjust_Distribution():
     def best_parameters(self, study):
         best_trial = study.best_trial
         
-        if self.fix_method == 'source':
+        if self.fix_data == 'source':
             a1 = 1
             lam1 = 1
             
             a2 = best_trial.params["alpha"]
             lam2 = best_trial.params["lam"]
         
-        elif self.fix_method == 'target':
+        elif self.fix_data == 'target':
             a1 = best_trial.params["alpha"]
             lam1 = best_trial.params["lam"]
             
             a2 = 1
             lam2 = 1
         
-        elif self.fix_method == 'both':
+        elif self.fix_data == 'both':
             a1 = best_trial.params["alpha1"]
             lam1 = best_trial.params["lam1"]
             
@@ -227,27 +243,23 @@ class Adjust_Distribution():
             lam2 = best_trial.params["lam2"]
         
         return a1, lam1, a2, lam2
-
+    
     def best_models(self, study):
         a1, lam1, a2, lam2 = self.best_parameters(study)
-        model1_norm = self.model_normalize(self.model1, lam1, a1) 
-        model2_norm = self.model_normalize(self.model2, lam2, a2)
-        return model1_norm, model2_norm
+        source_norm = self.YeoJohnson_transformation(self.source, lam1, a1) 
+        target_norm = self.YeoJohnson_transformation(self.target, lam2, a2)
+        return source_norm, target_norm
     
     def make_graph(self, study):
         
         a1, lam1, a2, lam2 = self.best_parameters(study)
-        model1_norm, model2_norm = self.best_models(study)
+        source_norm, target_norm = self.best_models(study)
         
         plt.figure()
         plt.subplot(121)
 
-        model_numpy1 = model1_norm.to('cpu').numpy()
-        # np.fill_diagonal(model_numpy1, np.nan)
-        
-        model_numpy2 = model2_norm.to('cpu').numpy()
-        # np.fill_diagonal(model_numpy2, np.nan)
-        mappable = ScalarMappable(cmap=plt.cm.jet, norm = colors.Normalize(vmin = 0, vmax = 1))
+        model_numpy1 = source_norm.to('cpu').numpy()
+        model_numpy2 = target_norm.to('cpu').numpy()
         
         plt.title('source (a:{:.3g}, lam:{:.3g})'.format(a1, lam1))
         plt.imshow(model_numpy1, cmap=plt.cm.jet)
@@ -264,11 +276,11 @@ class Adjust_Distribution():
         lim_min, lim_max = self.make_limit()
         # bins = 100
         
-        # hist1 = torch.histc(model1_norm, bins = bins, min = lim_min, max = lim_max)
-        # hist2 = torch.histc(model2_norm, bins = bins, min = lim_min, max = lim_max)
+        # hist1 = torch.histc(source_norm, bins = bins, min = lim_min, max = lim_max)
+        # hist2 = torch.histc(target_norm, bins = bins, min = lim_min, max = lim_max)
         
-        hist1 = self.make_histogram(model1_norm)
-        hist2 = self.make_histogram(model2_norm)
+        hist1 = self.make_histogram(source_norm)
+        hist2 = self.make_histogram(target_norm)
         
         x = np.linspace(lim_min, lim_max, len(hist1))
         plt.figure()
@@ -283,8 +295,8 @@ class Adjust_Distribution():
         plt.show()
         
         
-        corr = sp.stats.pearsonr(model1_norm[~torch.isnan(model1_norm)].to('cpu').numpy(),
-                                 model2_norm[~torch.isnan(model2_norm)].to('cpu').numpy())
+        corr = sp.stats.pearsonr(source_norm[~torch.isnan(source_norm)].to('cpu').numpy(),
+                                 target_norm[~torch.isnan(target_norm)].to('cpu').numpy())
     
         print('peason\'s r (without diag element) =', corr[0])
     
@@ -292,24 +304,24 @@ class Adjust_Distribution():
         optuna.visualization.plot_optimization_history(study).show()
         optuna.visualization.plot_parallel_coordinate(study).show()
         # optuna.visualization.plot_contour(study).show()
-
+    
 # %%
 if __name__ == '__main__':
     os.chdir(os.path.dirname(__file__))
-    model1 = torch.load('../../data/model1.pt')
-    model2 = torch.load('../../data/model2.pt')
+    source = torch.load('../../data/source.pt')
+    target = torch.load('../../data/target.pt')
     unittest_save_path = '../../results/unittest/adjust_histogram'
-    fix_method = 'both'
+    fix_data = 'both'
     device = 'cuda'
     
     # %%
-    tt = Adjust_Distribution(model1, model2, unittest_save_path, fix_method = fix_method, device = device) 
+    tt = HistogramMatchingByTransformationWithOptuna(source, target, device = device, save_path = unittest_save_path, fix_data = fix_data) 
     # %%
     study = optuna.create_study(direction = 'minimize',
-                                study_name = 'unit_test('+fix_method+')',
+                                study_name = 'unit_test('+fix_data+')',
                                 sampler = optuna.samplers.RandomSampler(seed = 42),
                                 pruner = optuna.pruners.MedianPruner(),
-                                storage = 'sqlite:///' + unittest_save_path + '/unit_test('+fix_method+').db',
+                                storage = 'sqlite:///' + unittest_save_path + '/unit_test('+fix_data+').db',
                                 load_if_exists = True)
 
     test_adjust = functools.partial(tt, device = device)

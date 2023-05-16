@@ -18,7 +18,7 @@ from typing import List
 from utils.utils_functions import get_category_idx
 from utils import visualize_functions, backend, init_matrix, gw_optimizer
 from gw_alignment import GW_Alignment
-from histogram_matching import HistogramMatching
+from histogram_matching import SimpleHistogramMatching
 
 class Optimization_Config:
     def __init__(
@@ -157,9 +157,9 @@ class Pairwise_Analysis():
             source (Representation): instance of Representation
             target (Representation): instance of Representation
         """
-        self.config = config
         self.source = source
         self.target = target
+        self.config = config
         
         assert self.source.shuffle == self.target.shuffle, "please use the same 'shuffle' both for source and target."
         
@@ -174,19 +174,32 @@ class Pairwise_Analysis():
             self.pair_name = f"{target.name} vs {source.name}"
             
         assert self.RDM_source.shape == self.RDM_target.shape, "the shape of sim_mat is not the same."
+        
+        
+        self.backend = backend.Backend(device=self.config.device, to_types=self.config)
+        
+        self.RDM_source, self.RDM_target = self.backend(self.RDM_source, self.RDM_target)
+        
     
     def show_both_sim_mats(self):
+        
+        if self.config.to_types == 'torch':
+            a = self.RDM_source.to('cpu').numpy()
+            b = self.RDM_target.to('cpu').numpy()
+        else:
+            a = self.RDM_source
+            b = self.RDM_target
         
         plt.figure()
         plt.subplot(121)
 
         plt.title('source : ' + self.source.name)
-        plt.imshow(self.RDM_source, cmap=plt.cm.jet)
+        plt.imshow(a, cmap=plt.cm.jet)
         plt.colorbar(orientation='horizontal')
 
         plt.subplot(122)
         plt.title('target : ' + self.target.name)
-        plt.imshow(self.RDM_target , cmap=plt.cm.jet)
+        plt.imshow(b , cmap=plt.cm.jet)
         plt.colorbar(orientation='horizontal')
 
         plt.tight_layout()
@@ -205,16 +218,9 @@ class Pairwise_Analysis():
         return corr
     
     def match_sim_mat_distribution(self):
+        matching = SimpleHistogramMatching(self.RDM_source, self.RDM_target, self.backend)
         
-        # source = self.RDM_source
-        # source[range(len(source)), range(len(source))] = 0
-        
-        # target = self.RDM_target
-        # target[range(len(target)), range(len(target))] = 0
-        
-        matching = HistogramMatching(self.RDM_source, self.RDM_target)
-        
-        self.RDM_target = matching.pointwise_matching(self.RDM_source, self.RDM_target)
+        self.RDM_target = matching.simple_histogram_matching()
         
     
     def run_gw(self, ticks_size = None, load_OT = False, fig_dir = None):
@@ -254,7 +260,7 @@ class Pairwise_Analysis():
             save_path,
             n_jobs=self.config.n_jobs,
             num_trial=self.config.num_trial,
-            to_types=self.config.device,
+            to_types=self.config.to_types,
             method="optuna",
             sampler_name=self.config.sampler_name,
             pruner_name=self.config.pruner_name,
@@ -306,18 +312,18 @@ class Pairwise_Analysis():
             
         visualize_functions.show_heatmap(matrix = self.OT, title = title, ticks_size = ticks_size, file_name = fig_path)
     
-    def eval_accuracy(self, top_n_list, eval_type = "ot_plan",  metric = "cosine", supervised = False):
+    def eval_accuracy(self, top_k_list, eval_type = "ot_plan",  metric = "cosine", supervised = False):
         df = pd.DataFrame()
         
-        df["top_n"] = top_n_list
+        df["top_n"] = top_k_list
 
         if supervised:
-            OT = np.diag([1/len(self.target.sim_mat) for _ in range(len(self.target.sim_mat))]) # ここも、torchでも対応できるようにする必要がある。
+            OT = self.backend.nx.diag([1/len(self.target.sim_mat) for _ in range(len(self.target.sim_mat))]) # ここも、torchでも対応できるようにする必要がある。
         else:
             OT = self.OT
         
         acc_list = list()
-        for k in top_n_list:
+        for k in top_k_list:
             if eval_type == "k_nearest":
                 """
                 2023.5.15 佐々木
@@ -330,7 +336,7 @@ class Pairwise_Analysis():
                 dist_mat = distance.cdist(self.target.embedding, new_embedding_source, metric) # ここも、torchでも対応できるようにする必要がある。
 
                 # Get sorted indices 
-                sorted_idx = np.argsort(dist_mat, axis = 1)
+                sorted_idx = self.backend.nx.argsort(dist_mat, axis = 1)
                 # sorted_idx = np.argpartition(dist_mat, )
 
                 # Get the same colors and count k-nearest
@@ -343,7 +349,7 @@ class Pairwise_Analysis():
             elif eval_type == "ot_plan":
                 acc = 0
                 for i in range(OT.shape[0]):
-                    idx = np.argsort(-OT[i, :])
+                    idx = self.backend.nx.argsort(-OT[i, :])
                     acc += (idx[:k] == i).sum()    
                 acc /= OT.shape[0]
                 acc *= 100
