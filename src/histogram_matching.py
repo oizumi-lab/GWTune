@@ -29,10 +29,21 @@ from sklearn.metrics import confusion_matrix, accuracy_score
 from utils.backend import Backend
 
 class HistogramMatching():
-    def __init__(self, source, target, backend):
+    def __init__(self, source, target):
+        """
+        2023.5.16 佐々木
+        Histogram Matchingを行う際の親クラス。
+        これを行いたいmatching方法のインスタンスに継承させると、計算の重複がなくてすみそう。
+
+        Args:
+            source (np.ndarray or torch.tensor): dis-similarity matrix
+            target (np.ndarray or torch.tensor): dis-similarity matrix
+            
+        注記
+            numpyに対応していない箇所がある。
+        """
         self.source = source
         self.target = target
-        self.backend = backend
         
     def _extract_min_and_max(self, data):
         data = data.detach().clone()
@@ -96,14 +107,26 @@ class HistogramMatching():
 
 #%%    
 class SimpleHistogramMatching(HistogramMatching):
-    def __init__(self, source, target, backend) -> None:
-        super().__init__(source, target, backend)
+    def __init__(self, source, target) -> None:
+        """
+        2023.5.16 佐々木
+        Simple Histogram Matchingを行う際の子クラス。
+
+        Args:
+            source (np.ndarray or torch.tensor): dis-similarity matrix
+            target (np.ndarray or torch.tensor): dis-similarity matrix
+            
+        注記
+            torchに対応していない。
+        """
+        super().__init__(source, target)
+        
         pass
     
     def _sort_for_scaling(self, X):
         x = X.flatten()
-        x_sorted = self.backend.nx.argsort(x)
-        x_inverse_idx = self.backend.nx.argsort(x_sorted)
+        x_sorted = np.sort(x)
+        x_inverse_idx = np.argsort(x).argsort()
         return x, x_sorted, x_inverse_idx
 
     def _simple_histogram_matching(self, X, Y):
@@ -122,8 +145,9 @@ class SimpleHistogramMatching(HistogramMatching):
 
 # %%
 class HistogramMatchingByTransformationWithOptuna(HistogramMatching):
-    def __init__(self, source, target, backend, save_path = None, fix_data = 'target') -> None:
-        super().__init__(source, target, backend)
+    def __init__(self, source, target, to_types = 'torch', save_path = None, fix_data = 'target') -> None:
+        super().__init__(source, target)
+        self.to_types = to_types
         self.save_path = save_path
         self.fix_data = fix_data
         
@@ -177,6 +201,8 @@ class HistogramMatchingByTransformationWithOptuna(HistogramMatching):
         
         if self.to_types == 'numpy':
             assert device == 'cpu'
+            
+        self.backend = Backend(device, self.to_types)
         
         if self.fix_data == 'source':
             alpha = trial.suggest_float("alpha", 1e-6, 1e1, log = True)
