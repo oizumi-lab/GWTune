@@ -1,3 +1,4 @@
+# %%
 # Standard Library
 import itertools
 import os
@@ -28,23 +29,60 @@ from sklearn.metrics import confusion_matrix, accuracy_score
 # nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
 from utils.backend import Backend
 
-class HistogramMatching():
-    def __init__(self, source, target):
+
+#%%    
+class SimpleHistogramMatching():
+    def __init__(self, source, target) -> None:
         """
         2023.5.16 佐々木
-        Histogram Matchingを行う際の親クラス。
-        これを行いたいmatching方法のインスタンスに継承させると、計算の重複がなくてすみそう。
+        Simple Histogram Matchingを行うクラス。
 
         Args:
             source (np.ndarray or torch.tensor): dis-similarity matrix
             target (np.ndarray or torch.tensor): dis-similarity matrix
             
         注記
-            numpyに対応していない箇所がある。
+            torchに対応していない。
         """
         self.source = source
         self.target = target
+        pass
+    
+    def _sort_for_scaling(self, X):
+        x = X.flatten()
+        x_sorted = np.sort(x)
+        x_inverse_idx = np.argsort(x).argsort()
+        return x, x_sorted, x_inverse_idx
+
+    def _simple_histogram_matching(self, X, Y):
+        # X, Y: dissimilarity matrices
+        x, x_sorted, x_inverse_idx = self._sort_for_scaling(X)
+        y, y_sorted, y_inverse_idx = self._sort_for_scaling(Y)
+
+        y_t = x_sorted[y_inverse_idx]
+        Y_t = y_t.reshape(Y.shape)  # transformed matrix
+        return Y_t
+    
+    def simple_histogram_matching(self):
+        new_target = self._simple_histogram_matching(self.source, self.target)
+        return new_target
+
+
+# %%
+class HistogramMatchingByTransformationWithOptuna():
+    def __init__(self, source, target, to_types = 'torch', method = 'yeojohnson', save_path = None, fix_data = 'target') -> None:
+        self.source = source
+        self.target = target
+        self.to_types = to_types
+        self.save_path = save_path
+        self.fix_data = fix_data
+        self.method = method
         
+        if self.save_path is not None:
+            if not os.path.exists(self.save_path):
+                os.makedirs(self.save_path)
+        pass
+    
     def _extract_min_and_max(self, data):
         data = data.detach().clone()
         data = data.fill_diagonal_(float('nan'))
@@ -61,7 +99,7 @@ class HistogramMatching():
         elif self.fix_data == 'target':
             lim_min, lim_max = self._extract_min_and_max(self.target)
             
-        elif self.fix_data == 'both':
+        elif self.fix_data == None:
             lim_min1, lim_max1 = self._extract_min_and_max(self.source)
             lim_min2, lim_max2 = self._extract_min_and_max(self.target)
             
@@ -104,61 +142,8 @@ class HistogramMatching():
         return hist
 
 
-
-#%%    
-class SimpleHistogramMatching(HistogramMatching):
-    def __init__(self, source, target) -> None:
-        """
-        2023.5.16 佐々木
-        Simple Histogram Matchingを行う際の子クラス。
-
-        Args:
-            source (np.ndarray or torch.tensor): dis-similarity matrix
-            target (np.ndarray or torch.tensor): dis-similarity matrix
-            
-        注記
-            torchに対応していない。
-        """
-        super().__init__(source, target)
-        
-        pass
-    
-    def _sort_for_scaling(self, X):
-        x = X.flatten()
-        x_sorted = np.sort(x)
-        x_inverse_idx = np.argsort(x).argsort()
-        return x, x_sorted, x_inverse_idx
-
-    def _simple_histogram_matching(self, X, Y):
-        # X, Y: dissimilarity matrices
-        x, x_sorted, x_inverse_idx = self._sort_for_scaling(X)
-        y, y_sorted, y_inverse_idx = self._sort_for_scaling(Y)
-
-        y_t = x_sorted[y_inverse_idx]
-        Y_t = y_t.reshape(Y.shape)  # transformed matrix
-        return Y_t
-    
-    def simple_histogram_matching(self):
-        new_target = self._simple_histogram_matching(self.source, self.target)
-        return new_target
-
-
-# %%
-class HistogramMatchingByTransformationWithOptuna(HistogramMatching):
-    def __init__(self, source, target, to_types = 'torch', save_path = None, fix_data = 'target') -> None:
-        super().__init__(source, target)
-        self.to_types = to_types
-        self.save_path = save_path
-        self.fix_data = fix_data
-        
-        if self.save_path is not None:
-            if not os.path.exists(self.save_path):
-                os.makedirs(self.save_path)
-    
-        pass
-
-    def transformation(self, data, lam : float, alpha : float, method : str):
-        if method.lower() == 'yeojohnson':
+    def transformation(self, data, lam : float, alpha : float):
+        if self.method.lower() == 'yeojohnson':
             data = self.YeoJohnson_transformation(data, lam, alpha)
     
         return data
@@ -167,7 +152,7 @@ class HistogramMatchingByTransformationWithOptuna(HistogramMatching):
         data = alpha * ((torch.pow(1 + data, lam) - 1) / lam)
         return data
     
-    def L2_wasserstain(self, m1, m2, method = 'sinkhorn'):
+    def L2_wasserstain(self, m1, m2, method = 'sinkhorn', reg = 1):
         
         # lim_max, lim_min = self.make_limit()
         # bins = 100
@@ -184,7 +169,7 @@ class HistogramMatchingByTransformationWithOptuna(HistogramMatching):
         if method == 'sinkhorn':
             # sinkhornを動かすコマンド。
             dist = ot.dist(h1_prob.unsqueeze(dim=1), h2_prob.unsqueeze(dim=1))
-            res = ot.sinkhorn2(h1_prob, h2_prob, dist, reg = 1)
+            res = ot.sinkhorn2(h1_prob, h2_prob, dist, reg = reg)
         
         elif method.lower() == 'emd':
             # 以下は、EMDを動かす際のコマンド。
@@ -204,29 +189,31 @@ class HistogramMatchingByTransformationWithOptuna(HistogramMatching):
             
         self.backend = Backend(device, self.to_types)
         
+        self.source, self.target = self.backend(self.source, self.target)
+        
         if self.fix_data == 'source':
             alpha = trial.suggest_float("alpha", 1e-6, 1e1, log = True)
             lam = trial.suggest_float("lam", 1e-6, 1e1, log = True)
         
-            source_norm = self.YeoJohnson_transformation(self.source, 1.0, 1.0) 
-            target_norm = self.YeoJohnson_transformation(self.target, lam, alpha)
+            source_norm = self.transformation(self.source, 1.0, 1.0) 
+            target_norm = self.transformation(self.target, lam, alpha)
         
         elif self.fix_data == 'target':
             alpha = trial.suggest_float("alpha", 1e-6, 1e1, log = True)
             lam = trial.suggest_float("lam", 1e-6, 1e1, log = True)
             
-            source_norm = self.YeoJohnson_transformation(self.source, lam, alpha) 
-            target_norm = self.YeoJohnson_transformation(self.target, 1.0, 1.0)
+            source_norm = self.transformation(self.source, lam, alpha) 
+            target_norm = self.transformation(self.target, 1.0, 1.0)
             
-        elif self.fix_data == 'both':
+        elif self.fix_data == None:
             alpha1 = trial.suggest_float("alpha1", 1e-6, 1e1, log = True)
             lam1   = trial.suggest_float("lam1", 1e-6, 1e1, log = True)
             
             alpha2 = trial.suggest_float("alpha2", 1e-6, 1e1, log = True)
             lam2   = trial.suggest_float("lam2", 1e-6, 1e1, log = True)
             
-            source_norm = self.YeoJohnson_transformation(self.source, lam1, alpha1) 
-            target_norm = self.YeoJohnson_transformation(self.target, lam2, alpha2)
+            source_norm = self.transformation(self.source, lam1, alpha1) 
+            target_norm = self.transformation(self.target, lam2, alpha2)
         
         else:
             raise ValueError('Please choose the fix method')
@@ -261,7 +248,7 @@ class HistogramMatchingByTransformationWithOptuna(HistogramMatching):
             a2 = 1
             lam2 = 1
         
-        elif self.fix_data == 'both':
+        elif self.fix_data == None:
             a1 = best_trial.params["alpha1"]
             lam1 = best_trial.params["lam1"]
             
@@ -272,8 +259,8 @@ class HistogramMatchingByTransformationWithOptuna(HistogramMatching):
     
     def best_models(self, study):
         a1, lam1, a2, lam2 = self.best_parameters(study)
-        source_norm = self.YeoJohnson_transformation(self.source, lam1, a1) 
-        target_norm = self.YeoJohnson_transformation(self.target, lam2, a2)
+        source_norm = self.transformation(self.source, lam1, a1) 
+        target_norm = self.transformation(self.target, lam2, a2)
         return source_norm, target_norm
     
     def make_graph(self, study):
@@ -296,7 +283,7 @@ class HistogramMatchingByTransformationWithOptuna(HistogramMatching):
         plt.imshow(model_numpy2, cmap=plt.cm.jet)
         plt.colorbar(orientation='horizontal')
 
-        plt.tight_layout()
+        # plt.tight_layout()
         plt.show()
         
         lim_min, lim_max = self.make_limit()
@@ -334,24 +321,24 @@ class HistogramMatchingByTransformationWithOptuna(HistogramMatching):
 # %%
 if __name__ == '__main__':
     os.chdir(os.path.dirname(__file__))
-    source = torch.load('../../data/source.pt')
-    target = torch.load('../../data/target.pt')
-    unittest_save_path = '../../results/unittest/adjust_histogram'
-    fix_data = 'both'
+    source = torch.load('../data/model1.pt')
+    target = torch.load('../data/model2.pt')
+    unittest_save_path = '../results/unittest/histogram_matching'
+    fix_data = None
     device = 'cuda'
     
     # %%
-    tt = HistogramMatchingByTransformationWithOptuna(source, target, device = device, save_path = unittest_save_path, fix_data = fix_data) 
+    tt = HistogramMatchingByTransformationWithOptuna(source, target, save_path = unittest_save_path, fix_data = fix_data) 
     # %%
     study = optuna.create_study(direction = 'minimize',
-                                study_name = 'unit_test('+fix_data+')',
-                                sampler = optuna.samplers.RandomSampler(seed = 42),
+                                study_name = 'unit_test('+str(fix_data)+')',
+                                sampler = optuna.samplers.TPESampler(seed = 42),
                                 pruner = optuna.pruners.MedianPruner(),
-                                storage = 'sqlite:///' + unittest_save_path + '/unit_test('+fix_data+').db',
+                                storage = 'sqlite:///' + unittest_save_path + '/unit_test('+str(fix_data)+').db',
                                 load_if_exists = True)
 
     test_adjust = functools.partial(tt, device = device)
-    study.optimize(test_adjust, n_trials = 1500)
+    study.optimize(test_adjust, n_trials = 1000)
     
     # %%
     tt.make_graph(study)
