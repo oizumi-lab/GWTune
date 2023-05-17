@@ -5,9 +5,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 import numpy as np
 import pandas as pd
 import pickle as pkl
-from src.align_representations import Representation, Pairwise_Analysis, Align_Representations
+from src.align_representations import Representation, Pairwise_Analysis, Align_Representations, Optimization_Config
 from src.utils.utils_functions import get_category_idx
-from src.gw_alignment import Optimization_Config
 
 #%%
 ### load data
