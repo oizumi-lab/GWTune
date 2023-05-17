@@ -63,9 +63,17 @@ class SimpleHistogramMatching():
         Y_t = y_t.reshape(Y.shape)  # transformed matrix
         return Y_t
     
-    def simple_histogram_matching(self):
-        new_target = self._simple_histogram_matching(self.source, self.target)
-        return new_target
+    def simple_histogram_matching(self, method = 'target'):
+        if method == 'target':
+            new_emb = self._simple_histogram_matching(self.source, self.target)
+        
+        elif method == 'source':
+            new_emb = self._simple_histogram_matching(self.target, self.source)
+        
+        else:
+            raise ValueError('method should be source or target only.')
+        
+        return new_emb
 
 
 # %%
