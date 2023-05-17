@@ -122,7 +122,7 @@ class Representation:
     
     def _get_index_data(self, category_mat : pd.DataFrame = None, category_name_list = None):
         if category_mat is None:
-            object_labels, category_idx_list, category_num_list, new_category_name_list = None
+            object_labels, category_idx_list, category_num_list, new_category_name_list = None, None, None, None
         
         else:
             if category_name_list == ["all"]:
@@ -250,7 +250,7 @@ class Pairwise_Analysis:
             if np.array_equal(category_mat[i], category_mat[max_index]):
                 count += 1
                 
-        accuracy = count / self.OT.shape[0]
+        accuracy = count / self.OT.shape[0] * 100
         
         return accuracy
         
