@@ -83,7 +83,7 @@ align_representation.RSA_get_corr(shuffle = False)
 GW alignment
 '''
 ## If no need for computation, turn load_OT True, then OT plans calculated before is loaded.
-align_representation.gw_alignment(pairnumber_list = "all", shuffle = False, load_OT = True, fig_dir = "../figures")
+align_representation.gw_alignment(pairnumber_list = "all", shuffle = False, load_OT = False, fig_dir = "../figures")
 
 ## Calculate the accuracy of the optimized OT matrix
 align_representation.calc_top_k_accuracy(k_list = [1, 5, 10], shuffle = False)
