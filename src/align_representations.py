@@ -240,8 +240,9 @@ class Pairwise_Analysis:
         acc_list = self._eval_accuracy(OT = self.OT, k_list = k_list, eval_type = "k_nearest", metric = metric)
         self.k_nearest_matching_rate[self.pair_name] = acc_list
         
-    def calc_category_level_accuracy(self):
-        category_mat = self.source.category_mat.values
+    def calc_category_level_accuracy(self, category_mat = None):
+        if category_mat is None:
+            category_mat = self.source.category_mat.values
         count = 0
         
         for i in range(self.OT.shape[0]):
@@ -385,11 +386,11 @@ class Align_Representations:
         print("K nearest matching rate : \n", self.k_nearest_matching_rate)
         print("Mean : \n", self.k_nearest_matching_rate.iloc[:, 1:].mean(axis = "columns"))
         
-    def calc_category_level_accuracy(self, make_hist = False, fig_dir = None, fig_name = "Category_level_accuracy.png"):
+    def calc_category_level_accuracy(self, make_hist = False, fig_dir = None, fig_name = "Category_level_accuracy.png", category_mat = None):
         acc_list = []
         for pairnumber in self.pairnumber_list:
             pairwise = self.pairwise_list[pairnumber]
-            acc = pairwise.calc_category_level_accuracy()
+            acc = pairwise.calc_category_level_accuracy(category_mat = category_mat)
             print(f"{pairwise.pair_name} :  {acc}")
             acc_list.append(acc)
         
