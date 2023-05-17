@@ -243,6 +243,8 @@ class Pairwise_Analysis:
     def calc_category_level_accuracy(self, category_mat = None):
         if category_mat is None:
             category_mat = self.source.category_mat.values
+        else:
+            category_mat = category_mat.values
         count = 0
         
         for i in range(self.OT.shape[0]):
