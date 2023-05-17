@@ -200,6 +200,35 @@ class Pairwise_Analysis():
         plt.tight_layout()
         plt.show()
         
+        
+        a_hist, a_bin = np.histogram(a, bins=100)
+        b_hist, b_bin = np.histogram(b, bins=100)
+        
+        # print(a_hist, a_bin)
+        # print(a_hist.shape, a_bin.shape)
+        
+        # plt.figure()
+        # plt.suptitle('histogram')
+        # plt.subplot(121)
+        # plt.title('source : ' + self.source.name)
+        # plt.hist(a_bin[:-1], a_bin, weights = a_hist, color = 'C0', alpha = 0.5)
+        # plt.grid(True)
+
+        # plt.subplot(122)
+        # plt.title('target : ' + self.target.name)
+        # plt.hist(b_bin[:-1], b_bin, weights = b_hist, color = 'C1', alpha = 0.5)
+        # plt.grid(True)
+        
+        plt.figure()
+        plt.title('histogram source : ' + self.source.name + ', target : ' + self.target.name)
+        plt.hist(a_bin[:-1], a_bin, weights = a_hist, label = self.source.name, alpha = 0.5)
+        plt.hist(b_bin[:-1], b_bin, weights = b_hist, label = self.target.name, alpha = 0.5)
+        plt.grid(True)
+        plt.legend(loc = 'upper left')
+        plt.tight_layout()
+        plt.show()
+        
+        
     
     def RSA(self, metric = "spearman"):# ここも、torchでも対応できるようにする必要がある。
         upper_tri_source = self.RDM_source[np.triu_indices(self.RDM_source.shape[0], k=1)]
