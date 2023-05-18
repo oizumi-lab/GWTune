@@ -368,14 +368,14 @@ class Pairwise_Analysis():
     def _get_optimization_log(self):
         pass
     
-    def _show_OT(self, title, shuffle : bool, ticks_size = None, fig_dir = None):
+    def _show_OT(self, title, ticks_size = None, fig_dir = None):
         if fig_dir is not None:
             fig_path = os.path.join(fig_dir, f"OT_{self.pair_name}.png")  
         else: 
             fig_path = None
             
         if self.source.category_name_list is not None:
-            OT = np.concatenate([np.concatenate([OT[self.source.category_idx_list[i]] for i in range(len(self.source.category_idx_list))], axis = 0)[:, self.source.category_idx_list[i]] for i in range(len(self.source.category_idx_list))], axis = 1)
+            OT = np.concatenate([np.concatenate([self.OT[self.source.category_idx_list[i]] for i in range(len(self.source.category_idx_list))], axis = 0)[:, self.source.category_idx_list[i]] for i in range(len(self.source.category_idx_list))], axis = 1)
         else:
             OT = self.OT
             
@@ -555,7 +555,7 @@ class Align_Representations():
         
     def calc_category_level_accuracy(self, make_hist = False, fig_dir = None, fig_name = "Category_level_accuracy.png", category_mat = None):
         acc_list = []
-        for pairnumber in self.pairnumber_list:
+        for pairnumber in self.pair_number_list:
             pairwise = self.pairwise_list[pairnumber]
             acc = pairwise.calc_category_level_accuracy(category_mat = category_mat)
             print(f"{pairwise.pair_name} :  {acc}")
