@@ -15,20 +15,6 @@ jax.config.update("jax_enable_x64", True)
 #%%
 str_type_error = "All array should be from the same type/backend. Current types are : {}"
 
-def fix_seed(seed=42):
-    # Python
-    random.seed(seed)
-    # Numpy
-    np.random.seed(seed)
-    # Pytorch
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.benchmark = True
-    torch.backends.cudnn.deterministic = True
-    torch.use_deterministic_algorithms = True
-
-
 class Backend():
     def __init__(self, device = 'cpu', to_types = 'torch'):
         """
@@ -234,7 +220,3 @@ if __name__ == '__main__':
     print(test_torch1)
     print(type(test_torch1))
 
-
-# %%
-
-# %%

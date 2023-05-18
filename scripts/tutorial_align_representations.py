@@ -5,9 +5,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 import numpy as np
 import pandas as pd
 import pickle as pkl
-from src.align_representations import Representation, Pairwise_Analysis, Align_Representations
+from src.align_representations import Representation, Pairwise_Analysis, Align_Representations, Optimization_Config
 from src.utils.utils_functions import get_category_idx
-from src.gw_alignment import Optimization_Config
 
 #%%
 ### load data
@@ -83,7 +82,7 @@ align_representation.RSA_get_corr(shuffle = False)
 GW alignment
 '''
 ## If no need for computation, turn load_OT True, then OT plans calculated before is loaded.
-align_representation.gw_alignment(pairnumber_list = "all", shuffle = False, load_OT = True, fig_dir = "../figures")
+align_representation.gw_alignment(pairnumber_list = "all", shuffle = False, load_OT = False, fig_dir = "../figures")
 
 ## Calculate the accuracy of the optimized OT matrix
 align_representation.calc_top_k_accuracy(k_list = [1, 5, 10], shuffle = False)
