@@ -76,7 +76,7 @@ Unsupervised alignment between Representations
 align_representation = Align_Representations(representations_list = representations, config = config)
 
 # RSA
-align_representation.show_sim_mat(fig_dir = "../figures")
+align_representation.show_sim_mat()#fig_dir = "../figures")
 align_representation.RSA_get_corr()
 
 #%%
@@ -88,7 +88,7 @@ align_representation.gw_alignment(load_OT = True, fig_dir = "../figures")
 
 ## Calculate the accuracy of the optimized OT matrix
 align_representation.calc_accuracy(top_k_list = [1, 5, 10], eval_type = "ot_plan")
-align_representation.plot_accuracy(eval_type = "ot_plan", scatter = True, fig_dir = "../figures") # If scatter is True, the scatter plot is employed.
+align_representation.plot_accuracy(eval_type = "ot_plan", scatter = True)
 
 ## Calclate the category level accuracy
 align_representation.calc_category_level_accuracy()
@@ -97,8 +97,9 @@ align_representation.calc_category_level_accuracy()
 Align embeddings with OT plans
 '''
 ## Calculate the matching rate of k-nearest neighbors of embeddings
+## Matching rate of k-nearest neighbors 
 align_representation.calc_accuracy(top_k_list = [1, 5, 10], eval_type = "k_nearest")
-align_representation.plot_accuracy(eval_type = "k_nearest", scatter = True, fig_dir = "../figures")
+align_representation.plot_accuracy(eval_type = "k_nearest", scatter = True)
 
 '''
 Visualize the aligned embeddings
@@ -109,10 +110,10 @@ if data_select == "THINGS":
     category_name_list = ["bird", "insect", "plant", "clothing",  "furniture", "fruit", "drink", "vehicle"]
     category_mat = pd.read_csv("../data/category_mat_manual_preprocessed.csv", sep = ",", index_col = 0)   
     category_idx_list, category_num_list = get_category_idx(category_mat, category_name_list, show_numbers = True)  
-    align_representation.visualize_embedding(dim = 3, color_labels = color_labels, category_name_list = category_name_list, category_idx_list = category_idx_list, category_num_list = category_num_list, fig_dir = "../figures")
+    align_representation.visualize_embedding(dim = 3, color_labels = color_labels, category_name_list = category_name_list, category_idx_list = category_idx_list, category_num_list = category_num_list)#, fig_dir = "../figures")
 elif data_select == "color":
     file_path = "../data/color_dict.csv"
     data_color = pd.read_csv(file_path)
     color_labels = data_color.columns.values
-    align_representation.visualize_embedding(dim = 3, color_labels = color_labels, fig_dir = "../figures")
+    align_representation.visualize_embedding(dim = 3, color_labels = color_labels)#, fig_dir = "../figures")
 # %%
