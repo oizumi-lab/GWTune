@@ -43,7 +43,8 @@ elif data_select == "THINGS":
     for i in range(n_representations):
         name = f"Group{i+1}"
         embedding = np.load(f"../data/THINGS_embedding_Group{i+1}.npy")[0]
-        representation = Representation(name = name, embedding = embedding, metric = metric)
+        category_mat = pd.read_csv("../data/category_mat_manual_preprocessed.csv", sep = ",", index_col = 0)  
+        representation = Representation(name = name, embedding = embedding, metric = metric, category_mat = category_mat)
         representations.append(representation)
     
 #%%
@@ -54,7 +55,7 @@ config = Optimization_Config(data_name = data_select,
                              delete_study = False, 
                              device = 'cpu',
                              to_types = 'numpy',
-                             n_jobs = 4,
+                             n_jobs = 1,
                              init_plans_list = ['random'],
                              num_trial = 4,
                              n_iter = 1,
@@ -78,16 +79,19 @@ align_representation = Align_Representations(representations_list = representati
 align_representation.show_sim_mat()#fig_dir = "../figures")
 align_representation.RSA_get_corr()
 
+#%%
 '''
 GW alignment
 '''
 ## If no need for computation, turn load_OT True, then OT plans calculated before is loaded.
-align_representation.gw_alignment(pairnumber_list = "all", load_OT = False)#, fig_dir = "../figures")
+align_representation.gw_alignment(load_OT = True, fig_dir = "../figures")
 
 ## Calculate the accuracy of the optimized OT matrix
 align_representation.calc_accuracy(top_k_list = [1, 5, 10], eval_type = "ot_plan")
 align_representation.plot_accuracy(eval_type = "ot_plan", scatter = True)
 
+## Calclate the category level accuracy
+align_representation.calc_category_level_accuracy()
 #%%
 '''
 Align embeddings with OT plans
