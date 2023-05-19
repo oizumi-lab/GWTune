@@ -59,7 +59,7 @@ class Representation():
     """
     A class object that has information of a representation, such as embeddings and similarity matrices
     """
-    def __init__(self, name, sim_mat = None, embedding = None, metric = "cosine", shuffle = False) -> None:
+    def __init__(self, name, sim_mat = None, get_embedding = True, embedding = None, metric = "cosine", shuffle = False, category_mat : pd.DataFrame = None, category_name_list = ["all"]) -> None:
         """
         Args:
             name (_type_): The name of Representation (e.g. "Group 1")
@@ -87,20 +87,24 @@ class Representation():
         if self.shuffle:
             self.shuffled_sim_mat = self._get_shuffled_sim_mat()
 
+        self.category_mat = category_mat
+        self.object_labels, self.category_idx_list, self.num_category_list, self.category_name_list = self._get_index_data(category_mat, category_name_list)
+        
     def _get_shuffled_sim_mat(self):# ここも、torchでも対応できるようにする必要がある。
         """ 
         The function for shuffling the lower trianglar matrix.
         """
         # Get the lower triangular elements of the matrix
-        lower_tri = self.sim_mat[np.tril_indices(self.sim_mat.shape[0], k=-1)]
+        lower_tri = self.sim_mat[np.tril_indices(self.sim_mat.shape[0], k = -1)]
         
         # Shuffle the lower triangular elements
         np.random.shuffle(lower_tri)
         
         # Create a new matrix with the shuffled lower triangular elements
         shuffled_matrix = np.zeros_like(self.sim_mat)
-        shuffled_matrix[np.tril_indices(shuffled_matrix.shape[0], k=-1)] = lower_tri
+        shuffled_matrix[np.tril_indices(shuffled_matrix.shape[0], k = -1)] = lower_tri
         shuffled_matrix = shuffled_matrix + shuffled_matrix.T
+        
         return shuffled_matrix
     
     def _get_sim_mat(self):
@@ -115,15 +119,38 @@ class Representation():
         MDS_embedding = manifold.MDS(n_components = 3, dissimilarity = 'precomputed', random_state = 0)
         embedding = MDS_embedding.fit_transform(self.sim_mat)
         return embedding
+    
+    def _get_index_data(self, category_mat : pd.DataFrame = None, category_name_list = None):
+        if category_mat is None:
+            object_labels, category_idx_list, category_num_list, new_category_name_list = None, None, None, None
+        
+        else:
+            if category_name_list == ["all"]:
+                new_category_name_list = category_mat.columns.tolist()
+            else:
+                new_category_name_list = category_name_list
+            
+            category_idx_list, category_num_list = get_category_idx(category_mat, new_category_name_list, show_numbers = True)  
+            
+            object_labels = list()
+            for i in range(len(category_idx_list)):           
+                object_labels += category_mat.index[category_idx_list[i]].tolist()
+        
+        return object_labels, category_idx_list, category_num_list, new_category_name_list
         
     def show_sim_mat(self, ticks_size = None, label = None, fig_dir = None):
         if fig_dir is not None:
             fig_path = os.path.join(fig_dir, f"RDM_{self.name}.png")
         else:
             fig_path = None
+            
+        if self.category_idx_list is None:
+            sim_mat = self.sim_mat
+        else:
+            sim_mat = np.concatenate([np.concatenate([self.sim_mat[self.category_idx_list[i]] for i in range(len(self.category_idx_list))], axis = 0)[:, self.category_idx_list[i]] for i in range(len(self.category_idx_list))], axis = 1)
         
         visualize_functions.show_heatmap(
-            self.sim_mat, 
+            sim_mat, 
             title = self.name, 
             ticks_size = ticks_size, 
             xlabel = label, 
@@ -347,11 +374,32 @@ class Pairwise_Analysis():
         else: 
             fig_path = None
             
-        visualize_functions.show_heatmap(matrix = self.OT, title = title, ticks_size = ticks_size, file_name = fig_path)
-    
+        if self.source.category_name_list is not None:
+            OT = np.concatenate([np.concatenate([self.OT[self.source.category_idx_list[i]] for i in range(len(self.source.category_idx_list))], axis = 0)[:, self.source.category_idx_list[i]] for i in range(len(self.source.category_idx_list))], axis = 1)
+        else:
+            OT = self.OT
+            
+        visualize_functions.show_heatmap(matrix = OT, title = title, ticks_size = ticks_size, file_name = fig_path)
+        
+    def calc_category_level_accuracy(self, category_mat = None):
+        if category_mat is None:
+            category_mat = self.source.category_mat.values
+        else:
+            category_mat = category_mat.values
+        count = 0
+        
+        for i in range(self.OT.shape[0]):
+            max_index = np.argmax(self.OT[i])
+
+            if np.array_equal(category_mat[i], category_mat[max_index]):
+                count += 1
+                
+        accuracy = count / self.OT.shape[0] * 100
+        
+        return accuracy
+        
     def eval_accuracy(self, top_k_list, eval_type = "ot_plan",  metric = "cosine", supervised = False):
         df = pd.DataFrame()
-        
         df["top_n"] = top_k_list
 
         if supervised:
@@ -505,7 +553,21 @@ class Align_Representations():
         
         print("Mean : \n", accuracy.iloc[:, 1:].mean(axis = "columns"))
         
-    
+    def calc_category_level_accuracy(self, make_hist = False, fig_dir = None, fig_name = "Category_level_accuracy.png", category_mat = None):
+        acc_list = []
+        for pairnumber in self.pair_number_list:
+            pairwise = self.pairwise_list[pairnumber]
+            acc = pairwise.calc_category_level_accuracy(category_mat = category_mat)
+            print(f"{pairwise.pair_name} :  {acc}")
+            acc_list.append(acc)
+        
+        if make_hist:
+            plt.figure()
+            plt.hist(acc_list)
+            plt.xlabel("Accuracy")
+            plt.savefig(os.path.join(fig_dir, fig_name))
+            plt.show()
+                
     def _get_dataframe(self, eval_type = "ot_plan", shuffle = False, concat = True):
         df = self.top_k_accuracy if eval_type == "ot_plan" else self.k_nearest_matching_rate         
         
@@ -520,7 +582,7 @@ class Align_Representations():
             df = df.rename("matching rate")
         return df
         
-    def plot_accuracy(self, eval_type = "ot_plan", shuffle = False, fig_dir = None, fig_name = None, scatter = True):
+    def plot_accuracy(self, eval_type = "ot_plan", shuffle = False, fig_dir = None, fig_name = "Accuracy_ot_plan.png", scatter = True):
         plt.figure(figsize = (5, 3)) 
         
         if scatter:
