@@ -19,7 +19,7 @@
 
 ## Core modules in src
 
-### Basic GW algigment (now mainly Sasaki & Abe)
+### Basic GW aligngment (now mainly Sasaki & Abe)
 GW alignment with the hyperparameter optimization of epsilon and initial transportation plans
 
 0. util function for selecting cpu and gpu, changing variable types  
