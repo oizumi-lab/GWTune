@@ -9,8 +9,8 @@ import warnings
 from typing import Any, Union, Optional
 
 # Third Party Library
-import jax
-import jax.numpy as jnp
+# import jax
+# import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import matplotlib.style as mplstyle
 import numpy as np
