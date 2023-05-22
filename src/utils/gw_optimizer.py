@@ -175,7 +175,17 @@ class RunOptuna:
         Returns:
             _type_: _description_
         """
-        db_file_path = self.save_path + "/" + self.filename + ".db"
+        if self.sql_name == "sqlite":
+            db_file_path = self.save_path + "/" + self.filename + ".db"
+            if not os.path.exists(db_file_path):
+                raise ValueError("This db does not exist.")
+
+        study = optuna.load_study(
+            study_name=self.filename,
+            sampler=self.choose_sampler(seed=seed),
+            pruner=self.choose_pruner(),
+            storage=self.storage,
+        )
 
         if os.path.exists(db_file_path) or self.sql_name == "mysql":
             study = optuna.load_study(
