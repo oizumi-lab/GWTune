@@ -739,12 +739,15 @@ class Align_Representations():
         else: 
             fig_path = None
             
-        name_list = []
-        embedding_list = []
         for i in range(len(self.pairwise_list) // 2):
             pair = self.pairwise_list[i]
-            embedding_list.append(pair.get_new_source_embedding())
-            name_list.append(pair.pair_name)
+            pair.source.embedding = pair.get_new_source_embedding()
+            
+        name_list = []
+        embedding_list = []
+        for i in range(len(self.representations_list)): 
+            embedding_list.append(self.representations_list[i].embedding)
+            name_list.append(self.representations_list[i].name)
         
         if category_idx_list is None:
             if self.representations_list[0].category_idx_list is not None:
