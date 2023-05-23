@@ -58,4 +58,17 @@ def get_category_idx(category_mat, category_name_list, show_numbers = False):
     
     return category_idx_list, n_category_list 
 
+def sort_matrix_with_categories(matrix, category_idx_list):
+    new_mat_blocks = []
+    for i in range(len(category_idx_list)):
+        row_blocks = []
+        for j in range(len(category_idx_list)):
+            block = matrix[category_idx_list[i]][:, category_idx_list[j]]
+            row_blocks.append(block)
+        new_mat_blocks.append(np.concatenate(row_blocks, axis=1))
+    
+    new_mat = np.concatenate(new_mat_blocks, axis=0)
+    return new_mat
+
+
 # %%
