@@ -84,37 +84,99 @@ def get_color_labels_for_category(n_category_list, min_saturation, show_labels =
     return color_labels, main_colors
         
 
-def show_heatmap(matrix, title, category_name_list = None, num_category_list = None, object_labels = None, ticks = None, ticks_size = None, xlabel = None, ylabel = None, file_name = None):
-    plt.figure(figsize = (20, 20))
-    ax = sns.heatmap(matrix, square = True, cbar_kws = {"shrink": .80})
+#def show_heatmap(matrix, 
+#                 figsize = (20, 20),
+#                 title = None, 
+#                 category_name_list = None, 
+#                 num_category_list = None, 
+#                 object_labels = None, 
+#                 ticks = None, 
+#                 ticks_size = None, 
+#                 xticks_rotation = 90, 
+#                 yticks_rotation = 0, 
+#                 xlabel = None, 
+#                 ylabel = None, 
+#                 file_name = None
+#                 ):
+#    plt.figure(figsize = figsize)
+#    ax = sns.heatmap(matrix, square = True, cbar_kws = {"shrink": .80})
+#    cbar = ax.collections[0].colorbar
+#    cbar.ax.tick_params(labelsize = ticks_size)
+#    if category_name_list is not None:
+#        if ticks == "objects":
+#            plt.xticks(np.arange(sum(num_category_list)) + 0.5, labels = object_labels, rotation = xticks_rotation, size = ticks_size)
+#            plt.yticks(np.arange(sum(num_category_list)) + 0.5, labels = object_labels, rotation = yticks_rotation, size = ticks_size)
+#        elif ticks == "category":
+#            label_pos = [sum(num_category_list[: i + 1]) for i in range(len(category_name_list))]
+#            plt.xticks(label_pos, labels = category_name_list, rotation = xticks_rotation, size = ticks_size, fontweight = "bold")
+#            plt.yticks(label_pos, labels = category_name_list, rotation = yticks_rotation, size = ticks_size, fontweight = "bold")
+#        else:
+#            plt.xticks([])
+#            plt.yticks([])
+#    else:    
+#        if ticks == "numbers":
+#            plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = ticks_size)
+#            plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = ticks_size, rotation = 90)
+#        else:
+#            plt.xticks([])
+#            plt.yticks([])
+#    #plt.imshow(self.sim_mat)
+#    plt.xlabel(xlabel, size = 40)
+#    plt.ylabel(ylabel, size = 40)
+#    if title is not None:
+#        plt.title(title, size = 60)
+#    if file_name is not None:
+#        plt.savefig(file_name)
+#    plt.show() 
+
+def show_heatmap(matrix, title, file_name, **kwargs):
+    figsize = kwargs.get('figsize', (20, 20))
+    category_name_list = kwargs.get('category_name_list', None)
+    num_category_list = kwargs.get('num_category_list', None)
+    object_labels = kwargs.get('object_labels', None)
+    cbar_size = kwargs.get("cbar_size", .80)
+    cbar_ticks_size = kwargs.get("cbar_ticks_size", None)
+    ticks = kwargs.get('ticks', None)
+    ticks_size = kwargs.get('ticks_size', None)
+    xticks_rotation = kwargs.get('xticks_rotation', 90)
+    yticks_rotation = kwargs.get('yticks_rotation', 0)
+    title_size = kwargs.get('title_size', 60)
+    xlabel = kwargs.get('xlabel', None)
+    xlabel_size = kwargs.get('xlabel_size', 40)
+    ylabel = kwargs.get('ylabel', None)
+    ylabel_size = kwargs.get('ylabel_size', 40)
+
+    plt.figure(figsize = figsize)
+    ax = sns.heatmap(matrix, square=True, cbar_kws = {"shrink": cbar_size})
     cbar = ax.collections[0].colorbar
-    cbar.ax.tick_params(labelsize = ticks_size)
+    cbar.ax.tick_params(labelsize = cbar_ticks_size)
     if category_name_list is not None:
+        assert num_category_list is not None
         if ticks == "objects":
-            plt.xticks(np.arange(sum(num_category_list)) + 0.5, labels = object_labels, rotation = 90, size = ticks_size)
-            plt.yticks(np.arange(sum(num_category_list)) + 0.5, labels = object_labels, rotation = 0, size = ticks_size)
+            plt.xticks(np.arange(sum(num_category_list)) + 0.5, labels = object_labels, rotation = xticks_rotation, size = ticks_size)
+            plt.yticks(np.arange(sum(num_category_list)) + 0.5, labels = object_labels, rotation = yticks_rotation, size = ticks_size)
         elif ticks == "category":
-            label_pos = [sum(num_category_list[: i + 1]) for i in range(len(category_name_list))]
-            plt.xticks(label_pos, labels = category_name_list, rotation = 70, size = ticks_size, fontweight = "bold")
-            plt.yticks(label_pos, labels = category_name_list, rotation = 0, size = ticks_size, fontweight = "bold")
+            label_pos = [sum(num_category_list[:i + 1]) for i in range(len(category_name_list))]
+            plt.xticks(label_pos, labels = category_name_list, rotation = xticks_rotation, size = ticks_size, fontweight = "bold")
+            plt.yticks(label_pos, labels = category_name_list, rotation = yticks_rotation, size = ticks_size, fontweight = "bold")
         else:
             plt.xticks([])
             plt.yticks([])
-    else:    
+    else:
         if ticks == "numbers":
-            plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = ticks_size)
-            plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = ticks_size, rotation = 90)
+            plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = ticks_size, rotation = xticks_rotation)
+            plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = ticks_size, rotation = yticks_rotation)
         else:
             plt.xticks([])
             plt.yticks([])
-    #plt.imshow(self.sim_mat)
-    plt.xlabel(xlabel, size = 40)
-    plt.ylabel(ylabel, size = 40)
-    plt.title(title, size = 60)
+    plt.xlabel(xlabel, size = xlabel_size)
+    plt.ylabel(ylabel, size = ylabel_size)
+    if title is not None:
+        plt.title(title, size = title_size)
     if file_name is not None:
         plt.savefig(file_name)
-    plt.show() 
-    
+    plt.show()
+
 
 def plot_lower_triangular_histogram(matrix, title):
     lower_triangular = np.tril(matrix)

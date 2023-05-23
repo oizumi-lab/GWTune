@@ -16,7 +16,7 @@ import sys
 import os
 from typing import List
 
-from utils.utils_functions import get_category_idx
+from utils.utils_functions import get_category_idx, sort_matrix_with_categories
 from utils import visualize_functions, backend, init_matrix, gw_optimizer
 from gw_alignment import GW_Alignment
 from histogram_matching import SimpleHistogramMatching
@@ -54,6 +54,48 @@ class Optimization_Config:
         self.eps_log = eps_log
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
+        
+class Visualize_Matrix():
+    def __init__(self, 
+                 figsize = (20, 20),
+                 category_name_list = None,
+                 num_category_list = None,
+                 object_labels = None,
+                 cbar_size = 0.80,
+                 cbar_ticks_size = None,
+                 ticks = None,
+                 ticks_size = None,
+                 xticks_rotation = 90,
+                 yticks_rotation = 0,
+                 title_size = 60,
+                 xlabel = None,
+                 xlabel_size = 40,
+                 ylabel = None,
+                 ylabel_size = 40
+                 ) -> None:
+        
+        self.visualize_params = {
+            'figsize': figsize,
+            'category_name_list': category_name_list,
+            'num_category_list': num_category_list,
+            'object_labels': object_labels,
+            'cbar_size': cbar_size,
+            'cbar_ticks_size': cbar_ticks_size,
+            'ticks': ticks,
+            'ticks_size': ticks_size,
+            'xticks_rotation': xticks_rotation,
+            'yticks_rotation': yticks_rotation,
+            'title_size': title_size,
+            'xlabel': xlabel,
+            'xlabel_size': xlabel_size,
+            'ylabel': ylabel,
+            'ylabel_size': ylabel_size
+        }
+
+        pass
+    
+    def show(self, matrix, title, file_name):
+        visualize_functions.show_heatmap(matrix = matrix, title = title, file_name = file_name, **self.visualize_params)
 
 class Representation():
     """
@@ -80,7 +122,8 @@ class Representation():
           
         if embedding is None:
             self.sim_mat = sim_mat
-            self.embedding = self._get_embedding()
+            if get_embedding:
+                self.embedding = self._get_embedding()
         else:
             self.embedding = embedding
         
@@ -138,25 +181,52 @@ class Representation():
         
         return object_labels, category_idx_list, category_num_list, new_category_name_list
         
-    def show_sim_mat(self, ticks_size = None, label = None, fig_dir = None):
-        if fig_dir is not None:
-            fig_path = os.path.join(fig_dir, f"RDM_{self.name}.png")
-        else:
-            fig_path = None
-            
-        if self.category_idx_list is None:
-            sim_mat = self.sim_mat
-        else:
-            sim_mat = np.concatenate([np.concatenate([self.sim_mat[self.category_idx_list[i]] for i in range(len(self.category_idx_list))], axis = 0)[:, self.category_idx_list[i]] for i in range(len(self.category_idx_list))], axis = 1)
+    def show_sim_mat(self, returned = "figure", sim_mat_format = "default", visualize_matrix : Visualize_Matrix = None, fig_dir = None):
+        """_summary_
+
+        Args:
+            returned (str, optional): "figure", "row_data" or "both" . Defaults to "figure".
+            sim_mat_format (str, optional): "default", "sorted" or "both". Defaults to "default".
+            visualize_matrix (Visualize_Matrix, optional): The instance of Visualize_Matrix. Defaults to None.
+            fig_dir (_type_, optional): _description_. Defaults to None.
+        """
+        if self.category_idx_list is not None:
+            sim_mat_sorted = sort_matrix_with_categories(self.sim_mat, category_idx_list = self.category_idx_list)
         
-        visualize_functions.show_heatmap(
-            sim_mat, 
-            title = self.name, 
-            ticks_size = ticks_size, 
-            xlabel = label, 
-            ylabel = label, 
-            file_name = fig_path,
-        )
+        if returned == "figure" or returned == "both":
+            if fig_dir is not None:
+                fig_path = os.path.join(fig_dir, f"RDM_{self.name}.png")
+            else:
+                fig_path = None
+                
+            if sim_mat_format == "default":
+                sim_mat_list = [self.sim_mat]
+            
+            elif sim_mat_format == "sorted":
+                sim_mat_list = [sim_mat_sorted]
+            
+            elif sim_mat_format == "both":
+                sim_mat_list = [self.sim_mat, sim_mat_sorted]
+                
+            else:
+                raise ValueError("sim_mat_format must be either 'default', 'sorted', or 'both'.")
+            
+            for sim_mat in sim_mat_list:
+                visualize_matrix.show(sim_mat, title = self.name, file_name = fig_path)
+        
+            
+        elif returned == "row_data" or returned == "both":
+            if sim_mat_format == "default":
+                return self.sim_mat
+            
+            elif sim_mat_format == "sorted":
+                return sim_mat_sorted
+            
+            elif sim_mat_format == "both":
+                return self.sim_mat, sim_mat_sorted
+            
+            else:
+                raise ValueError("sim_mat_format must be either 'default', 'sorted', or 'both'.")
         
     def show_sim_mat_distribution(self):# ここも、torchでも対応できるようにする必要がある。
         lower_triangular = np.tril(self.sim_mat)
@@ -274,13 +344,19 @@ class Pairwise_Analysis():
         self.RDM_target = matching.simple_histogram_matching()
         
     
-    def run_gw(self, ticks_size = None, load_OT = False, fig_dir = None):
+    def run_gw(self, load_OT = False, returned = "figure", OT_format = "default", visualize_matrix : Visualize_Matrix = None, fig_dir = None):
         """
         Main computation
         """            
         self.OT = self._gw_alignment(load_OT = load_OT)
-        self._show_OT(title = f"$\Gamma$ ({self.pair_name})", ticks_size = ticks_size, fig_dir = fig_dir)
+        OT = self._show_OT(title = f"$\Gamma$ ({self.pair_name})", 
+                      returned = returned, 
+                      OT_format = OT_format, 
+                      visualize_matrix = visualize_matrix, 
+                      fig_dir = fig_dir)
         
+        return OT
+    
     def _gw_alignment(self, results_dir = "../results/", load_OT = False):
         
         filename = self.config.data_name + " " + self.pair_name
@@ -368,19 +444,45 @@ class Pairwise_Analysis():
     def _get_optimization_log(self):
         pass
     
-    def _show_OT(self, title, ticks_size = None, fig_dir = None):
-        if fig_dir is not None:
-            fig_path = os.path.join(fig_dir, f"OT_{self.pair_name}.png")  
-        else: 
-            fig_path = None
-            
-        if self.source.category_name_list is not None:
-            OT = np.concatenate([np.concatenate([self.OT[self.source.category_idx_list[i]] for i in range(len(self.source.category_idx_list))], axis = 0)[:, self.source.category_idx_list[i]] for i in range(len(self.source.category_idx_list))], axis = 1)
-        else:
-            OT = self.OT
-            
-        visualize_functions.show_heatmap(matrix = OT, title = title, ticks_size = ticks_size, file_name = fig_path)
+    def _show_OT(self, title, returned = "figure", OT_format = "default", visualize_matrix : Visualize_Matrix = None, fig_dir = None):
+        if self.source.category_idx_list is not None:
+            OT_sorted = sort_matrix_with_categories(self.OT, category_idx_list = self.source.category_idx_list)
         
+        if returned == "figure" or returned == "both":
+            if fig_dir is not None:
+                fig_path = os.path.join(fig_dir, f"OT_{self.pair_name}.png")
+            else:
+                fig_path = None
+                
+            if OT_format == "default":
+                OT_list = [self.OT]
+            
+            elif OT_format == "sorted":
+                OT_list = [OT_sorted]
+            
+            elif OT_format == "both":
+                OT_list = [self.OT, OT_sorted]
+                
+            else:
+                raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
+            
+            for OT in OT_list:
+                visualize_matrix.show(OT, title = title, file_name = fig_path)
+        
+            
+        elif returned == "row_data" or returned == "both":
+            if OT_format == "default":
+                return self.OT
+            
+            elif OT_format == "sorted":
+                return OT_sorted
+            
+            elif OT_format == "both":
+                return self.OT, OT_sorted
+            
+            else:
+                raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
+                
     def calc_category_level_accuracy(self, category_mat = None):
         if category_mat is None:
             category_mat = self.source.category_mat.values
@@ -403,51 +505,51 @@ class Pairwise_Analysis():
         df["top_n"] = top_k_list
 
         if supervised:
-            OT = np.diag([1/len(self.target.sim_mat) for _ in range(len(self.target.sim_mat))]) # ここも、torchでも対応できるようにする必要がある。
+            OT = np.diag([1/len(self.target.sim_mat) for _ in range(len(self.target.sim_mat))])
         else:
             OT = self.OT
         
         acc_list = list()
         for k in top_k_list:
             if eval_type == "k_nearest":
-                """
-                2023.5.15 佐々木
-                ここのtop_kの算出方法は直すべき箇所で間違いないが、
-                全く本質的ではないので、全部公開するときに直した方がいい。
-                """
                 new_embedding_source = self.procrustes(self.target.embedding, self.source.embedding, OT)
                 
                 # Compute distances between each points
-                dist_mat = distance.cdist(self.target.embedding, new_embedding_source, metric) # ここも、torchでも対応できるようにする必要がある。
-
-                # Get sorted indices 
-                sorted_idx = np.argsort(dist_mat, axis = 1)
-                # sorted_idx = np.argpartition(dist_mat, 
-
-                # Get the same colors and count k-nearest
-                acc = 0 # ここはot_planと重複しているし、もっと簡単な関数に書き直せる直せるはず。
-                for i in range(self.target.embedding.shape[0]):
-                    acc += (sorted_idx[i, :k]  == i).sum() 
-                acc /= self.target.embedding.shape[0]
-                acc *= 100
+                dist_mat = distance.cdist(self.target.embedding, new_embedding_source, metric)
+ 
+                acc = self._calc_accuracy_with_topk_diagonal(dist_mat, k = k, order = "minimum")
             
             elif eval_type == "ot_plan":
-                acc = 0
-                for i in range(OT.shape[0]):
-                    idx = np.argsort(-OT[i, :])
-                    acc += (idx[:k] == i).sum()    
-                acc /= OT.shape[0]
-                acc *= 100
+                acc = self._calc_accuracy_with_topk_diagonal(OT, k = k, order = "maximum")
             
             acc_list.append(acc)
         
         df[self.pair_name] = acc_list
         
         return df
-    
-    # def procrustes(self):
-    #     self.source.embedding = self._procrustes(self.target.embedding, self.source.embedding, self.OT)
 
+    def _calc_accuracy_with_topk_diagonal(self, matrix, k, order='maximum'):
+        # Get the diagonal elements
+        diagonal = np.diag(matrix)
+        
+        # Get the top k values for each row
+        if order == 'maximum':
+            topk_values = np.partition(matrix, -k)[:, -k:]
+        elif order == 'minimum':
+            topk_values = np.partition(matrix, k - 1)[:, :k]
+        else:
+            raise ValueError("Invalid order parameter. Must be 'maximum' or 'minimum'.")
+        
+        # Count the number of rows where the diagonal is in the top k values
+        count = np.sum(np.isin(diagonal, topk_values))
+        
+        # Calculate the accuracy as the proportion of counts to the total number of rows
+        accuracy = count / matrix.shape[0]
+        accuracy *= 100
+        
+        return accuracy
+
+    
     def procrustes(self, embedding_1, embedding_2, Pi):
         """
         embedding_2をembedding_1に最も近づける回転行列Qを求める
@@ -463,7 +565,7 @@ class Pairwise_Analysis():
         """
         assert self.source.shuffle == False, "you cannot use procrustes method if 'shuffle' is True."
         
-        # ここも、torchでも対応できるようにする必要がある。
+       
         U, S, Vt = np.linalg.svd(np.matmul(embedding_2.T, np.matmul(Pi, embedding_1)))
         Q = np.matmul(U, Vt)
         new_embedding_2 = np.matmul(embedding_2, Q)
@@ -517,16 +619,33 @@ class Align_Representations():
             self.RSA_corr[pairwise.pair_name] = corr
             print(f"Correlation {pairwise.pair_name} : {corr}")
     
-    def show_sim_mat(self, ticks_size = None, label = None, fig_dir = None, show_distribution = True):
+    def show_sim_mat(self, returned = "figure", sim_mat_format = "default", visualize_matrix : Visualize_Matrix = None, fig_dir = None, show_distribution = True):
+        """_summary_
+
+        Args:
+            returned (str, optional): "figure", "row_data" or "both" . Defaults to "figure".
+            sim_mat_format (str, optional): "default", "sorted" or "both". Defaults to "default".
+            visualize_matrix (Visualize_Matrix, optional): The instance of Visualize_Matrix. Defaults to None.
+            fig_dir (_type_, optional): _description_. Defaults to None.
+        """
         for representation in self.representations_list:
-            representation.show_sim_mat(ticks_size = ticks_size, label = label, fig_dir = fig_dir)
+            representation.show_sim_mat(returned = returned,
+                                        sim_mat_format = sim_mat_format,
+                                        visualize_matrix = visualize_matrix,
+                                        fig_dir = fig_dir
+                                        )
             if show_distribution:
                 representation.show_sim_mat_distribution()
     
-    def gw_alignment(self, ticks_size = None, load_OT = False, fig_dir = None):
+    def gw_alignment(self, load_OT = False, returned = "figure", OT_format = "default", visualize_matrix : Visualize_Matrix = None, fig_dir = None):
         for pair_number in self.pair_number_list:
             pairwise = self.pairwise_list[pair_number]
-            pairwise.run_gw(ticks_size = ticks_size, load_OT = load_OT, fig_dir = fig_dir)
+            pairwise.run_gw(load_OT = load_OT,
+                            returned = returned,
+                            OT_format = OT_format,
+                            visualize_matrix = visualize_matrix,
+                            fig_dir = fig_dir
+                            )
             
     def barycenter_alignment(self):
         pass
@@ -612,19 +731,29 @@ class Align_Representations():
                             category_name_list = None, 
                             category_num_list = None, 
                             category_idx_list = None, 
-                            fig_dir = None):
+                            fig_dir = None, 
+                            fig_name = "Aligned_embedding.png"):
         
         if fig_dir is not None:
-            fig_path = os.path.join(fig_dir, "Aligned_embedding.png")  
+            fig_path = os.path.join(fig_dir, fig_name)  
         else: 
             fig_path = None
             
-        name_list = []
-        embedding_list = []
         for i in range(len(self.pairwise_list) // 2):
             pair = self.pairwise_list[i]
-            embedding_list.append(pair.get_new_source_embedding())
-            name_list.append(pair.pair_name)
+            pair.source.embedding = pair.get_new_source_embedding()
+            
+        name_list = []
+        embedding_list = []
+        for i in range(len(self.representations_list)): 
+            embedding_list.append(self.representations_list[i].embedding)
+            name_list.append(self.representations_list[i].name)
+        
+        if category_idx_list is None:
+            if self.representations_list[0].category_idx_list is not None:
+                category_name_list = self.representations_list[0].category_name_list
+                category_num_list = self.representations_list[0].num_category_list
+                category_idx_list = self.representations_list[0].category_idx_list
             
         visualize_embedding = visualize_functions.Visualize_Embedding(
             embedding_list = embedding_list,
@@ -637,64 +766,3 @@ class Align_Representations():
         
         visualize_embedding.plot_embedding(dim = dim, save_dir = fig_path)
 
-
-#%%
-if __name__ == "__main__":
-    '''
-    parameters
-    '''
-    n_group = 4
-    metric = "euclidean"
-    
-    #%%
-    '''
-    Create subject groups list
-    '''
-    representations = []
-    for i in range(n_group):
-        name = f"Group{i+1}"
-        embedding = np.load(f"../data/THINGS_embedding_Group{i+1}.npy")[0]
-        representation = Representation(name = name, embedding = embedding, metric = metric, shuffle = False)
-        representations.append(representation)
-    
-    #%%
-    '''
-    Unsupervised alignment between Representations
-    '''
-    test_config = Optimization_Config(delete_study=False, n_jobs=1)
-    align_representations = Align_Representations(config = test_config, representations_list = representations)
-    
-    #%%
-    # RSA
-    align_representations.show_sim_mat()
-    align_representations.RSA_get_corr()
-    
-    #%%
-    # Run gw
-    align_representations.gw_alignment(load_OT = True)
-    #%%
-    '''
-    Evaluate the accuracy
-    '''
-    ## Accuracy of the optimized OT matrix
-    align_representations.calc_accuracy(top_k_list = [1, 5, 10], eval_type = "ot_plan")
-    
-    # %%
-    align_representations.plot_accuracy(eval_type = "ot_plan", scatter = True)
-    # %%
-    ## Matching rate of k-nearest neighbors 
-    align_representations.calc_accuracy(top_k_list = [1, 5, 10], eval_type = "k_nearest")
-    # %%
-    align_representations.plot_accuracy(eval_type = "k_nearest", scatter = True)
-    
-    #%%
-    '''
-    Visualize embedding
-    '''
-    ## Load the coarse categories data
-    category_name_list = ["bird", "insect", "plant", "clothing",  "furniture", "fruit", "drink", "vehicle"]
-    category_mat = pd.read_csv("../data/category_mat_manual_preprocessed.csv", sep = ",", index_col = 0)   
-    category_idx_list, category_num_list = get_category_idx(category_mat, category_name_list, show_numbers = True)  
-    
-    align_representations.visualize_embedding(dim = 3, category_name_list = category_name_list, category_idx_list = category_idx_list, category_num_list = category_num_list)
-# %%
