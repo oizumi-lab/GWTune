@@ -89,7 +89,7 @@ align_representation.RSA_get_corr()
 GW alignment
 '''
 ## If no need for computation, turn load_OT True, then OT plans calculated before is loaded.
-align_representation.gw_alignment(load_OT = True, returned = "figure", OT_format = "sorted", visualize_matrix = visualize_matrix)
+align_representation.gw_alignment(load_OT = True, returned = "figure", OT_format = "sorted", visualize_matrix = visualize_matrix, show_log = True)
 
 ## Calculate the accuracy of the optimized OT matrix
 align_representation.calc_accuracy(top_k_list = [1, 5, 10], eval_type = "ot_plan")

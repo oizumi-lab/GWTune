@@ -344,16 +344,19 @@ class Pairwise_Analysis():
         self.RDM_target = matching.simple_histogram_matching()
         
     
-    def run_gw(self, load_OT = False, returned = "figure", OT_format = "default", visualize_matrix : Visualize_Matrix = None, fig_dir = None):
+    def run_gw(self, load_OT = False, returned = "figure", OT_format = "default", visualize_matrix : Visualize_Matrix = None, show_log = False, fig_dir = None):
         """
         Main computation
         """            
-        self.OT = self._gw_alignment(load_OT = load_OT)
+        self.OT, df_trial = self._gw_alignment(load_OT = load_OT)
         OT = self._show_OT(title = f"$\Gamma$ ({self.pair_name})", 
                       returned = returned, 
                       OT_format = OT_format, 
                       visualize_matrix = visualize_matrix, 
                       fig_dir = fig_dir)
+        
+        if show_log:
+            self._get_optimization_log(df_trial, fig_dir = fig_dir)
         
         return OT
     
@@ -430,6 +433,7 @@ class Pairwise_Analysis():
         else:
             study = opt.load_study()
             best_trial = study.best_trial
+            df_trial = study.trials_dataframe()
             
             if self.config.to_types == 'numpy':
                 OT = np.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.npy")
@@ -439,10 +443,26 @@ class Pairwise_Analysis():
                 
                 OT = OT.to('cpu').numpy()
         
-        return OT
+        return OT, df_trial
           
-    def _get_optimization_log(self):
-        pass
+    def _get_optimization_log(self, df_trial, fig_dir):
+        # figure plotting epsilon as x-axis and GWD as y-axis
+        sns.scatterplot(data = df_trial, x = "params_eps", y = "value", s = 50)
+        plt.xlabel("$\epsilon$")
+        plt.ylabel("GWD")
+        if fig_dir is not None:
+            fig_path = os.path.join(fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png")
+            plt.savefig(fig_path)
+        plt.show()
+        
+        # 　figure plotting GWD as x-axis and accuracy as y-axis
+        sns.scatterplot(data = df_trial, x = "value", y = "user_attrs_best_acc", s = 50)
+        plt.xlabel("GWD")
+        plt.ylabel("accuracy")
+        if fig_dir is not None:
+            fig_path = os.path.join(fig_dir, f"Optim_log_acc_GWD_{self.pair_name}.png")
+            plt.savefig(fig_path)
+        plt.show()
     
     def _show_OT(self, title, returned = "figure", OT_format = "default", visualize_matrix : Visualize_Matrix = None, fig_dir = None):
         if self.source.category_idx_list is not None:
@@ -637,13 +657,14 @@ class Align_Representations():
             if show_distribution:
                 representation.show_sim_mat_distribution()
     
-    def gw_alignment(self, load_OT = False, returned = "figure", OT_format = "default", visualize_matrix : Visualize_Matrix = None, fig_dir = None):
+    def gw_alignment(self, load_OT = False, returned = "figure", OT_format = "default", visualize_matrix : Visualize_Matrix = None, show_log = False, fig_dir = None):
         for pair_number in self.pair_number_list:
             pairwise = self.pairwise_list[pair_number]
             pairwise.run_gw(load_OT = load_OT,
                             returned = returned,
                             OT_format = OT_format,
                             visualize_matrix = visualize_matrix,
+                            show_log = show_log,
                             fig_dir = fig_dir
                             )
             
