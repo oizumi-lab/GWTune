@@ -422,6 +422,7 @@ class Pairwise_Analysis():
             )
             
             best_trial = study.best_trial
+            df_trial = study.trials_dataframe()
             
             if self.config.to_types == 'numpy':
                 OT = np.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.npy")
