@@ -731,10 +731,11 @@ class Align_Representations():
                             category_name_list = None, 
                             category_num_list = None, 
                             category_idx_list = None, 
-                            fig_dir = None):
+                            fig_dir = None, 
+                            fig_name = "Aligned_embedding.png"):
         
         if fig_dir is not None:
-            fig_path = os.path.join(fig_dir, "Aligned_embedding.png")  
+            fig_path = os.path.join(fig_dir, fig_name)  
         else: 
             fig_path = None
             
@@ -762,64 +763,3 @@ class Align_Representations():
         
         visualize_embedding.plot_embedding(dim = dim, save_dir = fig_path)
 
-
-#%%
-if __name__ == "__main__":
-    '''
-    parameters
-    '''
-    n_group = 4
-    metric = "euclidean"
-    
-    #%%
-    '''
-    Create subject groups list
-    '''
-    representations = []
-    for i in range(n_group):
-        name = f"Group{i+1}"
-        embedding = np.load(f"../data/THINGS_embedding_Group{i+1}.npy")[0]
-        representation = Representation(name = name, embedding = embedding, metric = metric, shuffle = False)
-        representations.append(representation)
-    
-    #%%
-    '''
-    Unsupervised alignment between Representations
-    '''
-    test_config = Optimization_Config(delete_study=False, n_jobs=1)
-    align_representations = Align_Representations(config = test_config, representations_list = representations)
-    
-    #%%
-    # RSA
-    align_representations.show_sim_mat()
-    align_representations.RSA_get_corr()
-    
-    #%%
-    # Run gw
-    align_representations.gw_alignment(load_OT = True)
-    #%%
-    '''
-    Evaluate the accuracy
-    '''
-    ## Accuracy of the optimized OT matrix
-    align_representations.calc_accuracy(top_k_list = [1, 5, 10], eval_type = "ot_plan")
-    
-    # %%
-    align_representations.plot_accuracy(eval_type = "ot_plan", scatter = True)
-    # %%
-    ## Matching rate of k-nearest neighbors 
-    align_representations.calc_accuracy(top_k_list = [1, 5, 10], eval_type = "k_nearest")
-    # %%
-    align_representations.plot_accuracy(eval_type = "k_nearest", scatter = True)
-    
-    #%%
-    '''
-    Visualize embedding
-    '''
-    ## Load the coarse categories data
-    category_name_list = ["bird", "insect", "plant", "clothing",  "furniture", "fruit", "drink", "vehicle"]
-    category_mat = pd.read_csv("../data/category_mat_manual_preprocessed.csv", sep = ",", index_col = 0)   
-    category_idx_list, category_num_list = get_category_idx(category_mat, category_name_list, show_numbers = True)  
-    
-    align_representations.visualize_embedding(dim = 3, category_name_list = category_name_list, category_idx_list = category_idx_list, category_num_list = category_num_list)
-# %%
