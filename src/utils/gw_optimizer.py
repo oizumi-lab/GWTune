@@ -32,7 +32,6 @@ def load_optimizer(
     pruner_params=None,
     n_iter=10,
     filename="test",
-    sql_name="sqlite",
     storage=None,
     delete_study=False,
 ):
@@ -56,16 +55,6 @@ def load_optimizer(
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
-    # make db path
-    if sql_name == "sqlite":
-        storage = "sqlite:///" + save_path + "/" + filename + ".db"
-
-    elif sql_name == "mysql":
-        if storage == None:
-            raise ValueError("mysql path was not set.")
-    else:
-        raise ValueError("no implemented SQL.")
-
     if method == "optuna":
         Opt = RunOptuna(
             save_path,
@@ -76,7 +65,6 @@ def load_optimizer(
             pruner_name,
             pruner_params,
             n_iter,
-            sql_name,
             n_jobs,
             num_trial,
             delete_study,
@@ -98,8 +86,7 @@ class RunOptuna:
         pruner_name,
         pruner_params,
         n_iter,
-        sql_name,  # optunaにおける各種設定
-        n_jobs,
+        n_jobs,  # optunaにおける各種設定
         num_trial,
         delete_study,  # optuna.studyに与えるパラメータ
     ):
@@ -114,7 +101,6 @@ class RunOptuna:
         self.sampler_name = sampler_name
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
-        self.sql_name = sql_name
 
         # optuna.studyに与えるパラメータ
         self.n_jobs = n_jobs
@@ -175,28 +161,12 @@ class RunOptuna:
         Returns:
             _type_: _description_
         """
-        if self.sql_name == "sqlite":
-            db_file_path = self.save_path + "/" + self.filename + ".db"
-            if not os.path.exists(db_file_path):
-                raise ValueError("This db does not exist.")
-
         study = optuna.load_study(
             study_name=self.filename,
             sampler=self.choose_sampler(seed=seed),
             pruner=self.choose_pruner(),
             storage=self.storage,
         )
-
-        if os.path.exists(db_file_path) or self.sql_name == "mysql":
-            study = optuna.load_study(
-                study_name=self.filename,
-                sampler=self.choose_sampler(seed=seed),
-                pruner=self.choose_pruner(),
-                storage=self.storage,
-            )
-
-        else:
-            raise ValueError("This db does not exist.")
         return study
 
     def _run_study(self, objective, device="cpu", seed=42, forced_run=True):
