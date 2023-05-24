@@ -279,7 +279,7 @@ class RunOptuna:
 
     def choose_pruner(self):
         """
-        2023/3/15 阿部
+        2023/3/15 abe
         Median PrunerとHyperbandPrunerを追加
         (RandomSampler, MedianPruner)か(TPESampler, HyperbandPruner)がbestらしい
         """
