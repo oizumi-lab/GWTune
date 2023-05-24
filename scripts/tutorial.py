@@ -11,8 +11,6 @@ import warnings
 sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
 
 # Third Party Library
-import jax
-import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import matplotlib.style as mplstyle
 import numpy as np
@@ -29,7 +27,7 @@ import torch
 from src.gw_alignment import GW_Alignment
 from src.utils.gw_optimizer import load_optimizer
 from src.utils.init_matrix import InitMatrix
-from src.utils.evaluation import calc_correct_rate_ot_plan, pairwise_k_nearest_matching_rate
+# from src.utils.evaluation import calc_correct_rate_ot_plan, pairwise_k_nearest_matching_rate
 from src.utils.utils_functions import procrustes, get_category_idx
 from src.utils.visualize_functions import Visualize_Embedding
 

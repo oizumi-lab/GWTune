@@ -7,6 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import itertools
+import torch
 from scipy.spatial import distance
 from scipy.stats import spearmanr, pearsonr
 from sklearn import manifold
@@ -15,68 +16,219 @@ import sys
 import os
 from typing import List
 
-from utils.utils_functions import procrustes, get_category_idx
-from utils import visualize_functions, evaluation
-from gw_alignment import run_main_gw, Optimization_Config
+from utils.utils_functions import get_category_idx, sort_matrix_with_categories
+from utils import visualize_functions, backend, init_matrix, gw_optimizer
+from gw_alignment import GW_Alignment
+from histogram_matching import SimpleHistogramMatching
 
+class Optimization_Config:
+    def __init__(
+        self,
+        data_name="THINGS",
+        delete_study=False,
+        device="cpu",
+        to_types="numpy",
+        n_jobs=1,
+        init_plans_list=["random"],
+        num_trial=4,
+        n_iter=1,
+        max_iter=200,
+        sampler_name="tpe",
+        eps_list=[1, 10],
+        eps_log=True,
+        pruner_name="hyperband",
+        pruner_params={"n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3},
+    ) -> None:
+        
+        self.data_name = data_name
+        self.delete_study = delete_study
+        self.device = device
+        self.to_types = to_types
+        self.n_jobs = n_jobs
+        self.init_plans_list = init_plans_list
+        self.num_trial = num_trial
+        self.n_iter = n_iter
+        self.max_iter = max_iter
+        self.sampler_name = sampler_name
+        self.eps_list = eps_list
+        self.eps_log = eps_log
+        self.pruner_name = pruner_name
+        self.pruner_params = pruner_params
+        
+class Visualize_Matrix():
+    def __init__(self, 
+                 figsize = (20, 20),
+                 category_name_list = None,
+                 num_category_list = None,
+                 object_labels = None,
+                 cbar_size = 0.80,
+                 cbar_ticks_size = None,
+                 ticks = None,
+                 ticks_size = None,
+                 xticks_rotation = 90,
+                 yticks_rotation = 0,
+                 title_size = 60,
+                 xlabel = None,
+                 xlabel_size = 40,
+                 ylabel = None,
+                 ylabel_size = 40
+                 ) -> None:
+        
+        self.visualize_params = {
+            'figsize': figsize,
+            'category_name_list': category_name_list,
+            'num_category_list': num_category_list,
+            'object_labels': object_labels,
+            'cbar_size': cbar_size,
+            'cbar_ticks_size': cbar_ticks_size,
+            'ticks': ticks,
+            'ticks_size': ticks_size,
+            'xticks_rotation': xticks_rotation,
+            'yticks_rotation': yticks_rotation,
+            'title_size': title_size,
+            'xlabel': xlabel,
+            'xlabel_size': xlabel_size,
+            'ylabel': ylabel,
+            'ylabel_size': ylabel_size
+        }
 
-class Representation:
+        pass
+    
+    def show(self, matrix, title, file_name):
+        visualize_functions.show_heatmap(matrix = matrix, title = title, file_name = file_name, **self.visualize_params)
+
+class Representation():
     """
     A class object that has information of a representation, such as embeddings and similarity matrices
     """
-    def __init__(self, name, sim_mat = None, embedding = None, metric = "cosine") -> None:
-        """_summary_
-
+    def __init__(self, name, sim_mat = None, get_embedding = True, embedding = None, metric = "cosine", shuffle = False, category_mat : pd.DataFrame = None, category_name_list = ["all"]) -> None:
+        """
         Args:
             name (_type_): The name of Representation (e.g. "Group 1")
             sim_mat (_type_, optional): RDM (Representational Dissimilarity Matrix) of the representation. Defaults to None.
             embedding (_type_, optional): The embedding of the representaion. Defaults to None.
             metric (str, optional): The distance metric for computing dissimilarity matrix. Defaults to "cosine".
         """
+
         self.name = name
         self.metric = metric
+        self.shuffle = shuffle
+        
         if sim_mat is None:
             self.embedding = embedding
             self.sim_mat = self._get_sim_mat()
-        elif embedding is None:
+        else:
             self.sim_mat = sim_mat
-            self.embedding = self._get_embedding()
+          
+        if embedding is None:
+            self.sim_mat = sim_mat
+            if get_embedding:
+                self.embedding = self._get_embedding()
         else:
             self.embedding = embedding
-            self.sim_mat = sim_mat
-        self.shuffled_sim_mat = self._get_shuffled_sim_mat()
+        
+        if self.shuffle:
+            self.shuffled_sim_mat = self._get_shuffled_sim_mat()
 
+        self.category_mat = category_mat
+        self.object_labels, self.category_idx_list, self.num_category_list, self.category_name_list = self._get_index_data(category_mat, category_name_list)
+        
+    def _get_shuffled_sim_mat(self):# ここも、torchでも対応できるようにする必要がある。
+        """ 
+        The function for shuffling the lower trianglar matrix.
+        """
+        # Get the lower triangular elements of the matrix
+        lower_tri = self.sim_mat[np.tril_indices(self.sim_mat.shape[0], k = -1)]
+        
+        # Shuffle the lower triangular elements
+        np.random.shuffle(lower_tri)
+        
+        # Create a new matrix with the shuffled lower triangular elements
+        shuffled_matrix = np.zeros_like(self.sim_mat)
+        shuffled_matrix[np.tril_indices(shuffled_matrix.shape[0], k = -1)] = lower_tri
+        shuffled_matrix = shuffled_matrix + shuffled_matrix.T
+        
+        return shuffled_matrix
+    
     def _get_sim_mat(self):
         if self.metric == "dot":
             metric = "cosine"
         else:
             metric = self.metric
-        return distance.cdist(self.embedding, self.embedding, metric = metric)
+        
+        return distance.cdist(self.embedding, self.embedding, metric = metric)# ここも、torchでも対応できるようにする必要がある。backendにdistを定義すたら良いと思う。
     
-    def _get_shuffled_sim_mat(self):
-        """ 
-        The function for shuffling the lower trianglar matrix.
-        """
-        # Get the lower triangular elements of the matrix
-        lower_tri = self.sim_mat[np.tril_indices(self.sim_mat.shape[0], k=-1)]
-        # Shuffle the lower triangular elements
-        np.random.shuffle(lower_tri)
-        # Create a new matrix with the shuffled lower triangular elements
-        shuffled_matrix = np.zeros_like(self.sim_mat)
-        shuffled_matrix[np.tril_indices(shuffled_matrix.shape[0], k=-1)] = lower_tri
-        shuffled_matrix = shuffled_matrix + shuffled_matrix.T
-        return shuffled_matrix
-    
-    def _get_embedding(self):
+    def _get_embedding(self):# ここも、torchでも対応できるようにする必要がある。sklearnはtorchで使えない。
         MDS_embedding = manifold.MDS(n_components = 3, dissimilarity = 'precomputed', random_state = 0)
         embedding = MDS_embedding.fit_transform(self.sim_mat)
         return embedding
+    
+    def _get_index_data(self, category_mat : pd.DataFrame = None, category_name_list = None):
+        if category_mat is None:
+            object_labels, category_idx_list, category_num_list, new_category_name_list = None, None, None, None
         
-    def show_sim_mat(self, ticks_size = None, label = None, fig_dir = None):
-        fig_path = os.path.join(fig_dir, f"RDM_{self.name}.png") if fig_dir is not None else None
-        visualize_functions.show_heatmap(self.sim_mat, title = self.name, ticks_size = ticks_size, xlabel = label, ylabel = label, file_name = fig_path)
+        else:
+            if category_name_list == ["all"]:
+                new_category_name_list = category_mat.columns.tolist()
+            else:
+                new_category_name_list = category_name_list
+            
+            category_idx_list, category_num_list = get_category_idx(category_mat, new_category_name_list, show_numbers = True)  
+            
+            object_labels = list()
+            for i in range(len(category_idx_list)):           
+                object_labels += category_mat.index[category_idx_list[i]].tolist()
         
-    def show_sim_mat_distribution(self):
+        return object_labels, category_idx_list, category_num_list, new_category_name_list
+        
+    def show_sim_mat(self, returned = "figure", sim_mat_format = "default", visualize_matrix : Visualize_Matrix = None, fig_dir = None):
+        """_summary_
+
+        Args:
+            returned (str, optional): "figure", "row_data" or "both" . Defaults to "figure".
+            sim_mat_format (str, optional): "default", "sorted" or "both". Defaults to "default".
+            visualize_matrix (Visualize_Matrix, optional): The instance of Visualize_Matrix. Defaults to None.
+            fig_dir (_type_, optional): _description_. Defaults to None.
+        """
+        if self.category_idx_list is not None:
+            sim_mat_sorted = sort_matrix_with_categories(self.sim_mat, category_idx_list = self.category_idx_list)
+        
+        if returned == "figure" or returned == "both":
+            if fig_dir is not None:
+                fig_path = os.path.join(fig_dir, f"RDM_{self.name}.png")
+            else:
+                fig_path = None
+                
+            if sim_mat_format == "default":
+                sim_mat_list = [self.sim_mat]
+            
+            elif sim_mat_format == "sorted":
+                sim_mat_list = [sim_mat_sorted]
+            
+            elif sim_mat_format == "both":
+                sim_mat_list = [self.sim_mat, sim_mat_sorted]
+                
+            else:
+                raise ValueError("sim_mat_format must be either 'default', 'sorted', or 'both'.")
+            
+            for sim_mat in sim_mat_list:
+                visualize_matrix.show(sim_mat, title = self.name, file_name = fig_path)
+        
+            
+        elif returned == "row_data" or returned == "both":
+            if sim_mat_format == "default":
+                return self.sim_mat
+            
+            elif sim_mat_format == "sorted":
+                return sim_mat_sorted
+            
+            elif sim_mat_format == "both":
+                return self.sim_mat, sim_mat_sorted
+            
+            else:
+                raise ValueError("sim_mat_format must be either 'default', 'sorted', or 'both'.")
+        
+    def show_sim_mat_distribution(self):# ここも、torchでも対応できるようにする必要がある。
         lower_triangular = np.tril(self.sim_mat)
         lower_triangular = lower_triangular.flatten()
         plt.hist(lower_triangular)
@@ -84,202 +236,485 @@ class Representation:
         plt.show()
         
     def show_embedding(self, dim = 3):
-        visualize_embedding = visualize_functions.Visualize_Embedding(embedding_list = [self.embedding], name_list = [self.name])
+        visualize_embedding = visualize_functions.Visualize_Embedding(
+            embedding_list = [self.embedding], 
+            name_list = [self.name],
+        )
+        
         visualize_embedding.plot_embedding(dim = dim)
     
-    
-class Pairwise_Analysis:
+class Pairwise_Analysis():
     """
     A class object that has methods conducting gw-alignment and corresponding results
     This object has information of a pair of Representations.
     """
-    
-    def __init__(self, target : Representation, source : Representation, config : Optimization_Config) -> None:
+    def __init__(self, config : Optimization_Config, source : Representation, target : Representation) -> None:
         """
         Args:
+            config (Optimization_Config) : instance of Optimization_Config
             source (Representation): instance of Representation
             target (Representation): instance of Representation
-            config (Optimization_Config) : instance of Optimization_Config
         """
-        self.target = target
         self.source = source
+        self.target = target
         self.config = config
-        self.OT = 0
-        self.shuffled_OT = 0
-        self.top_k_accuracy = pd.DataFrame()
-        self.k_nearest_matching_rate = pd.DataFrame()
-        self.pair_name = f"{target.name} vs {source.name}"
+        
+        assert self.source.shuffle == self.target.shuffle, "please use the same 'shuffle' both for source and target."
+        
+        if self.source.shuffle:
+            self.RDM_source = self.source.shuffled_sim_mat
+            self.RDM_target = self.target.shuffled_sim_mat
+            self.pair_name = f"{target.name} vs {source.name} (shuffle)"
+        
+        else:
+            self.RDM_source = self.source.sim_mat
+            self.RDM_target = self.target.sim_mat
+            self.pair_name = f"{target.name} vs {source.name}"
+            
+        assert self.RDM_source.shape == self.RDM_target.shape, "the shape of sim_mat is not the same."
+        
+        
+        self.backend = backend.Backend(device=self.config.device, to_types=self.config.to_types)
+        
     
-    def RSA(self, shuffle = False, metric = "spearman"):
-        RDM_source, RDM_target = (self.source.sim_mat, self.target.sim_mat) if not shuffle else (self.source.shuffled_sim_mat, self.target.shuffled_sim_mat)
-        upper_tri_source = RDM_source[np.triu_indices(RDM_source.shape[0], k=1)]
-        upper_tri_target = RDM_target[np.triu_indices(RDM_target.shape[0], k=1)]
+    def show_both_sim_mats(self):
+  
+        a = self.RDM_source
+        b = self.RDM_target
+        
+        plt.figure()
+        plt.subplot(121)
+
+        plt.title('source : ' + self.source.name)
+        plt.imshow(a, cmap=plt.cm.jet)
+        plt.colorbar(orientation='horizontal')
+
+        plt.subplot(122)
+        plt.title('target : ' + self.target.name)
+        plt.imshow(b , cmap=plt.cm.jet)
+        plt.colorbar(orientation='horizontal')
+
+        plt.tight_layout()
+        plt.show()
+        
+        
+        a_hist, a_bin = np.histogram(a, bins=100)
+        b_hist, b_bin = np.histogram(b, bins=100)
+        
+        # print(a_hist, a_bin)
+        # print(a_hist.shape, a_bin.shape)
+        
+        # plt.figure()
+        # plt.suptitle('histogram')
+        # plt.subplot(121)
+        # plt.title('source : ' + self.source.name)
+        # plt.hist(a_bin[:-1], a_bin, weights = a_hist, color = 'C0', alpha = 0.5)
+        # plt.grid(True)
+
+        # plt.subplot(122)
+        # plt.title('target : ' + self.target.name)
+        # plt.hist(b_bin[:-1], b_bin, weights = b_hist, color = 'C1', alpha = 0.5)
+        # plt.grid(True)
+        
+        plt.figure()
+        plt.title('histogram source : ' + self.source.name + ', target : ' + self.target.name)
+        plt.hist(a_bin[:-1], a_bin, weights = a_hist, label = self.source.name, alpha = 0.5)
+        plt.hist(b_bin[:-1], b_bin, weights = b_hist, label = self.target.name, alpha = 0.5)
+        plt.grid(True)
+        plt.legend(loc = 'upper left')
+        plt.tight_layout()
+        plt.show()
+        
+        
+    
+    def RSA(self, metric = "spearman"):# ここも、torchでも対応できるようにする必要がある。
+        upper_tri_source = self.RDM_source[np.triu_indices(self.RDM_source.shape[0], k=1)]
+        upper_tri_target = self.RDM_target[np.triu_indices(self.RDM_target.shape[0], k=1)]
+        
         if metric == "spearman":
             corr, _ = spearmanr(upper_tri_source, upper_tri_target)
         elif metric == "pearson":
             corr, _ = pearsonr(upper_tri_source, upper_tri_target)
+        
         return corr
     
     def match_sim_mat_distribution(self):
-        pass
+        matching = SimpleHistogramMatching(self.RDM_source, self.RDM_target)
+        
+        self.RDM_target = matching.simple_histogram_matching()
+        
     
-    def run_gw(self, shuffle, ticks_size = None, load_OT = False, fig_dir = None):
+    def run_gw(self, load_OT = False, returned = "figure", OT_format = "default", visualize_matrix : Visualize_Matrix = None, fig_dir = None):
         """
         Main computation
         """            
-        if shuffle:     
-                self.shuffled_OT = self._gw_alignment(shuffle = shuffle, load_OT = load_OT)
-        else:
-                self.OT = self._gw_alignment(shuffle = shuffle, load_OT = load_OT)
-        self._show_OT(title = f"$\Gamma$ ({self.pair_name}) {'(shuffle)' if shuffle else ''} ", shuffle = shuffle, ticks_size = ticks_size, fig_dir = fig_dir)
+        self.OT = self._gw_alignment(load_OT = load_OT)
+        OT = self._show_OT(title = f"$\Gamma$ ({self.pair_name})", 
+                      returned = returned, 
+                      OT_format = OT_format, 
+                      visualize_matrix = visualize_matrix, 
+                      fig_dir = fig_dir)
         
-    def _gw_alignment(self, results_dir = "../results/", shuffle = False, load_OT = False):
+        return OT
+    
+    def _gw_alignment(self, results_dir = "../results/", load_OT = False):
+        
         filename = self.config.data_name + " " + self.pair_name
-        RDM_source, RDM_target = (self.source.sim_mat, self.target.sim_mat) if not shuffle else (self.source.shuffled_sim_mat, self.target.shuffled_sim_mat)
-        OT = run_main_gw(self.config, RDM_source, RDM_target, results_dir, filename, load_OT)
+        
+        sql_name = "sqlite"
+        storage = "sqlite:///" + results_dir + "/" + filename + ".db"
+        
+        save_path = results_dir + filename
+        
+        # distribution in the source space, and target space
+        p = ot.unif(len(self.RDM_source))
+        q = ot.unif(len(self.RDM_target))
+
+        # generate instance solves gw_alignment
+        test_gw = GW_Alignment(
+            self.RDM_source,
+            self.RDM_target,
+            p,
+            q,
+            save_path,
+            max_iter=self.config.max_iter,
+            n_iter=self.config.n_iter,
+            to_types=self.config.to_types,
+        )
+
+        # generate instance optimize gw_alignment
+        opt = gw_optimizer.load_optimizer(
+            save_path,
+            n_jobs=self.config.n_jobs,
+            num_trial=self.config.num_trial,
+            to_types=self.config.to_types,
+            method="optuna",
+            sampler_name=self.config.sampler_name,
+            pruner_name=self.config.pruner_name,
+            pruner_params=self.config.pruner_params,
+            n_iter=self.config.n_iter,
+            filename=filename,
+            sql_name=sql_name,
+            storage=storage,
+            delete_study=self.config.delete_study,
+        )
+        
+        if not load_OT:
+            ### optimization
+            # 1. choose the initial matrix for GW alignment computation.
+            init_plans = init_matrix.InitMatrix().implemented_init_plans(self.config.init_plans_list)
+
+            # used only in grid search sampler below the two lines
+            eps_space = opt.define_eps_space(self.config.eps_list, self.config.eps_log, self.config.num_trial)
+            search_space = {"eps": eps_space, "initialize": init_plans}
+            
+            # 2. run optimzation
+            study = opt.run_study(
+                test_gw,
+                self.config.device,
+                init_plans_list=init_plans,
+                eps_list=self.config.eps_list,
+                eps_log=self.config.eps_log,
+                search_space=search_space,
+            )
+            
+            best_trial = study.best_trial
+            
+            if self.config.to_types == 'numpy':
+                OT = np.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.npy")
+                
+            elif self.config.to_types == 'torch':
+                OT = torch.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.pt")
+                OT = OT.to('cpu').numpy()
+        
+        else:
+            study = opt.load_study()
+            best_trial = study.best_trial
+            
+            if self.config.to_types == 'numpy':
+                OT = np.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.npy")
+            
+            elif self.config.to_types == 'torch':
+                OT = torch.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.pt")
+                
+                OT = OT.to('cpu').numpy()
+        
         return OT
           
     def _get_optimization_log(self):
         pass
     
-    def _show_OT(self, title, shuffle : bool, ticks_size = None, fig_dir = None):
-        OT = self.OT if not shuffle else self.shuffled_OT
-        fig_path = os.path.join(fig_dir, f"OT_{self.pair_name}.png") if fig_dir is not None else None
-        visualize_functions.show_heatmap(matrix = OT, title = title, ticks_size = ticks_size, file_name = fig_path)
-    
-    def calc_top_k_accuracy(self, k_list, shuffle : bool):
-        OT = self.OT if not shuffle else self.shuffled_OT
-        name = self.pair_name if not shuffle else self.pair_name + " shuffle"
+    def _show_OT(self, title, returned = "figure", OT_format = "default", visualize_matrix : Visualize_Matrix = None, fig_dir = None):
+        if self.source.category_idx_list is not None:
+            OT_sorted = sort_matrix_with_categories(self.OT, category_idx_list = self.source.category_idx_list)
         
-        self.top_k_accuracy["top_n"] = k_list
-        acc_list = self._eval_accuracy(OT = OT, k_list = k_list, eval_type = "ot_plan")
-        self.top_k_accuracy[name] = acc_list
-    
-    def calc_k_nearest_matching_rate(self, k_list, metric):
-        self.k_nearest_matching_rate["top_n"] = k_list
-        acc_list = self._eval_accuracy(OT = self.OT, k_list = k_list, eval_type = "k_nearest", metric = metric)
-        self.k_nearest_matching_rate[self.pair_name] = acc_list
+        if returned == "figure" or returned == "both":
+            if fig_dir is not None:
+                fig_path = os.path.join(fig_dir, f"OT_{self.pair_name}.png")
+            else:
+                fig_path = None
+                
+            if OT_format == "default":
+                OT_list = [self.OT]
+            
+            elif OT_format == "sorted":
+                OT_list = [OT_sorted]
+            
+            elif OT_format == "both":
+                OT_list = [self.OT, OT_sorted]
+                
+            else:
+                raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
+            
+            for OT in OT_list:
+                visualize_matrix.show(OT, title = title, file_name = fig_path)
         
-    def _eval_accuracy(self, OT, k_list, eval_type = "ot_plan", supervised = False, metric = "cosine"):
-        top_n_list = k_list
+            
+        elif returned == "row_data" or returned == "both":
+            if OT_format == "default":
+                return self.OT
+            
+            elif OT_format == "sorted":
+                return OT_sorted
+            
+            elif OT_format == "both":
+                return self.OT, OT_sorted
+            
+            else:
+                raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
+                
+    def calc_category_level_accuracy(self, category_mat = None):
+        if category_mat is None:
+            category_mat = self.source.category_mat.values
+        else:
+            category_mat = category_mat.values
+        count = 0
+        
+        for i in range(self.OT.shape[0]):
+            max_index = np.argmax(self.OT[i])
 
-        OT = OT if not supervised else np.diag([1/len(self.target.sim_mat) for i in range(len(self.target.sim_mat))])
+            if np.array_equal(category_mat[i], category_mat[max_index]):
+                count += 1
+                
+        accuracy = count / self.OT.shape[0] * 100
+        
+        return accuracy
+        
+    def eval_accuracy(self, top_k_list, eval_type = "ot_plan",  metric = "cosine", supervised = False):
+        df = pd.DataFrame()
+        df["top_n"] = top_k_list
+
+        if supervised:
+            OT = np.diag([1/len(self.target.sim_mat) for _ in range(len(self.target.sim_mat))])
+        else:
+            OT = self.OT
+        
         acc_list = list()
-        for k in top_n_list:
+        for k in top_k_list:
             if eval_type == "k_nearest":
-                Q, new_embedding_source = procrustes(self.target.embedding, self.source.embedding, OT)
-                acc = evaluation.pairwise_k_nearest_matching_rate(self.target.embedding, new_embedding_source, top_n = k, metric = metric)
+                new_embedding_source = self.procrustes(self.target.embedding, self.source.embedding, OT)
+                
+                # Compute distances between each points
+                dist_mat = distance.cdist(self.target.embedding, new_embedding_source, metric)
+ 
+                acc = self._calc_accuracy_with_topk_diagonal(dist_mat, k = k, order = "minimum")
+            
             elif eval_type == "ot_plan":
-                acc = evaluation.calc_correct_rate_ot_plan(OT, top_n = k)
+                acc = self._calc_accuracy_with_topk_diagonal(OT, k = k, order = "maximum")
+            
             acc_list.append(acc)
-        return acc_list
+        
+        df[self.pair_name] = acc_list
+        
+        return df
+
+    def _calc_accuracy_with_topk_diagonal(self, matrix, k, order='maximum'):
+        # Get the diagonal elements
+        diagonal = np.diag(matrix)
+        
+        # Get the top k values for each row
+        if order == 'maximum':
+            topk_values = np.partition(matrix, -k)[:, -k:]
+        elif order == 'minimum':
+            topk_values = np.partition(matrix, k - 1)[:, :k]
+        else:
+            raise ValueError("Invalid order parameter. Must be 'maximum' or 'minimum'.")
+        
+        # Count the number of rows where the diagonal is in the top k values
+        count = np.sum(np.isin(diagonal, topk_values))
+        
+        # Calculate the accuracy as the proportion of counts to the total number of rows
+        accuracy = count / matrix.shape[0]
+        accuracy *= 100
+        
+        return accuracy
+
     
-    def procrustes(self):
-        Q, self.source.embedding = procrustes(self.target.embedding, self.source.embedding, self.OT)
+    def procrustes(self, embedding_1, embedding_2, Pi):
+        """
+        embedding_2をembedding_1に最も近づける回転行列Qを求める
+
+        Args:
+            embedding_1 : shape (n_1, m)
+            embedding_2 : shape (n_2, m)
+            Pi : shape (n_2, n_1) 
+                Transportation matrix of 2→1
+            
+        Returns:
+            new_embedding_2 : shape (n_2, m)
+        """
+        assert self.source.shuffle == False, "you cannot use procrustes method if 'shuffle' is True."
         
-    def visualize_embedding(self, dim = 3, category_name_list = None, category_num_list = None, category_idx_list = None):
-        self.procrustes()
-        embedding_list = [self.target.embedding, self.source.embedding]
-        name_list = [self.target.name, self.source.name]
+       
+        U, S, Vt = np.linalg.svd(np.matmul(embedding_2.T, np.matmul(Pi, embedding_1)))
+        Q = np.matmul(U, Vt)
+        new_embedding_2 = np.matmul(embedding_2, Q)
         
-        visualize_embedding = visualize_functions.Visualize_Embedding(embedding_list = embedding_list, name_list = name_list, category_name_list = category_name_list, category_num_list = category_num_list, category_idx_list = category_idx_list)
-        visualize_embedding.plot_embedding(dim = dim)
-  
-  
-class Align_Representations:
+        return new_embedding_2
+    
+    def get_new_source_embedding(self):
+        return self.procrustes(self.target.embedding, self.source.embedding, self.OT)
+
+
+
+class Align_Representations():
     """
     This object has methods for conducting N groups level analysis and corresponding results.
     This has information of all pairs of representations.
     """
-    def __init__(self, representations_list : List[Representation], config : Optimization_Config) -> None:
+    def __init__(self, config : Optimization_Config, representations_list : List[Representation], pair_number_list = "all", metric = 'cosine', shuffle = False) -> None:
         """
         Args:
             representations_list (list): a list of Representations
         """
-        self.representations_list = representations_list
         self.config = config
+        
+        self.metric = metric
+        self.representations_list = representations_list
         self.pairwise_list = self._get_pairwise_list()
         
         self.RSA_corr = dict()
-        self.top_k_accuracy = pd.DataFrame()
-        self.k_nearest_matching_rate = pd.DataFrame()
+        
+        self.shuffle = shuffle
+        
+        if pair_number_list == "all":
+            pair_number_list = range(len(self.pairwise_list))
+        
+        self.pair_number_list = pair_number_list
 
     def _get_pairwise_list(self) -> List[Pairwise_Analysis]:
         pairs = list(itertools.combinations(self.representations_list, 2))
+        
         pairwise_list = list()
         for i, pair in enumerate(pairs):
-            pairwise = Pairwise_Analysis(target = pair[0], source = pair[1], config = self.config)
+            pairwise = Pairwise_Analysis(config = self.config, source = pair[1], target = pair[0])
             pairwise_list.append(pairwise)    
             print(f"Pair number {i} : {pairwise.pair_name}")
+        
         return pairwise_list
 
-    def RSA_get_corr(self, shuffle = False, metric = "spearman"):
+    def RSA_get_corr(self, metric = "spearman"):
         for pairwise in self.pairwise_list:
-            corr = pairwise.RSA(shuffle = shuffle, metric = metric)
+            corr = pairwise.RSA(metric = metric)
             self.RSA_corr[pairwise.pair_name] = corr
             print(f"Correlation {pairwise.pair_name} : {corr}")
     
-    def show_sim_mat(self, ticks_size = None, label = None, fig_dir = None, show_distribution = True):
+    def show_sim_mat(self, returned = "figure", sim_mat_format = "default", visualize_matrix : Visualize_Matrix = None, fig_dir = None, show_distribution = True):
+        """_summary_
+
+        Args:
+            returned (str, optional): "figure", "row_data" or "both" . Defaults to "figure".
+            sim_mat_format (str, optional): "default", "sorted" or "both". Defaults to "default".
+            visualize_matrix (Visualize_Matrix, optional): The instance of Visualize_Matrix. Defaults to None.
+            fig_dir (_type_, optional): _description_. Defaults to None.
+        """
         for representation in self.representations_list:
-            representation.show_sim_mat(ticks_size = ticks_size, label = label, fig_dir = fig_dir)
+            representation.show_sim_mat(returned = returned,
+                                        sim_mat_format = sim_mat_format,
+                                        visualize_matrix = visualize_matrix,
+                                        fig_dir = fig_dir
+                                        )
             if show_distribution:
                 representation.show_sim_mat_distribution()
     
-    def gw_alignment(self, pairnumber_list = "all", shuffle = False, ticks_size = None, load_OT = False, fig_dir = None):
-        if pairnumber_list == "all":
-            pairnumber_list = [i for i in range(len(self.pairwise_list))]
-        self.pairnumber_list = pairnumber_list
-        for pairnumber in self.pairnumber_list:
-            pairwise = self.pairwise_list[pairnumber]
-            pairwise.run_gw(shuffle = shuffle, ticks_size = ticks_size, load_OT = load_OT, fig_dir = fig_dir)
+    def gw_alignment(self, load_OT = False, returned = "figure", OT_format = "default", visualize_matrix : Visualize_Matrix = None, fig_dir = None):
+        for pair_number in self.pair_number_list:
+            pairwise = self.pairwise_list[pair_number]
+            pairwise.run_gw(load_OT = load_OT,
+                            returned = returned,
+                            OT_format = OT_format,
+                            visualize_matrix = visualize_matrix,
+                            fig_dir = fig_dir
+                            )
             
     def barycenter_alignment(self):
         pass
        
-    def calc_top_k_accuracy(self, k_list : int, shuffle : bool):
-        self.top_k_accuracy["top_n"] = k_list
-        for pairnumber in self.pairnumber_list:
+    def calc_accuracy(self, top_k_list, eval_type = "ot_plan"):
+        accuracy = pd.DataFrame()
+        accuracy["top_n"] = top_k_list
+        
+        for pair_number in self.pair_number_list:
+            pairwise = self.pairwise_list[pair_number]
+            df = pairwise.eval_accuracy(top_k_list, eval_type = eval_type, metric = self.metric)
+
+            accuracy = pd.merge(accuracy, df, on = "top_n")
+        
+        accuracy = accuracy.set_index("top_n")
+        
+        if eval_type == "ot_plan":
+            self.top_k_accuracy = accuracy
+            print("Top k accuracy : \n", accuracy)
+        
+        elif eval_type == "k_nearest":
+            self.k_nearest_matching_rate = accuracy  
+            print("K nearest matching rate : \n", accuracy)
+        
+        print("Mean : \n", accuracy.iloc[:, 1:].mean(axis = "columns"))
+        
+    def calc_category_level_accuracy(self, make_hist = False, fig_dir = None, fig_name = "Category_level_accuracy.png", category_mat = None):
+        acc_list = []
+        for pairnumber in self.pair_number_list:
             pairwise = self.pairwise_list[pairnumber]
-            pairwise.calc_top_k_accuracy(k_list, shuffle = shuffle)
-            #if shuffle:
-            #    pairwise.calc_top_k_accuracy(k_list, shuffle = True)
-            self.top_k_accuracy = pd.merge(self.top_k_accuracy, pairwise.top_k_accuracy, on = "top_n")
-        print("Top k accuracy : \n", self.top_k_accuracy)
-        print("Mean : \n", self.top_k_accuracy.iloc[:, 1:].mean(axis = "columns"))
-            
-    def calc_k_nearest_matching_rate(self, k_list, metric):
-        self.k_nearest_matching_rate["top_n"] = k_list
-        for pairnumber in self.pairnumber_list:
-            pairwise = self.pairwise_list[pairnumber]
-            pairwise.calc_k_nearest_matching_rate(k_list, metric)
-            self.k_nearest_matching_rate = pd.merge(self.k_nearest_matching_rate, pairwise.k_nearest_matching_rate, on = "top_n")
-        print("K nearest matching rate : \n", self.k_nearest_matching_rate)
-        print("Mean : \n", self.k_nearest_matching_rate.iloc[:, 1:].mean(axis = "columns"))
-    
+            acc = pairwise.calc_category_level_accuracy(category_mat = category_mat)
+            print(f"{pairwise.pair_name} :  {acc}")
+            acc_list.append(acc)
+        
+        if make_hist:
+            plt.figure()
+            plt.hist(acc_list)
+            plt.xlabel("Accuracy")
+            plt.savefig(os.path.join(fig_dir, fig_name))
+            plt.show()
+                
     def _get_dataframe(self, eval_type = "ot_plan", shuffle = False, concat = True):
         df = self.top_k_accuracy if eval_type == "ot_plan" else self.k_nearest_matching_rate         
-        df = df.set_index("top_n")
+        
         if not shuffle:
             cols = [col for col in df.columns if "shuffle" not in col and "top_n" not in col]
         else:
             cols = [col for col in df.columns if "shuffle" in col]
+        
         df = df[cols]
         if concat:
             df = pd.concat([df[i] for i in df.columns], axis = 0)
             df = df.rename("matching rate")
         return df
         
-    def plot_accuracy(self, eval_type = "ot_plan", shuffle = False, fig_dir = None, fig_name = None, scatter = True):
+    def plot_accuracy(self, eval_type = "ot_plan", shuffle = False, fig_dir = None, fig_name = "Accuracy_ot_plan.png", scatter = True):
         plt.figure(figsize = (5, 3)) 
+        
         if scatter:
             df = self._get_dataframe(eval_type, shuffle = shuffle, concat = True)
             sns.set_style("darkgrid")
             sns.set_palette("pastel")
             sns.swarmplot(data = pd.DataFrame(df), x = "top_n", y = "matching rate", size = 5, dodge = True)
+        
         else:
             df = self._get_dataframe(eval_type, shuffle = shuffle, concat = False)
             for group in df.columns:
                 plt.plot(df.index, df[group], c = "blue")
+        
         plt.ylim(0, 100)
         plt.xlabel("k")
         plt.ylabel("Matching rate")
@@ -290,67 +725,44 @@ class Align_Representations:
             plt.savefig(os.path.join(fig_dir, fig_name))
         plt.show()
     
-    def visualize_embedding(self, dim = 3, color_labels = None, category_name_list = None, category_num_list = None, category_idx_list = None, fig_dir = None):
+    def visualize_embedding(self, 
+                            dim = 3, 
+                            color_labels = None, 
+                            category_name_list = None, 
+                            category_num_list = None, 
+                            category_idx_list = None, 
+                            fig_dir = None, 
+                            fig_name = "Aligned_embedding.png"):
+        
+        if fig_dir is not None:
+            fig_path = os.path.join(fig_dir, fig_name)  
+        else: 
+            fig_path = None
+            
         for i in range(len(self.pairwise_list) // 2):
             pair = self.pairwise_list[i]
-            pair.procrustes()
-        embedding_list = [self.representations_list[i].embedding for i in range(len(self.representations_list))]
-        name_list = [self.representations_list[i].name for i in range(len(self.representations_list))]
-        fig_path = os.path.join(fig_dir, "Aligned_embedding.png") if fig_dir is not None else None
+            pair.source.embedding = pair.get_new_source_embedding()
+            
+        name_list = []
+        embedding_list = []
+        for i in range(len(self.representations_list)): 
+            embedding_list.append(self.representations_list[i].embedding)
+            name_list.append(self.representations_list[i].name)
         
-        visualize_embedding = visualize_functions.Visualize_Embedding(embedding_list = embedding_list, name_list = name_list, color_labels = color_labels, category_name_list = category_name_list, category_num_list = category_num_list, category_idx_list = category_idx_list)
+        if category_idx_list is None:
+            if self.representations_list[0].category_idx_list is not None:
+                category_name_list = self.representations_list[0].category_name_list
+                category_num_list = self.representations_list[0].num_category_list
+                category_idx_list = self.representations_list[0].category_idx_list
+            
+        visualize_embedding = visualize_functions.Visualize_Embedding(
+            embedding_list = embedding_list,
+            name_list = name_list,
+            color_labels = color_labels,
+            category_name_list = category_name_list,
+            category_num_list = category_num_list,
+            category_idx_list = category_idx_list
+        )
+        
         visualize_embedding.plot_embedding(dim = dim, save_dir = fig_path)
 
-#%%
-if __name__ == "__main__":
-    '''
-    parameters
-    '''
-    n_group = 4
-    metric = "euclidean"
-    #%%
-    '''
-    Create subject groups list
-    '''
-    representations = []
-    for i in range(n_group):
-        name = f"Group{i+1}"
-        embedding = np.load(f"../data/THINGS_embedding_Group{i+1}.npy")[0]
-        representation = Representation(name = name, embedding = embedding, metric = metric)
-        representations.append(representation)
-    #%%
-    '''
-    Unsupervised alignment between Representations
-    '''
-    align_representations = Align_Representations(representations_list = representations, config = Optimization_Config())
-    #%%
-    # RSA
-    align_representations.show_sim_mat()
-    align_representations.RSA_get_corr(shuffle = False)
-    
-    #%%
-    # Run gw
-    align_representations.gw_alignment(shuffle = False, load_OT = True)
-    #%%
-    '''
-    Evaluate the accuracy
-    '''
-    ## Accuracy of the optimized OT matrix
-    align_representations.calc_top_k_accuracy(k_list = [1, 5, 10], shuffle = False)
-    align_representations.plot_accuracy(eval_type = "ot_plan", shuffle = False, scatter = True)
-    #%%
-    ## Matching rate of k-nearest neighbors 
-    align_representations.calc_k_nearest_matching_rate(k_list = [1, 5, 10], metric = metric)
-    align_representations.plot_accuracy(eval_type = "k_nearest", shuffle = False, scatter = True)
-    
-    #%%
-    '''
-    Visualize embedding
-    '''
-    ## Load the coarse categories data
-    category_name_list = ["bird", "insect", "plant", "clothing",  "furniture", "fruit", "drink", "vehicle"]
-    category_mat = pd.read_csv("../data/category_mat_manual_preprocessed.csv", sep = ",", index_col = 0)   
-    category_idx_list, category_num_list = get_category_idx(category_mat, category_name_list, show_numbers = True)  
-    
-    align_representations.visualize_embedding(dim = 3, category_name_list = category_name_list, category_idx_list = category_idx_list, category_num_list = category_num_list)
-# %%
