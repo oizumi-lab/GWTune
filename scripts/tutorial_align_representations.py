@@ -5,7 +5,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 import numpy as np
 import pandas as pd
 import pickle as pkl
-from src.align_representations import Representation, Pairwise_Analysis, Align_Representations, Optimization_Config, Visualize_Matrix
+from src.align_representations import Representation, Pairwise_Analysis, Align_Representations, Optimization_Config, Visualization_Config
 from src.utils.utils_functions import get_category_idx
 
 #%%
@@ -57,9 +57,9 @@ config = Optimization_Config(data_name = data_select,
                              to_types = 'numpy',
                              n_jobs = 1,
                              init_plans_list = ['random'],
-                             num_trial = 4,
-                             n_iter = 1,
-                             max_iter = 200,
+                             num_trial = 10,
+                             n_iter = 2,
+                             max_iter = 1000,
                              sampler_name = 'tpe',
                              eps_list = [1, 10], # [1, 10] for THINGS data, [0.02, 0.2] for colors data
                              eps_log = True,
@@ -70,7 +70,7 @@ config = Optimization_Config(data_name = data_select,
 '''
 Set the parameters for visualizing matrices
 '''
-visualize_matrix = Visualize_Matrix()
+visualization_config = Visualization_Config()
 #%%
 '''
 Unsupervised alignment between Representations
@@ -81,7 +81,7 @@ Unsupervised alignment between Representations
 align_representation = Align_Representations(representations_list = representations, config = config)
 
 # RSA
-sim_mat = align_representation.show_sim_mat(returned = "figure", sim_mat_format = "sorted", visualize_matrix = visualize_matrix)#fig_dir = "../figures")
+sim_mat = align_representation.show_sim_mat(returned = "figure", sim_mat_format = "sorted", visualization_config = visualization_config, show_distribution = False)#fig_dir = "../figures")
 align_representation.RSA_get_corr()
 
 #%%
@@ -89,7 +89,7 @@ align_representation.RSA_get_corr()
 GW alignment
 '''
 ## If no need for computation, turn load_OT True, then OT plans calculated before is loaded.
-align_representation.gw_alignment(load_OT = True, returned = "figure", OT_format = "sorted", visualize_matrix = visualize_matrix, show_log = True)
+align_representation.gw_alignment(load_OT = True, returned = "figure", OT_format = "sorted", visualization_config = visualization_config, show_log = True)
 
 ## Calculate the accuracy of the optimized OT matrix
 align_representation.calc_accuracy(top_k_list = [1, 5, 10], eval_type = "ot_plan")
@@ -106,19 +106,28 @@ Align embeddings with OT plans
 align_representation.calc_accuracy(top_k_list = [1, 5, 10], eval_type = "k_nearest")
 align_representation.plot_accuracy(eval_type = "k_nearest", scatter = True)
 
+#%%
 '''
 Visualize the aligned embeddings
 '''
-# Set color labels and category data if exist.
+
 if data_select == "THINGS":
-    color_labels = None
     category_name_list = ["bird", "insect", "plant", "clothing",  "furniture", "fruit", "drink", "vehicle"]
     category_mat = pd.read_csv("../data/category_mat_manual_preprocessed.csv", sep = ",", index_col = 0)   
-    category_idx_list, category_num_list = get_category_idx(category_mat, category_name_list, show_numbers = True)  
-    align_representation.visualize_embedding(dim = 3, color_labels = color_labels, category_name_list = category_name_list, category_idx_list = category_idx_list, category_num_list = category_num_list)#, fig_dir = "../figures")
+    category_idx_list, num_category_list = get_category_idx(category_mat, category_name_list, show_numbers = True) 
+    
+    # Set the configuration
+    visualization_config = Visualization_Config(figsize = (15, 15), xlabel = "PC1", ylabel = "PC2", zlabel = "PC3", legend_size = 10, marker_size = 20) 
+
+    align_representation.visualize_embedding(dim = 3, visualization_config = visualization_config, category_name_list = category_name_list, category_idx_list = category_idx_list, num_category_list = num_category_list)#, fig_dir = "../figures")
+
 elif data_select == "color":
     file_path = "../data/color_dict.csv"
     data_color = pd.read_csv(file_path)
     color_labels = data_color.columns.values
-    align_representation.visualize_embedding(dim = 3, color_labels = color_labels)#, fig_dir = "../figures")
+    
+    # Set the configuration
+    visualization_config = Visualization_Config(color_labels = color_labels, figsize = (15, 15), xlabel = "PC1", ylabel = "PC2", zlabel = "PC3", legend_size = 10)
+    
+    align_representation.visualize_embedding(dim = 3, visualization_config = visualization_config)#, fig_dir = "../figures")
 # %%

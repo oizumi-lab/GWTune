@@ -129,15 +129,11 @@ def get_color_labels_for_category(n_category_list, min_saturation, show_labels =
 #        plt.savefig(file_name)
 #    plt.show() 
 
-def show_heatmap(matrix, title, file_name, **kwargs):
+def show_heatmap(matrix, title, file_name, ticks = None, category_name_list = None, num_category_list = None, object_labels = None, **kwargs):
     figsize = kwargs.get('figsize', (20, 20))
-    category_name_list = kwargs.get('category_name_list', None)
-    num_category_list = kwargs.get('num_category_list', None)
-    object_labels = kwargs.get('object_labels', None)
     cbar_size = kwargs.get("cbar_size", .80)
-    cbar_ticks_size = kwargs.get("cbar_ticks_size", None)
-    ticks = kwargs.get('ticks', None)
-    ticks_size = kwargs.get('ticks_size', None)
+    cbar_ticks_size = kwargs.get("cbar_ticks_size", 20)
+    ticks_size = kwargs.get('ticks_size', 20)
     xticks_rotation = kwargs.get('xticks_rotation', 90)
     yticks_rotation = kwargs.get('yticks_rotation', 0)
     title_size = kwargs.get('title_size', 60)
@@ -187,27 +183,22 @@ def plot_lower_triangular_histogram(matrix, title):
 
 
 class Visualize_Embedding():
-    def __init__(self, embedding_list : List[np.ndarray], name_list = None, color_labels = None, category_name_list = None, category_num_list = None, category_idx_list = None) -> None:
+    def __init__(self, embedding_list : List[np.ndarray], dim, category_name_list = None, num_category_list = None, category_idx_list = None) -> None:
         self.embedding_list = embedding_list
         if category_idx_list is not None:
-            self.embedding_list = [np.concatenate([embedding[category_idx_list[i]] for i in range(len(category_name_list))]) for embedding in self.embedding_list]
+            category_concat_embedding_list = []
+            for embedding in self.embedding_list:
+                concatenated_embedding = np.concatenate([embedding[category_idx_list[i]] for i in range(len(category_name_list))])
+                category_concat_embedding_list.append(concatenated_embedding)
+            self.embedding_list = category_concat_embedding_list
             
         if self.embedding_list[0].shape[1] > 3:
-            self.embedding_list = self.apply_pca_to_embedding_list(n_dim_pca = 3, show_result = False)
+            self.embedding_list = self.apply_pca_to_embedding_list(n_dim_pca = dim, show_result = False)
         
-        self.name_list = name_list
+        self.dim = dim
         self.category_name_list = category_name_list
-        
-        if color_labels is not None:
-            self.color_labels = color_labels
-        else:
-            if category_num_list is None:
-                self.color_labels = get_color_labels(self.embedding_list[0].shape[0], show_labels = False)
-            else:
-                self.color_labels, self.main_colors = get_color_labels_for_category(category_num_list, min_saturation = 1, show_labels = False)
-        
-        markers = ['o', 'x', '^', 's', 'v', '<', '>', 'p', '*', 'h', 'H', '+', 'D', 'd', '.', ',', '1', '2', '3', '4', '_', '|']
-        self.markers = markers[:len(self.embedding_list)]
+        self.num_category_list = num_category_list
+        self.category_idx_list = category_idx_list
 
     def apply_pca_to_embedding_list(self, n_dim_pca, show_result = True):
         """apply pca to the embedding list
@@ -238,66 +229,149 @@ class Visualize_Embedding():
 
         return embedding_list_pca
     
-    def plot_embedding(self, dim = 3, marker_size = 30, legend = True, title = None, title_fontsize = 20, legend_fontsize = 12, save_dir = None):
-        """plot embedding list
-
-        Args:
-            embedding_list (list): list of embeddings
-            markers_list (list): list of markers for each groups
-            color_label (list): color labels for each objects
-            name_list (list, optional): list of names for each groups. Defaults to None.
-            category_list (list, optional): list of names for each categories. Defaults to None.
-            main_colors (list, optional): list of representative color labels for each categories. Defaults to None.
-            title (string, optional): title of the figure. Defaults to None.
-            save_dir (string, optional): directory path for saving the figure. Defaults to None.
-        """
-        fig = plt.figure(figsize=(15, 15))
-        if dim == 3:
-            ax = fig.add_subplot(1, 1, 1, projection='3d')
-        else:
-            ax = fig.add_subplot(1, 1, 1)
-        plt.rcParams["grid.color"] = "black"
-        ax.grid(True)
-        ax.xaxis.set_ticklabels([])
-        ax.yaxis.set_ticklabels([])
-        ax.xaxis.pane.fill = False
-        ax.yaxis.pane.fill = False
-        ax.axes.get_xaxis().set_visible(True)
-        ax.axes.get_yaxis().set_visible(True)
-        ax.w_xaxis.gridlines.set_color('black')
-        ax.w_yaxis.gridlines.set_color('black')
-        ax.xaxis.pane.set_edgecolor('w')
-        ax.yaxis.pane.set_edgecolor('w')
-        ax.set_xlabel("PC1", fontsize = 25)
-        ax.set_ylabel("PC2", fontsize = 25)
-        ax.view_init(elev = 30, azim = 60)
+    #def plot_embedding(self, dim = 3, marker_size = 30, legend = True, title = None, title_fontsize = 20, legend_fontsize = 12, save_dir = None):
+    #    """plot embedding list
+#
+    #    Args:
+    #        embedding_list (list): list of embeddings
+    #        markers_list (list): list of markers for each groups
+    #        color_label (list): color labels for each objects
+    #        name_list (list, optional): list of names for each groups. Defaults to None.
+    #        category_list (list, optional): list of names for each categories. Defaults to None.
+    #        main_colors (list, optional): list of representative color labels for each categories. Defaults to None.
+    #        title (string, optional): title of the figure. Defaults to None.
+    #        save_dir (string, optional): directory path for saving the figure. Defaults to None.
+    #    """
+    #    fig = plt.figure(figsize=(15, 15))
+    #    if dim == 3:
+    #        ax = fig.add_subplot(1, 1, 1, projection='3d')
+    #    else:
+    #        ax = fig.add_subplot(1, 1, 1)
+    #    plt.rcParams["grid.color"] = "black"
+    #    ax.grid(True)
+    #    ax.xaxis.set_ticklabels([])
+    #    ax.yaxis.set_ticklabels([])
+    #    ax.xaxis.pane.fill = False
+    #    ax.yaxis.pane.fill = False
+    #    ax.axes.get_xaxis().set_visible(True)
+    #    ax.axes.get_yaxis().set_visible(True)
+    #    ax.w_xaxis.gridlines.set_color('black')
+    #    ax.w_yaxis.gridlines.set_color('black')
+    #    ax.xaxis.pane.set_edgecolor('w')
+    #    ax.yaxis.pane.set_edgecolor('w')
+    #    ax.set_xlabel("PC1", fontsize = 25)
+    #    ax.set_ylabel("PC2", fontsize = 25)
+    #    ax.view_init(elev = 30, azim = 60)
+    #    
+    #    if dim == 3:
+    #        ax.zaxis.set_ticklabels([])
+    #        ax.zaxis.pane.fill = False
+    #        ax.axes.get_zaxis().set_visible(True)
+    #        ax.w_zaxis.gridlines.set_color('black')
+    #        ax.zaxis.pane.set_edgecolor('w')
+    #        ax.set_zlabel("PC3", fontsize = 25)
+    #        
+    #    for i in range(len(self.embedding_list)):
+    #        coords_i = self.embedding_list[i]
+    #        if dim == 3:
+    #            ax.scatter(xs = coords_i[:, 0], ys = coords_i[:, 1], zs = coords_i[:, 2],
+    #                   marker = self.markers[i], color = self.color_labels, s = marker_size, alpha = 1, label = self.name_list[i])
+    #        else:
+    #            ax.scatter(xs = coords_i[:, 0], ys = coords_i[:, 1],
+    #                   marker = self.markers[i], color = self.color_labels, s = marker_size, alpha = 1, label = self.name_list[i])
+    #    if self.category_name_list is not None:
+    #        for i, category in enumerate(self.category_name_list):
+    #            ax.scatter([], [], [], marker = "o", color = self.main_colors[i], s = 30, alpha = 1, label = category)
+#
+    #    if legend:
+    #        ax.legend(fontsize=legend_fontsize, loc= "best")
+#
+    #    if title is not None:   
+    #        plt.title(title, fontsize = title_fontsize)
+    #    if save_dir is not None:
+    #        plt.savefig(save_dir)
+    #    plt.show()
+    
+    def plot_embedding(self, name_list = None, legend = True, title = None, save_dir = None, **kwargs):
+        figsize = kwargs.get('figsize', (15, 15))
+        xlabel = kwargs.get('xlabel', "PC1")
+        xlabel_size = kwargs.get('xlabel_size', 25)
+        ylabel = kwargs.get('ylabel', "PC2")
+        ylabel_size = kwargs.get('ylabel_size', 25)
+        zlabel = kwargs.get('zlabel', "PC3")
+        zlabel_size = kwargs.get('zlabel_size', 25)
+        title_size = kwargs.get('title_size', 60)
+        legend_size = kwargs.get('legend_size')
+        color_labels = kwargs.get('color_labels', None)
+        color_hue = kwargs.get("color_hue", None)
+        markers_list = kwargs.get('markers_list', None)
+        marker_size = kwargs.get('marker_size', 30)
         
-        if dim == 3:
-            ax.zaxis.set_ticklabels([])
+        
+        if color_labels is None:
+            if self.num_category_list is None:
+                color_labels = get_color_labels(self.embedding_list[0].shape[0], hue = color_hue, show_labels = False)
+            else:
+                color_labels, main_colors = get_color_labels_for_category(self.num_category_list, min_saturation = 1, show_labels = False)
+        
+        if markers_list is None:
+            markers = ['o', 'x', '^', 's', 'v', '<', '>', 'p', '*', 'h', 'H', '+', 'D', 'd', '.', ',', '1', '2', '3', '4', '_', '|'][:len(self.embedding_list)]
+        
+        
+        plt.rcParams["grid.color"] = "black"
+        fig = plt.figure(figsize = figsize)
+
+        if self.dim == 3:
+            ax = fig.add_subplot(1, 1, 1, projection='3d')
+            ax.set_xlabel(xlabel, fontsize = xlabel_size)
+            ax.set_ylabel(ylabel, fontsize = ylabel_size)
+            ax.set_zlabel(zlabel, fontsize = zlabel_size)
+            ax.view_init(elev = 30, azim = 60)
+            ax.xaxis.pane.fill = False
+            ax.yaxis.pane.fill = False
             ax.zaxis.pane.fill = False
+            ax.w_xaxis.gridlines.set_color('black')
+            ax.w_yaxis.gridlines.set_color('black')
+            ax.xaxis.pane.set_edgecolor('w')
+            ax.yaxis.pane.set_edgecolor('w')
+            ax.zaxis.set_ticklabels([])
             ax.axes.get_zaxis().set_visible(True)
             ax.w_zaxis.gridlines.set_color('black')
             ax.zaxis.pane.set_edgecolor('w')
-            ax.set_zlabel("PC3", fontsize = 25)
             
+        elif self.dim == 2:
+            ax = fig.add_subplot(1, 1, 1)
+            ax.set_xlabel(xlabel, fontsize = xlabel_size)
+            ax.set_ylabel(ylabel, fontsize = ylabel_size)
+            
+        else: 
+            raise ValueError("'dim' is either 2 or 3")
+
+        ax.grid(True)
+        ax.xaxis.set_ticklabels([])
+        ax.yaxis.set_ticklabels([])
+        ax.axes.get_xaxis().set_visible(True)
+        ax.axes.get_yaxis().set_visible(True)
+
         for i in range(len(self.embedding_list)):
             coords_i = self.embedding_list[i]
-            if dim == 3:
+            if self.dim == 3:
                 ax.scatter(xs = coords_i[:, 0], ys = coords_i[:, 1], zs = coords_i[:, 2],
-                       marker = self.markers[i], color = self.color_labels, s = marker_size, alpha = 1, label = self.name_list[i])
+                           marker = markers[i], color = color_labels, s = marker_size, alpha = 1, label = name_list[i])
             else:
-                ax.scatter(xs = coords_i[:, 0], ys = coords_i[:, 1],
-                       marker = self.markers[i], color = self.color_labels, s = marker_size, alpha = 1, label = self.name_list[i])
+                ax.scatter(x = coords_i[:, 0], y = coords_i[:, 1],
+                           marker = markers[i], color = color_labels, s = marker_size, alpha = 1, label = name_list[i])
+
         if self.category_name_list is not None:
             for i, category in enumerate(self.category_name_list):
-                ax.scatter([], [], [], marker = "o", color = self.main_colors[i], s = 30, alpha = 1, label = category)
+                ax.scatter([], [], [], marker = "o", color = "black", s = marker_size, alpha = 1, label = category)
 
         if legend:
-            ax.legend(fontsize=legend_fontsize, loc= "best")
+            ax.legend(fontsize = legend_size, loc = "best")
 
-        if title is not None:   
-            plt.title(title, fontsize = title_fontsize)
+        if title is not None:
+            plt.title(title, fontsize = title_size)
+
         if save_dir is not None:
             plt.savefig(save_dir)
         plt.show()
-    
