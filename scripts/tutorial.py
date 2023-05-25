@@ -204,18 +204,6 @@ eps_space = opt.define_eps_space(eps_list, eps_log, num_trial)
 search_space = {"eps": eps_space, "initialize": init_plans}
 
 # 2. run optimzation
-# parallel = 'thread' or 'multiprocessing', default is 'multiprocessing'
-study = opt.run_study(
-    test_gw,
-    device,
-    # parallel="multiprocessing",
-    parallel="thread",
-    init_plans_list=init_plans,
-    eps_list=eps_list,
-    eps_log=eps_log,
-    search_space=search_space,
-)
-
 # parallelは無意味だということがわかった, default is None
 study = opt.run_study(
     test_gw,
