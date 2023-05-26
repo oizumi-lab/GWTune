@@ -70,5 +70,7 @@ def sort_matrix_with_categories(matrix, category_idx_list):
     new_mat = np.concatenate(new_mat_blocks, axis=0)
     return new_mat
 
+ 
+
 
 # %%
