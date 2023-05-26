@@ -84,51 +84,6 @@ def get_color_labels_for_category(n_category_list, min_saturation, show_labels =
     return color_labels, main_colors
         
 
-#def show_heatmap(matrix, 
-#                 figsize = (20, 20),
-#                 title = None, 
-#                 category_name_list = None, 
-#                 num_category_list = None, 
-#                 object_labels = None, 
-#                 ticks = None, 
-#                 ticks_size = None, 
-#                 xticks_rotation = 90, 
-#                 yticks_rotation = 0, 
-#                 xlabel = None, 
-#                 ylabel = None, 
-#                 file_name = None
-#                 ):
-#    plt.figure(figsize = figsize)
-#    ax = sns.heatmap(matrix, square = True, cbar_kws = {"shrink": .80})
-#    cbar = ax.collections[0].colorbar
-#    cbar.ax.tick_params(labelsize = ticks_size)
-#    if category_name_list is not None:
-#        if ticks == "objects":
-#            plt.xticks(np.arange(sum(num_category_list)) + 0.5, labels = object_labels, rotation = xticks_rotation, size = ticks_size)
-#            plt.yticks(np.arange(sum(num_category_list)) + 0.5, labels = object_labels, rotation = yticks_rotation, size = ticks_size)
-#        elif ticks == "category":
-#            label_pos = [sum(num_category_list[: i + 1]) for i in range(len(category_name_list))]
-#            plt.xticks(label_pos, labels = category_name_list, rotation = xticks_rotation, size = ticks_size, fontweight = "bold")
-#            plt.yticks(label_pos, labels = category_name_list, rotation = yticks_rotation, size = ticks_size, fontweight = "bold")
-#        else:
-#            plt.xticks([])
-#            plt.yticks([])
-#    else:    
-#        if ticks == "numbers":
-#            plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = ticks_size)
-#            plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = ticks_size, rotation = 90)
-#        else:
-#            plt.xticks([])
-#            plt.yticks([])
-#    #plt.imshow(self.sim_mat)
-#    plt.xlabel(xlabel, size = 40)
-#    plt.ylabel(ylabel, size = 40)
-#    if title is not None:
-#        plt.title(title, size = 60)
-#    if file_name is not None:
-#        plt.savefig(file_name)
-#    plt.show() 
-
 def show_heatmap(matrix, title, file_name, ticks = None, category_name_list = None, num_category_list = None, object_labels = None, **kwargs):
     figsize = kwargs.get('figsize', (20, 20))
     cbar_size = kwargs.get("cbar_size", .80)
@@ -229,68 +184,6 @@ class Visualize_Embedding():
 
         return embedding_list_pca
     
-    #def plot_embedding(self, dim = 3, marker_size = 30, legend = True, title = None, title_fontsize = 20, legend_fontsize = 12, save_dir = None):
-    #    """plot embedding list
-#
-    #    Args:
-    #        embedding_list (list): list of embeddings
-    #        markers_list (list): list of markers for each groups
-    #        color_label (list): color labels for each objects
-    #        name_list (list, optional): list of names for each groups. Defaults to None.
-    #        category_list (list, optional): list of names for each categories. Defaults to None.
-    #        main_colors (list, optional): list of representative color labels for each categories. Defaults to None.
-    #        title (string, optional): title of the figure. Defaults to None.
-    #        save_dir (string, optional): directory path for saving the figure. Defaults to None.
-    #    """
-    #    fig = plt.figure(figsize=(15, 15))
-    #    if dim == 3:
-    #        ax = fig.add_subplot(1, 1, 1, projection='3d')
-    #    else:
-    #        ax = fig.add_subplot(1, 1, 1)
-    #    plt.rcParams["grid.color"] = "black"
-    #    ax.grid(True)
-    #    ax.xaxis.set_ticklabels([])
-    #    ax.yaxis.set_ticklabels([])
-    #    ax.xaxis.pane.fill = False
-    #    ax.yaxis.pane.fill = False
-    #    ax.axes.get_xaxis().set_visible(True)
-    #    ax.axes.get_yaxis().set_visible(True)
-    #    ax.w_xaxis.gridlines.set_color('black')
-    #    ax.w_yaxis.gridlines.set_color('black')
-    #    ax.xaxis.pane.set_edgecolor('w')
-    #    ax.yaxis.pane.set_edgecolor('w')
-    #    ax.set_xlabel("PC1", fontsize = 25)
-    #    ax.set_ylabel("PC2", fontsize = 25)
-    #    ax.view_init(elev = 30, azim = 60)
-    #    
-    #    if dim == 3:
-    #        ax.zaxis.set_ticklabels([])
-    #        ax.zaxis.pane.fill = False
-    #        ax.axes.get_zaxis().set_visible(True)
-    #        ax.w_zaxis.gridlines.set_color('black')
-    #        ax.zaxis.pane.set_edgecolor('w')
-    #        ax.set_zlabel("PC3", fontsize = 25)
-    #        
-    #    for i in range(len(self.embedding_list)):
-    #        coords_i = self.embedding_list[i]
-    #        if dim == 3:
-    #            ax.scatter(xs = coords_i[:, 0], ys = coords_i[:, 1], zs = coords_i[:, 2],
-    #                   marker = self.markers[i], color = self.color_labels, s = marker_size, alpha = 1, label = self.name_list[i])
-    #        else:
-    #            ax.scatter(xs = coords_i[:, 0], ys = coords_i[:, 1],
-    #                   marker = self.markers[i], color = self.color_labels, s = marker_size, alpha = 1, label = self.name_list[i])
-    #    if self.category_name_list is not None:
-    #        for i, category in enumerate(self.category_name_list):
-    #            ax.scatter([], [], [], marker = "o", color = self.main_colors[i], s = 30, alpha = 1, label = category)
-#
-    #    if legend:
-    #        ax.legend(fontsize=legend_fontsize, loc= "best")
-#
-    #    if title is not None:   
-    #        plt.title(title, fontsize = title_fontsize)
-    #    if save_dir is not None:
-    #        plt.savefig(save_dir)
-    #    plt.show()
     
     def plot_embedding(self, name_list = None, legend = True, title = None, save_dir = None, **kwargs):
         figsize = kwargs.get('figsize', (15, 15))
