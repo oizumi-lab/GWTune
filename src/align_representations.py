@@ -56,50 +56,53 @@ class Optimization_Config:
         self.eps_log = eps_log
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
-
-
-class Visualize_Matrix:
-    def __init__(
-        self,
-        figsize=(20, 20),
-        category_name_list=None,
-        num_category_list=None,
-        object_labels=None,
-        cbar_size=0.80,
-        cbar_ticks_size=None,
-        ticks=None,
-        ticks_size=None,
-        xticks_rotation=90,
-        yticks_rotation=0,
-        title_size=60,
-        xlabel=None,
-        xlabel_size=40,
-        ylabel=None,
-        ylabel_size=40,
-    ) -> None:
-
-        self.visualize_params = {
-            "figsize": figsize,
-            "category_name_list": category_name_list,
-            "num_category_list": num_category_list,
-            "object_labels": object_labels,
-            "cbar_size": cbar_size,
-            "cbar_ticks_size": cbar_ticks_size,
-            "ticks": ticks,
-            "ticks_size": ticks_size,
-            "xticks_rotation": xticks_rotation,
-            "yticks_rotation": yticks_rotation,
-            "title_size": title_size,
-            "xlabel": xlabel,
-            "xlabel_size": xlabel_size,
-            "ylabel": ylabel,
-            "ylabel_size": ylabel_size,
+        
+class Visualization_Config():
+    def __init__(self, 
+                 figsize = (8, 6),
+                 cbar_size = 1.0,
+                 cbar_ticks_size = 5,
+                 ticks_size = 5,
+                 xticks_rotation = 90,
+                 yticks_rotation = 0,
+                 title_size = 20,
+                 legend_size = 5, 
+                 xlabel = None,
+                 xlabel_size = 15,
+                 ylabel = None,
+                 ylabel_size = 15,
+                 zlabel = None,
+                 zlabel_size = 15, 
+                 color_labels = None, 
+                 color_hue = None, 
+                 markers_list = None, 
+                 marker_size = 30
+                 ) -> None:
+        
+        self.visualization_params = {
+            'figsize': figsize,
+            'cbar_size': cbar_size,
+            'cbar_ticks_size': cbar_ticks_size,
+            'ticks_size': ticks_size,
+            'xticks_rotation': xticks_rotation,
+            'yticks_rotation': yticks_rotation,
+            'title_size': title_size,
+            'legend_size' : legend_size, 
+            'xlabel': xlabel,
+            'xlabel_size': xlabel_size,
+            'ylabel': ylabel,
+            'ylabel_size': ylabel_size,
+            'zlabel' : zlabel,
+            'zlabel_size' : zlabel_size, 
+            'color_labels': color_labels, 
+            'color_hue' : color_hue, 
+            'markers_list' : markers_list, 
+            'marker_size' : marker_size
         }
+        
+    def __call__(self):
+        return self.visualization_params
 
-        pass
-
-    def show(self, matrix, title, file_name):
-        visualize_functions.show_heatmap(matrix=matrix, title=title, file_name=file_name, **self.visualize_params)
 
 
 class Representation:
@@ -110,13 +113,14 @@ class Representation:
     def __init__(
         self,
         name,
-        sim_mat=None,
-        get_embedding=True,
-        embedding=None,
-        metric="cosine",
-        shuffle=False,
+        sim_mat = None,
+        get_embedding = True,
+        MDS_dim = 3, 
+        embedding = None,
+        metric = "cosine",
+        shuffle = False,
         category_mat: pd.DataFrame = None,
-        category_name_list=["all"],
+        category_name_list = ["all"],
     ) -> None:
         """
         Args:
@@ -139,7 +143,7 @@ class Representation:
         if embedding is None:
             self.sim_mat = sim_mat
             if get_embedding:
-                self.embedding = self._get_embedding()
+                self.embedding = self._get_embedding(dim = MDS_dim)
         else:
             self.embedding = embedding
 
@@ -181,8 +185,8 @@ class Representation:
             self.embedding, self.embedding, metric=metric
         )  # ここも、torchでも対応できるようにする必要がある。backendにdistを定義すたら良いと思う。
 
-    def _get_embedding(self):  # ここも、torchでも対応できるようにする必要がある。sklearnはtorchで使えない。
-        MDS_embedding = manifold.MDS(n_components=3, dissimilarity="precomputed", random_state=0)
+    def _get_embedding(self, dim):  # ここも、torchでも対応できるようにする必要がある。sklearnはtorchで使えない。
+        MDS_embedding = manifold.MDS(n_components = dim, dissimilarity = "precomputed", random_state = 0)
         embedding = MDS_embedding.fit_transform(self.sim_mat)
         return embedding
 
@@ -205,10 +209,8 @@ class Representation:
                 object_labels += category_mat.index[category_idx_list[i]].tolist()
 
         return object_labels, category_idx_list, category_num_list, new_category_name_list
-
-    def show_sim_mat(
-        self, returned="figure", sim_mat_format="default", visualize_matrix: Visualize_Matrix = None, fig_dir=None
-    ):
+        
+    def show_sim_mat(self, returned = "figure", sim_mat_format = "default", visualization_config : Visualization_Config = Visualization_Config(), fig_dir = None, ticks = None):
         """_summary_
 
         Args:
@@ -216,31 +218,40 @@ class Representation:
             sim_mat_format (str, optional): "default", "sorted" or "both". Defaults to "default".
             visualize_matrix (Visualize_Matrix, optional): The instance of Visualize_Matrix. Defaults to None.
             fig_dir (_type_, optional): _description_. Defaults to None.
+            ticks : "None", "object", "category" or "numbers". Defaults to None.
         """
         if self.category_idx_list is not None:
             sim_mat_sorted = sort_matrix_with_categories(self.sim_mat, category_idx_list=self.category_idx_list)
 
         if returned == "figure" or returned == "both":
             if fig_dir is not None:
-                fig_path = os.path.join(fig_dir, f"RDM_{self.name}.png")
+                fig_path = os.path.join(fig_dir, f"RDM_{self.name}")
             else:
                 fig_path = None
 
             if sim_mat_format == "default":
-                sim_mat_list = [self.sim_mat]
-
+                visualize_functions.show_heatmap(self.sim_mat, title = self.name, file_name = fig_path, **visualization_config())
+            
             elif sim_mat_format == "sorted":
-                sim_mat_list = [sim_mat_sorted]
-
+                visualize_functions.show_heatmap(sim_mat_sorted, 
+                                                 title = self.name, 
+                                                 file_name = fig_path, 
+                                                 ticks = ticks, 
+                                                 category_name_list = self.category_name_list, 
+                                                 num_category_list = self.num_category_list, 
+                                                 object_labels = self.object_labels, 
+                                                 **visualization_config()
+                                                 )
+            
             elif sim_mat_format == "both":
                 sim_mat_list = [self.sim_mat, sim_mat_sorted]
-
+                for sim_mat in sim_mat_list:
+                    visualize_functions.show_heatmap(sim_mat, title = self.name, file_name = fig_path, **visualization_config())
+                
             else:
                 raise ValueError("sim_mat_format must be either 'default', 'sorted', or 'both'.")
-
-            for sim_mat in sim_mat_list:
-                visualize_matrix.show(sim_mat, title=self.name, file_name=fig_path)
-
+        
+            
         elif returned == "row_data" or returned == "both":
             if sim_mat_format == "default":
                 return self.sim_mat
@@ -260,17 +271,41 @@ class Representation:
         plt.hist(lower_triangular)
         plt.title(f"Distribution of RDM ({self.name})")
         plt.show()
-
-    def show_embedding(self, dim=3):
+        
+    def show_embedding(self, 
+                       dim, 
+                       visualization_config : Visualization_Config = Visualization_Config(),
+                       category_name_list = None, 
+                       num_category_list = None, 
+                       category_idx_list = None, 
+                       title = None, 
+                       legend = True, 
+                       fig_dir = None, 
+                       fig_name = "Aligned_embedding.png"
+                       ):
+        
+        if fig_dir is not None:
+            fig_path = os.path.join(fig_dir, fig_name)  
+        else: 
+            fig_path = None
+        
+        if category_idx_list is None:
+            if self.category_idx_list is not None:
+                category_name_list = self.category_name_list
+                num_category_list = self.num_category_list
+                category_idx_list = self.category_idx_list
+            
         visualize_embedding = visualize_functions.Visualize_Embedding(
-            embedding_list=[self.embedding],
-            name_list=[self.name],
+            embedding_list = [self.embedding],
+            dim = dim, 
+            category_name_list = category_name_list,
+            num_category_list = num_category_list,
+            category_idx_list = category_idx_list
         )
-
-        visualize_embedding.plot_embedding(dim=dim)
-
-
-class Pairwise_Analysis:
+        
+        visualize_embedding.plot_embedding(name_list = [self.name], title = title, legend = legend, save_dir = fig_path, **visualization_config())
+    
+class Pairwise_Analysis():
     """
     A class object that has methods conducting gw-alignment and corresponding results
     This object has information of a pair of Representations.
@@ -365,36 +400,33 @@ class Pairwise_Analysis:
         matching = SimpleHistogramMatching(self.RDM_source, self.RDM_target)
 
         self.RDM_target = matching.simple_histogram_matching()
-
-    def run_gw(
-        self,
-        load_OT=False,
-        returned="figure",
-        OT_format="default",
-        visualize_matrix: Visualize_Matrix = None,
-        fig_dir=None,
-    ):
+        
+    
+    def run_gw(self, results_dir, load_OT = False, returned = "figure", OT_format = "default", visualization_config : Visualization_Config = Visualization_Config(), show_log = False, fig_dir = None, ticks = None):
         """
         Main computation
-        """
-        self.OT = self._gw_alignment(load_OT=load_OT)
-        OT = self._show_OT(
-            title=f"$\Gamma$ ({self.pair_name})",
-            returned=returned,
-            OT_format=OT_format,
-            visualize_matrix=visualize_matrix,
-            fig_dir=fig_dir,
-        )
-
+        """            
+        self.OT, df_trial = self._gw_alignment(load_OT = load_OT, results_dir = results_dir)
+        OT = self._show_OT(title = f"$\Gamma$ ({self.pair_name})", 
+                      returned = returned, 
+                      OT_format = OT_format, 
+                      visualization_config = visualization_config, 
+                      fig_dir = fig_dir, 
+                      ticks = ticks)
+        
+        if show_log:
+            self._get_optimization_log(df_trial, fig_dir = fig_dir)
+        
         return OT
 
-    def _gw_alignment(self, results_dir="../results/", load_OT=False):
+    def _gw_alignment(self, results_dir = "../results/", load_OT=False):
 
         filename = self.config.data_name + " " + self.pair_name
 
-        storage = "sqlite:///" + results_dir + "/" + filename + ".db"
-
         save_path = results_dir + filename
+        
+        storage = "sqlite:///" + save_path + "/" + filename + ".db"
+
 
         # distribution in the source space, and target space
         p = ot.unif(len(self.RDM_source))
@@ -448,8 +480,9 @@ class Pairwise_Analysis:
             )
 
             best_trial = study.best_trial
-
-            if self.config.to_types == "numpy":
+            df_trial = study.trials_dataframe()
+            
+            if self.config.to_types == 'numpy':
                 OT = np.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.npy")
 
             elif self.config.to_types == "torch":
@@ -459,23 +492,38 @@ class Pairwise_Analysis:
         else:
             study = opt.load_study()
             best_trial = study.best_trial
-
-            if self.config.to_types == "numpy":
+            df_trial = study.trials_dataframe()
+            
+            if self.config.to_types == 'numpy':
                 OT = np.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.npy")
 
             elif self.config.to_types == "torch":
                 OT = torch.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.pt")
-
-                OT = OT.to("cpu").numpy()
-
-        return OT
-
-    def _get_optimization_log(self):
-        pass
-
-    def _show_OT(
-        self, title, returned="figure", OT_format="default", visualize_matrix: Visualize_Matrix = None, fig_dir=None
-    ):
+                
+                OT = OT.to('cpu').numpy()
+        
+        return OT, df_trial
+          
+    def _get_optimization_log(self, df_trial, fig_dir):
+        # figure plotting epsilon as x-axis and GWD as y-axis
+        sns.scatterplot(data = df_trial, x = "params_eps", y = "value", s = 50)
+        plt.xlabel("$\epsilon$")
+        plt.ylabel("GWD")
+        if fig_dir is not None:
+            fig_path = os.path.join(fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png")
+            plt.savefig(fig_path)
+        plt.show()
+        
+        # 　figure plotting GWD as x-axis and accuracy as y-axis
+        sns.scatterplot(data = df_trial, x = "value", y = "user_attrs_best_acc", s = 50)
+        plt.xlabel("GWD")
+        plt.ylabel("accuracy")
+        if fig_dir is not None:
+            fig_path = os.path.join(fig_dir, f"Optim_log_acc_GWD_{self.pair_name}.png")
+            plt.savefig(fig_path)
+        plt.show()
+    
+    def _show_OT(self, title, returned = "figure", OT_format = "default", visualization_config : Visualization_Config = Visualization_Config(), fig_dir = None, ticks = None):
         if self.source.category_idx_list is not None:
             OT_sorted = sort_matrix_with_categories(self.OT, category_idx_list=self.source.category_idx_list)
 
@@ -486,20 +534,28 @@ class Pairwise_Analysis:
                 fig_path = None
 
             if OT_format == "default":
-                OT_list = [self.OT]
-
+                visualize_functions.show_heatmap(self.OT, title = title, file_name = fig_path, **visualization_config())
+            
             elif OT_format == "sorted":
-                OT_list = [OT_sorted]
-
+                visualize_functions.show_heatmap(OT_sorted, 
+                                                 title = title, 
+                                                 file_name = fig_path, 
+                                                 ticks = ticks, 
+                                                 category_name_list = self.source.category_name_list, 
+                                                 num_category_list = self.source.num_category_list, 
+                                                 object_labels = self.source.object_labels, 
+                                                 **visualization_config()
+                                                 )
+            
             elif OT_format == "both":
                 OT_list = [self.OT, OT_sorted]
-
+                for OT in OT_list:
+                    visualize_functions.show_heatmap(OT, title = title, file_name = fig_path, **visualization_config())
+                    
             else:
                 raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
-
-            for OT in OT_list:
-                visualize_matrix.show(OT, title=title, file_name=fig_path)
-
+            
+            
         elif returned == "row_data" or returned == "both":
             if OT_format == "default":
                 return self.OT
@@ -653,48 +709,39 @@ class Align_Representations:
             corr = pairwise.RSA(metric=metric)
             self.RSA_corr[pairwise.pair_name] = corr
             print(f"Correlation {pairwise.pair_name} : {corr}")
-
-    def show_sim_mat(
-        self,
-        returned="figure",
-        sim_mat_format="default",
-        visualize_matrix: Visualize_Matrix = None,
-        fig_dir=None,
-        show_distribution=True,
-    ):
+    
+    def show_sim_mat(self, returned = "figure", sim_mat_format = "default", visualization_config : Visualization_Config = Visualization_Config(), fig_dir = None, show_distribution = True, ticks = None):
         """_summary_
 
         Args:
             returned (str, optional): "figure", "row_data" or "both" . Defaults to "figure".
             sim_mat_format (str, optional): "default", "sorted" or "both". Defaults to "default".
-            visualize_matrix (Visualize_Matrix, optional): The instance of Visualize_Matrix. Defaults to None.
+            visualization_config (Visualization_Config, optional): The instance of Visualization_Config. Defaults to None.
             fig_dir (_type_, optional): _description_. Defaults to None.
         """
         for representation in self.representations_list:
-            representation.show_sim_mat(
-                returned=returned, sim_mat_format=sim_mat_format, visualize_matrix=visualize_matrix, fig_dir=fig_dir
-            )
+            representation.show_sim_mat(returned = returned,
+                                        sim_mat_format = sim_mat_format,
+                                        visualization_config = visualization_config,
+                                        fig_dir = fig_dir, 
+                                        ticks = ticks
+                                        )
             if show_distribution:
                 representation.show_sim_mat_distribution()
-
-    def gw_alignment(
-        self,
-        load_OT=False,
-        returned="figure",
-        OT_format="default",
-        visualize_matrix: Visualize_Matrix = None,
-        fig_dir=None,
-    ):
+    
+    def gw_alignment(self, results_dir, load_OT = False, returned = "figure", OT_format = "default", visualization_config : Visualization_Config = Visualization_Config(), show_log = False, fig_dir = None, ticks = None):
         for pair_number in self.pair_number_list:
             pairwise = self.pairwise_list[pair_number]
-            pairwise.run_gw(
-                load_OT=load_OT,
-                returned=returned,
-                OT_format=OT_format,
-                visualize_matrix=visualize_matrix,
-                fig_dir=fig_dir,
-            )
-
+            pairwise.run_gw(results_dir = results_dir,
+                            load_OT = load_OT,
+                            returned = returned,
+                            OT_format = OT_format,
+                            visualization_config = visualization_config,
+                            show_log = show_log,
+                            fig_dir = fig_dir, 
+                            ticks = ticks
+                            )
+            
     def barycenter_alignment(self):
         pass
 
@@ -776,18 +823,36 @@ class Align_Representations:
         if fig_dir is not None:
             plt.savefig(os.path.join(fig_dir, fig_name))
         plt.show()
+    
+    def visualize_embedding(self, 
+                            dim, 
+                            returned = "figure", 
+                            visualization_config : Visualization_Config = Visualization_Config(), 
+                            category_name_list = None, 
+                            num_category_list = None, 
+                            category_idx_list = None, 
+                            title = None, 
+                            legend = True, 
+                            fig_dir = None, 
+                            fig_name = "Aligned_embedding.png"):
+        """_summary_
 
-    def visualize_embedding(
-        self,
-        dim=3,
-        color_labels=None,
-        category_name_list=None,
-        category_num_list=None,
-        category_idx_list=None,
-        fig_dir=None,
-        fig_name="Aligned_embedding.png",
-    ):
+        Args:
+            dim (_type_): The number of dimensions the points are embedded.  
+            returned (str, optional): "figure" or "row_data. Defaults to "figure".
+            visualization_config (Visualization_Config, optional): _description_. Defaults to Visualization_Config().
+            category_name_list (_type_, optional): _description_. Defaults to None.
+            num_category_list (_type_, optional): _description_. Defaults to None.
+            category_idx_list (_type_, optional): _description_. Defaults to None.
+            title (_type_, optional): _description_. Defaults to None.
+            legend (bool, optional): _description_. Defaults to True.
+            fig_dir (_type_, optional): _description_. Defaults to None.
+            fig_name (str, optional): _description_. Defaults to "Aligned_embedding.png".
 
+        Returns:
+            _type_: _description_
+        """
+        
         if fig_dir is not None:
             fig_path = os.path.join(fig_dir, fig_name)
         else:
@@ -802,20 +867,23 @@ class Align_Representations:
         for i in range(len(self.representations_list)):
             embedding_list.append(self.representations_list[i].embedding)
             name_list.append(self.representations_list[i].name)
+        
+        if returned == "figure":
+            if category_idx_list is None:
+                if self.representations_list[0].category_idx_list is not None:
+                    category_name_list = self.representations_list[0].category_name_list
+                    num_category_list = self.representations_list[0].num_category_list
+                    category_idx_list = self.representations_list[0].category_idx_list
 
-        if category_idx_list is None:
-            if self.representations_list[0].category_idx_list is not None:
-                category_name_list = self.representations_list[0].category_name_list
-                category_num_list = self.representations_list[0].num_category_list
-                category_idx_list = self.representations_list[0].category_idx_list
+            visualize_embedding = visualize_functions.Visualize_Embedding(
+                embedding_list = embedding_list,
+                dim = dim, 
+                category_name_list = category_name_list,
+                num_category_list = num_category_list,
+                category_idx_list = category_idx_list
+            )
 
-        visualize_embedding = visualize_functions.Visualize_Embedding(
-            embedding_list=embedding_list,
-            name_list=name_list,
-            color_labels=color_labels,
-            category_name_list=category_name_list,
-            category_num_list=category_num_list,
-            category_idx_list=category_idx_list,
-        )
+            visualize_embedding.plot_embedding(name_list = name_list, title = title, legend = legend, save_dir = fig_path, **visualization_config())
 
-        visualize_embedding.plot_embedding(dim=dim, save_dir=fig_path)
+        elif returned == "row_data":
+            return embedding_list
