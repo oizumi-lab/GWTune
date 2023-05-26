@@ -530,7 +530,14 @@ class Pairwise_Analysis():
             plt.savefig(fig_path)
         plt.show()
     
-    def _show_OT(self, title, returned = "figure", OT_format = "default", visualization_config : Visualization_Config = Visualization_Config(), fig_dir = None, ticks = None):
+    def _show_OT(self, 
+                 title, 
+                 returned = "figure",
+                 OT_format = "default",
+                 visualization_config : Visualization_Config = Visualization_Config(),
+                 fig_dir = None,
+                 ticks = None):
+        
         if self.source.category_idx_list is not None:
             OT_sorted = sort_matrix_with_categories(self.OT, category_idx_list=self.source.category_idx_list)
 
