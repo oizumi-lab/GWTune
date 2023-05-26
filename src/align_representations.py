@@ -402,11 +402,19 @@ class Pairwise_Analysis():
         self.RDM_target = matching.simple_histogram_matching()
         
     
-    def run_gw(self, results_dir, load_OT = False, returned = "figure", OT_format = "default", visualization_config : Visualization_Config = Visualization_Config(), show_log = False, fig_dir = None, ticks = None):
+    def run_gw(self, 
+               results_dir, 
+               load_OT = False, 
+               returned = "figure", 
+               OT_format = "default", 
+               visualization_config : Visualization_Config = Visualization_Config(), 
+               show_log = False,
+               fig_dir = None, 
+               ticks = None):
         """
         Main computation
         """            
-        self.OT, df_trial = self._gw_alignment(load_OT = load_OT, results_dir = results_dir)
+        self.OT, df_trial = self._gw_alignment(results_dir, load_OT = load_OT)
         OT = self._show_OT(title = f"$\Gamma$ ({self.pair_name})", 
                       returned = returned, 
                       OT_format = OT_format, 
@@ -419,14 +427,13 @@ class Pairwise_Analysis():
         
         return OT
 
-    def _gw_alignment(self, results_dir = "../results/", load_OT=False):
+    def _gw_alignment(self, results_dir, load_OT=False):
 
         filename = self.config.data_name + " " + self.pair_name
 
-        save_path = results_dir + filename
+        save_path = save_path = os.path.join(results_dir, filename)
         
         storage = "sqlite:///" + save_path + "/" + filename + ".db"
-
 
         # distribution in the source space, and target space
         p = ot.unif(len(self.RDM_source))
@@ -523,7 +530,14 @@ class Pairwise_Analysis():
             plt.savefig(fig_path)
         plt.show()
     
-    def _show_OT(self, title, returned = "figure", OT_format = "default", visualization_config : Visualization_Config = Visualization_Config(), fig_dir = None, ticks = None):
+    def _show_OT(self, 
+                 title, 
+                 returned = "figure",
+                 OT_format = "default",
+                 visualization_config : Visualization_Config = Visualization_Config(),
+                 fig_dir = None,
+                 ticks = None):
+        
         if self.source.category_idx_list is not None:
             OT_sorted = sort_matrix_with_categories(self.OT, category_idx_list=self.source.category_idx_list)
 
