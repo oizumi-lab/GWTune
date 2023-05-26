@@ -81,7 +81,7 @@ Unsupervised alignment between Representations
 align_representation = Align_Representations(representations_list = representations, config = config)
 
 # RSA
-sim_mat = align_representation.show_sim_mat(returned = "figure", sim_mat_format = "sorted", visualization_config = visualization_config, show_distribution = False)#fig_dir = "../figures")
+sim_mat = align_representation.show_sim_mat(returned = "row_data", sim_mat_format = "sorted", visualization_config = visualization_config, show_distribution = False)#fig_dir = "../figures")
 align_representation.RSA_get_corr()
 
 #%%
@@ -89,7 +89,7 @@ align_representation.RSA_get_corr()
 GW alignment
 '''
 ## If no need for computation, turn load_OT True, then OT plans calculated before is loaded.
-align_representation.gw_alignment(results_dir = "../../results/", load_OT = False, returned = "figure", OT_format = "sorted", visualization_config = visualization_config, show_log = True)
+align_representation.gw_alignment(results_dir = "../../results/", load_OT = True, returned = "row_data", OT_format = "sorted", visualization_config = visualization_config, show_log = True)
 
 ## Calculate the accuracy of the optimized OT matrix
 align_representation.calc_accuracy(top_k_list = [1, 5, 10], eval_type = "ot_plan")
@@ -119,7 +119,7 @@ if data_select == "THINGS":
     # Set the configuration
     visualization_config = Visualization_Config(figsize = (15, 15), xlabel = "PC1", ylabel = "PC2", zlabel = "PC3", legend_size = 10, marker_size = 20) 
 
-    align_representation.visualize_embedding(dim = 3, visualization_config = visualization_config, category_name_list = category_name_list, category_idx_list = category_idx_list, num_category_list = num_category_list)#, fig_dir = "../figures")
+    align_representation.visualize_embedding(dim = 2, visualization_config = visualization_config, category_name_list = category_name_list, category_idx_list = category_idx_list, num_category_list = num_category_list)#, fig_dir = "../figures")
 
 elif data_select == "color":
     file_path = "../../data/color_dict.csv"
