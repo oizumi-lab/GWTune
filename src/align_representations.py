@@ -113,13 +113,14 @@ class Representation:
     def __init__(
         self,
         name,
-        sim_mat=None,
-        get_embedding=True,
-        embedding=None,
-        metric="cosine",
-        shuffle=False,
+        sim_mat = None,
+        get_embedding = True,
+        MDS_dim = 3, 
+        embedding = None,
+        metric = "cosine",
+        shuffle = False,
         category_mat: pd.DataFrame = None,
-        category_name_list=["all"],
+        category_name_list = ["all"],
     ) -> None:
         """
         Args:
@@ -142,7 +143,7 @@ class Representation:
         if embedding is None:
             self.sim_mat = sim_mat
             if get_embedding:
-                self.embedding = self._get_embedding()
+                self.embedding = self._get_embedding(dim = MDS_dim)
         else:
             self.embedding = embedding
 
@@ -184,8 +185,8 @@ class Representation:
             self.embedding, self.embedding, metric=metric
         )  # ここも、torchでも対応できるようにする必要がある。backendにdistを定義すたら良いと思う。
 
-    def _get_embedding(self):  # ここも、torchでも対応できるようにする必要がある。sklearnはtorchで使えない。
-        MDS_embedding = manifold.MDS(n_components=3, dissimilarity="precomputed", random_state=0)
+    def _get_embedding(self, dim):  # ここも、torchでも対応できるようにする必要がある。sklearnはtorchで使えない。
+        MDS_embedding = manifold.MDS(n_components = dim, dissimilarity = "precomputed", random_state = 0)
         embedding = MDS_embedding.fit_transform(self.sim_mat)
         return embedding
 
@@ -401,11 +402,11 @@ class Pairwise_Analysis():
         self.RDM_target = matching.simple_histogram_matching()
         
     
-    def run_gw(self, load_OT = False, returned = "figure", OT_format = "default", visualization_config : Visualization_Config = Visualization_Config(), show_log = False, fig_dir = None, ticks = None):
+    def run_gw(self, results_dir, load_OT = False, returned = "figure", OT_format = "default", visualization_config : Visualization_Config = Visualization_Config(), show_log = False, fig_dir = None, ticks = None):
         """
         Main computation
         """            
-        self.OT, df_trial = self._gw_alignment(load_OT = load_OT)
+        self.OT, df_trial = self._gw_alignment(load_OT = load_OT, results_dir = results_dir)
         OT = self._show_OT(title = f"$\Gamma$ ({self.pair_name})", 
                       returned = returned, 
                       OT_format = OT_format, 
@@ -418,13 +419,14 @@ class Pairwise_Analysis():
         
         return OT
 
-    def _gw_alignment(self, results_dir="../results/", load_OT=False):
+    def _gw_alignment(self, results_dir = "../results/", load_OT=False):
 
         filename = self.config.data_name + " " + self.pair_name
 
-        storage = "sqlite:///" + results_dir + "/" + filename + ".db"
-
         save_path = results_dir + filename
+        
+        storage = "sqlite:///" + save_path + "/" + filename + ".db"
+
 
         # distribution in the source space, and target space
         p = ot.unif(len(self.RDM_source))
@@ -727,10 +729,11 @@ class Align_Representations:
             if show_distribution:
                 representation.show_sim_mat_distribution()
     
-    def gw_alignment(self, load_OT = False, returned = "figure", OT_format = "default", visualization_config : Visualization_Config = Visualization_Config(), show_log = False, fig_dir = None, ticks = None):
+    def gw_alignment(self, results_dir, load_OT = False, returned = "figure", OT_format = "default", visualization_config : Visualization_Config = Visualization_Config(), show_log = False, fig_dir = None, ticks = None):
         for pair_number in self.pair_number_list:
             pairwise = self.pairwise_list[pair_number]
-            pairwise.run_gw(load_OT = load_OT,
+            pairwise.run_gw(results_dir = results_dir,
+                            load_OT = load_OT,
                             returned = returned,
                             OT_format = OT_format,
                             visualization_config = visualization_config,
