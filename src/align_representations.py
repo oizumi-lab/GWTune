@@ -16,6 +16,7 @@ import ot
 import sys
 import os
 from typing import List
+import warnings
 
 from utils.utils_functions import get_category_idx, sort_matrix_with_categories
 from utils import visualize_functions, backend, init_matrix, gw_optimizer
@@ -103,8 +104,6 @@ class Visualization_Config():
     def __call__(self):
         return self.visualization_params
 
-
-
 class Representation:
     """
     A class object that has information of a representation, such as embeddings and similarity matrices
@@ -151,11 +150,11 @@ class Representation:
             self.shuffled_sim_mat = self._get_shuffled_sim_mat()
 
         self.category_mat = category_mat
-        (
-            self.object_labels,
-            self.category_idx_list,
-            self.num_category_list,
-            self.category_name_list,
+        
+        (self.object_labels,
+         self.category_idx_list,
+         self.num_category_list,
+         self.category_name_list,
         ) = self._get_index_data(category_mat, category_name_list)
 
     def _get_shuffled_sim_mat(self):  # ここも、torchでも対応できるようにする必要がある。
@@ -361,23 +360,8 @@ class Pairwise_Analysis():
         a_hist, a_bin = np.histogram(a, bins=100)
         b_hist, b_bin = np.histogram(b, bins=100)
 
-        # print(a_hist, a_bin)
-        # print(a_hist.shape, a_bin.shape)
-
-        # plt.figure()
-        # plt.suptitle('histogram')
-        # plt.subplot(121)
-        # plt.title('source : ' + self.source.name)
-        # plt.hist(a_bin[:-1], a_bin, weights = a_hist, color = 'C0', alpha = 0.5)
-        # plt.grid(True)
-
-        # plt.subplot(122)
-        # plt.title('target : ' + self.target.name)
-        # plt.hist(b_bin[:-1], b_bin, weights = b_hist, color = 'C1', alpha = 0.5)
-        # plt.grid(True)
-
         plt.figure()
-        plt.title("histogram source : " + self.source.name + ", target : " + self.target.name)
+        plt.title("histogram, source : " + self.source.name + ", target : " + self.target.name)
         plt.hist(a_bin[:-1], a_bin, weights=a_hist, label=self.source.name, alpha=0.5)
         plt.hist(b_bin[:-1], b_bin, weights=b_hist, label=self.target.name, alpha=0.5)
         plt.grid(True)
@@ -385,7 +369,7 @@ class Pairwise_Analysis():
         plt.tight_layout()
         plt.show()
 
-    def RSA(self, metric="spearman"):  # ここも、torchでも対応できるようにする必要がある。
+    def RSA(self, metric="spearman"):
         upper_tri_source = self.RDM_source[np.triu_indices(self.RDM_source.shape[0], k=1)]
         upper_tri_target = self.RDM_target[np.triu_indices(self.RDM_target.shape[0], k=1)]
 
@@ -396,15 +380,26 @@ class Pairwise_Analysis():
 
         return corr
 
-    def match_sim_mat_distribution(self):
+    def match_sim_mat_distribution(self, returned=False):
+        """
+        Args:
+            returned (bool, optional): _description_. Defaults to False.
+
+        Returns:
+            _type_: _description_
+        """
         matching = SimpleHistogramMatching(self.RDM_source, self.RDM_target)
 
-        self.RDM_target = matching.simple_histogram_matching()
+        new_target = matching.simple_histogram_matching()
         
+        if returned:
+            return new_target
+        else:
+            self.RDM_target = new_target
     
     def run_gw(self, 
-               results_dir, 
-               load_OT = False, 
+               results_dir,
+               compute_again = False, # 全然いい名前が思いつかなかったです・・・(2023.5.31 佐々木)
                returned = "figure", 
                OT_format = "default", 
                visualization_config : Visualization_Config = Visualization_Config(), 
@@ -414,43 +409,53 @@ class Pairwise_Analysis():
         """
         Main computation
         """            
-        self.OT, df_trial = self._gw_alignment(results_dir, load_OT = load_OT)
-        OT = self._show_OT(title = f"$\Gamma$ ({self.pair_name})", 
-                      returned = returned, 
-                      OT_format = OT_format, 
-                      visualization_config = visualization_config, 
-                      fig_dir = fig_dir, 
-                      ticks = ticks)
+        self.OT, df_trial = self._gw_alignment(results_dir, compute_again = compute_again)
+        
+        OT = self._show_OT(
+            title = f"$\Gamma$ ({self.pair_name})", 
+            returned = returned, 
+            OT_format = OT_format, 
+            visualization_config = visualization_config, 
+            fig_dir = fig_dir, 
+            ticks = ticks
+        )
         
         if show_log:
             self._get_optimization_log(df_trial, fig_dir = fig_dir)
         
         return OT
-
-    def _gw_alignment(self, results_dir, load_OT=False):
+    
+    def _gw_alignment(self, results_dir, compute_again):
 
         filename = self.config.data_name + " " + self.pair_name
 
-        save_path = save_path = os.path.join(results_dir, filename)
+        save_path = os.path.join(results_dir, filename)
         
         storage = "sqlite:///" + save_path + "/" + filename + ".db"
+        
+        if not os.path.exists(save_path):            
+            if compute_again != False:
+                warnings.warn("This computing is running for the first time in the 'results_dir'.", UserWarning)
+                
+            compute_again = True            
+    
+        study = self._run_optimization(filename, save_path, storage, compute_again)
+        
+        best_trial = study.best_trial
+        df_trial = study.trials_dataframe()
 
-        # distribution in the source space, and target space
-        p = ot.unif(len(self.RDM_source))
-        q = ot.unif(len(self.RDM_target))
+        if self.config.to_types == 'numpy':
+            ## ここはバグになる。init_plans_listの二番目が来ても対応できるようにしないといけない。
+            OT = np.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.npy")
 
-        # generate instance solves gw_alignment
-        test_gw = GW_Alignment(
-            self.RDM_source,
-            self.RDM_target,
-            p,
-            q,
-            save_path,
-            max_iter=self.config.max_iter,
-            n_iter=self.config.n_iter,
-            to_types=self.config.to_types,
-        )
-
+        elif self.config.to_types == "torch":
+            OT = torch.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.pt")
+            
+            OT = OT.to('cpu').numpy()
+        
+        return OT, df_trial
+          
+    def _run_optimization(self, filename, save_path, storage, compute_again):
         # generate instance optimize gw_alignment
         opt = gw_optimizer.load_optimizer(
             save_path,
@@ -466,8 +471,24 @@ class Pairwise_Analysis():
             storage=storage,
             delete_study=self.config.delete_study,
         )
+        
+        if compute_again:
+            # distribution in the source space, and target space
+            p = ot.unif(len(self.RDM_source))
+            q = ot.unif(len(self.RDM_target))
 
-        if not load_OT:
+            # generate instance solves gw_alignment
+            test_gw = GW_Alignment(
+                self.RDM_source,
+                self.RDM_target,
+                p,
+                q,
+                save_path,
+                max_iter=self.config.max_iter,
+                n_iter=self.config.n_iter,
+                to_types=self.config.to_types,
+            )
+            
             ### optimization
             # 1. choose the initial matrix for GW alignment computation.
             init_plans = init_matrix.InitMatrix().implemented_init_plans(self.config.init_plans_list)
@@ -485,32 +506,12 @@ class Pairwise_Analysis():
                 eps_log=self.config.eps_log,
                 search_space=search_space,
             )
-
-            best_trial = study.best_trial
-            df_trial = study.trials_dataframe()
-            
-            if self.config.to_types == 'numpy':
-                OT = np.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.npy")
-
-            elif self.config.to_types == "torch":
-                OT = torch.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.pt")
-                OT = OT.to("cpu").numpy()
-
+                
         else:
             study = opt.load_study()
-            best_trial = study.best_trial
-            df_trial = study.trials_dataframe()
-            
-            if self.config.to_types == 'numpy':
-                OT = np.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.npy")
-
-            elif self.config.to_types == "torch":
-                OT = torch.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.pt")
-                
-                OT = OT.to('cpu').numpy()
         
-        return OT, df_trial
-          
+        return study
+
     def _get_optimization_log(self, df_trial, fig_dir):
         # figure plotting epsilon as x-axis and GWD as y-axis
         sns.scatterplot(data = df_trial, x = "params_eps", y = "value", s = 50)
@@ -724,7 +725,13 @@ class Align_Representations:
             self.RSA_corr[pairwise.pair_name] = corr
             print(f"Correlation {pairwise.pair_name} : {corr}")
     
-    def show_sim_mat(self, returned = "figure", sim_mat_format = "default", visualization_config : Visualization_Config = Visualization_Config(), fig_dir = None, show_distribution = True, ticks = None):
+    def show_sim_mat(self, 
+                     returned = "figure", 
+                     sim_mat_format = "default", 
+                     visualization_config : Visualization_Config = Visualization_Config(), 
+                     fig_dir = None, 
+                     show_distribution = True, 
+                     ticks = None):
         """_summary_
 
         Args:
@@ -743,7 +750,27 @@ class Align_Representations:
             if show_distribution:
                 representation.show_sim_mat_distribution()
     
-    def gw_alignment(self, results_dir, load_OT = False, returned = "figure", OT_format = "default", visualization_config : Visualization_Config = Visualization_Config(), show_log = False, fig_dir = None, ticks = None):
+    def gw_alignment(self, 
+                     results_dir, 
+                     load_OT = False, 
+                     returned = "figure", 
+                     OT_format = "default", 
+                     visualization_config : Visualization_Config = Visualization_Config(),
+                     show_log = False,
+                     fig_dir = None,
+                     ticks = None
+                     ):
+        """
+        Args:
+            results_dir (_type_): _description_
+            load_OT (bool, optional): _description_. Defaults to False.
+            returned (str, optional): _description_. Defaults to "figure".
+            OT_format (str, optional): _description_. Defaults to "default".
+            visualization_config (Visualization_Config, optional): _description_. Defaults to Visualization_Config().
+            show_log (bool, optional): _description_. Defaults to False.
+            fig_dir (_type_, optional): _description_. Defaults to None.
+            ticks (_type_, optional): _description_. Defaults to None.
+        """
         for pair_number in self.pair_number_list:
             pairwise = self.pairwise_list[pair_number]
             pairwise.run_gw(results_dir = results_dir,
