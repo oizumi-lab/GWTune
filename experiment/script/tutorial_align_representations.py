@@ -88,14 +88,15 @@ align_representation.RSA_get_corr()
 '''
 GW alignment
 '''
-## If no need for computation, turn load_OT True, then OT plans calculated before is loaded.
-align_representation.gw_alignment(results_dir = "../../results/", load_OT = True, returned = "row_data", OT_format = "sorted", visualization_config = visualization_config, show_log = False, fig_dir = "../../figures")
+barycenter = True
+if not barycenter:
+    ## If no need for computation, turn load_OT True, then OT plans calculated before is loaded.
+    align_representation.gw_alignment(results_dir = "../../results/", load_OT = True, returned = "row_data", OT_format = "sorted", visualization_config = visualization_config, show_log = False, fig_dir = "../../figures")
 
 #%%
 '''
 Barycenter alignment (optional)
 '''
-barycenter = True
 if barycenter:
     align_representation.barycenter_alignment(pivot = 0, 
                                               n_iter = 30, 
@@ -116,7 +117,7 @@ align_representation.calc_accuracy(top_k_list = [1, 5, 10], eval_type = "ot_plan
 align_representation.plot_accuracy(eval_type = "ot_plan", scatter = True)
 
 ## Calclate the category level accuracy
-align_representation.calc_category_level_accuracy(barycenter=barycenter)
+align_representation.calc_category_level_accuracy()
 
 #%%
 ## Calculate the matching rate of k-nearest neighbors of embeddings

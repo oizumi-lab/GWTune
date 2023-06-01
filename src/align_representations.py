@@ -545,7 +545,7 @@ class Pairwise_Analysis():
 
         if returned == "figure" or returned == "both":
             if fig_dir is not None:
-                fig_path = os.path.join(fig_dir, f"OT_{self.pair_name}.png")
+                fig_path = os.path.join(fig_dir, f"{title}.png")
             else:
                 fig_path = None
 
@@ -806,6 +806,8 @@ class Align_Representations:
                              fig_dir=None, 
                              ticks=None):
         
+        assert self.pair_number_list == range(len(self.pairwise_list))
+        
         ### Select the pivot
         pivot_representation = self.representations_list[pivot]
         others_representaions = self.representations_list[:pivot] + self.representations_list[pivot + 1:]
@@ -829,17 +831,17 @@ class Align_Representations:
 
         ### Set up barycenter
         init_embedding = self.calc_barycenter()
-        barycenter = Representation(name="barycenter",
-                                    embedding=init_embedding,
-                                    category_mat=self.representations_list[0].category_mat,
-                                    category_name_list=self.representations_list[0].category_name_list
-                                    )
+        self.barycenter = Representation(name="barycenter",
+                                         embedding=init_embedding,
+                                         category_mat=self.representations_list[0].category_mat,
+                                         category_name_list=self.representations_list[0].category_name_list
+                                         )
         
         ### Set pairwises whose target is the barycenter
-        self.pairwise_barycenters = []
+        pairwise_barycenters = []
         for representation in self.representations_list:
-            pairwise = Pairwise_Analysis(config=self.config, source=representation, target=barycenter)
-            self.pairwise_barycenters.append(pairwise)
+            pairwise = Pairwise_Analysis(config=self.config, source=representation, target=self.barycenter)
+            pairwise_barycenters.append(pairwise)
         
         ### Barycenter alignment
         loss_list = []
@@ -848,7 +850,7 @@ class Align_Representations:
             embedding_barycenter = self.calc_barycenter(X_init=embedding_barycenter)
             
             loss = 0
-            for pairwise in self.pairwise_barycenters:
+            for pairwise in pairwise_barycenters:
                 # update the embedding of the barycenter
                 pairwise.target.embedding = embedding_barycenter
                 
@@ -858,30 +860,49 @@ class Align_Representations:
                 # update the embeddings of each representation
                 pairwise.source.embedding = pairwise.get_new_source_embedding()
                 
-            loss /= len(self.pairwise_barycenters)
+            loss /= len(pairwise_barycenters)
             loss_list.append(loss)
         
         plt.figure()
         plt.plot(loss_list)
         plt.xlabel("iteration")
         plt.ylabel("Mean Wasserstein distance")
+        
+        ### replace OT of each pairwise by the product of OTs to the barycenter
+        self._get_OT_all_pair(pairwise_barycenters)
+
+        ### visualize
+        OT_list = []
+        for pairwise in self.pairwise_list:
+            OT = pairwise.show_OT(title = f"$\Gamma$ ({pairwise.pair_name})",
+                                returned = returned,
+                                OT_format = OT_format,
+                                visualization_config = visualization_config,
+                                fig_dir = fig_dir,
+                                ticks = ticks)
+            OT_list.append(OT)
+        
+        if returned == "row_data":
+            return OT_list
+        
+    def _get_OT_all_pair(self, pairwise_barycenters):
+        # replace OT of each pairwise by the product of OTs to the barycenter
+        pairs = list(itertools.combinations(pairwise_barycenters, 2))
+        
+        for i, (pairwise_1, pairwise_2) in enumerate(pairs):
+            OT = np.matmul(pairwise_2.OT, pairwise_1.OT.T)
+            OT *= len(OT) # normalize
+            self.pairwise_list[i].OT = OT
             
     def calc_accuracy(self, top_k_list, eval_type="ot_plan", barycenter=False):
         accuracy = pd.DataFrame()
         accuracy["top_n"] = top_k_list
 
-        if barycenter:
-            for pairwise in self.pairwise_barycenters:
-                df = pairwise.eval_accuracy(top_k_list, eval_type=eval_type, metric=self.metric, barycenter=True)
+        for pair_number in self.pair_number_list:
+            pairwise = self.pairwise_list[pair_number]
+            df = pairwise.eval_accuracy(top_k_list, eval_type=eval_type, metric=self.metric, barycenter=barycenter)
 
-                accuracy = pd.merge(accuracy, df, on="top_n")
-        
-        else:
-            for pair_number in self.pair_number_list:
-                pairwise = self.pairwise_list[pair_number]
-                df = pairwise.eval_accuracy(top_k_list, eval_type=eval_type, metric=self.metric)
-
-                accuracy = pd.merge(accuracy, df, on="top_n")
+            accuracy = pd.merge(accuracy, df, on="top_n")
 
         accuracy = accuracy.set_index("top_n")
 
@@ -896,24 +917,16 @@ class Align_Representations:
         print("Mean : \n", accuracy.iloc[:, 1:].mean(axis="columns"))
 
     def calc_category_level_accuracy(self, 
-                                     barycenter=False,
                                      make_hist=False, 
                                      fig_dir=None, 
                                      fig_name="Category_level_accuracy.png", 
                                      category_mat=None):
         acc_list = []
-        if barycenter:
-            for pairwise in self.pairwise_barycenters:
-                acc = pairwise.calc_category_level_accuracy(category_mat=category_mat)
-                print(f"{pairwise.pair_name} :  {acc}")
-                acc_list.append(acc)
-        
-        else:  
-            for pairnumber in self.pair_number_list:
-                pairwise = self.pairwise_list[pairnumber]
-                acc = pairwise.calc_category_level_accuracy(category_mat=category_mat)
-                print(f"{pairwise.pair_name} :  {acc}")
-                acc_list.append(acc)
+        for pairnumber in self.pair_number_list:
+            pairwise = self.pairwise_list[pairnumber]
+            acc = pairwise.calc_category_level_accuracy(category_mat=category_mat)
+            print(f"{pairwise.pair_name} :  {acc}")
+            acc_list.append(acc)
 
         if make_hist:
             plt.figure()
@@ -1008,7 +1021,7 @@ class Align_Representations:
                 pair.source.embedding = pair.get_new_source_embedding()
         
         else:
-            assert(self.pairwise_barycenters is not None)
+            assert(self.barycenter is not None)
 
         name_list = []
         embedding_list = []
