@@ -430,6 +430,7 @@ class Pairwise_Analysis():
         filename = self.config.data_name + " " + self.pair_name
 
         save_path = os.path.join(results_dir, filename)
+        save_path = os.path.join(results_dir, filename)
         
         storage = "sqlite:///" + save_path + "/" + filename + ".db"
         
@@ -499,7 +500,7 @@ class Pairwise_Analysis():
 
             # 2. run optimzation
             study = opt.run_study(
-                test_gw,
+                gw,
                 self.config.device,
                 init_plans_list=init_plans,
                 eps_list=self.config.eps_list,
@@ -520,6 +521,7 @@ class Pairwise_Analysis():
         if fig_dir is not None:
             fig_path = os.path.join(fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png")
             plt.savefig(fig_path)
+        plt.tight_layout()
         plt.show()
         
         # 　figure plotting GWD as x-axis and accuracy as y-axis
@@ -529,9 +531,10 @@ class Pairwise_Analysis():
         if fig_dir is not None:
             fig_path = os.path.join(fig_dir, f"Optim_log_acc_GWD_{self.pair_name}.png")
             plt.savefig(fig_path)
+        plt.tight_layout()
         plt.show()
     
-    def _show_OT(self, 
+    def show_OT(self, 
                  title, 
                  returned = "figure",
                  OT_format = "default",
@@ -601,7 +604,7 @@ class Pairwise_Analysis():
 
         return accuracy
 
-    def eval_accuracy(self, top_k_list, eval_type="ot_plan", metric="cosine", supervised=False):
+    def eval_accuracy(self, top_k_list, eval_type="ot_plan", metric="cosine", barycenter=False, supervised=False):
         df = pd.DataFrame()
         df["top_n"] = top_k_list
 
@@ -613,8 +616,11 @@ class Pairwise_Analysis():
         acc_list = list()
         for k in top_k_list:
             if eval_type == "k_nearest":
-                new_embedding_source = self.procrustes(self.target.embedding, self.source.embedding, OT)
-
+                if not barycenter:
+                    new_embedding_source = self.procrustes(self.target.embedding, self.source.embedding, OT)
+                else:
+                    new_embedding_source = self.source.embedding
+                    
                 # Compute distances between each points
                 dist_mat = distance.cdist(self.target.embedding, new_embedding_source, metric)
 
@@ -650,27 +656,38 @@ class Pairwise_Analysis():
 
         return accuracy
 
-    def procrustes(self, embedding_1, embedding_2, Pi):
+    def procrustes(self, embedding_target, embedding_sourse, OT):
         """
-        embedding_2をembedding_1に最も近づける回転行列Qを求める
+        Function that brings embedding_sourse closest to embedding_target by orthogonal matrix
 
         Args:
-            embedding_1 : shape (n_1, m)
-            embedding_2 : shape (n_2, m)
-            Pi : shape (n_2, n_1)
-                Transportation matrix of 2→1
+            embedding_target : shape (n_target, m)
+            embedding_sourse : shape (n_sourse, m)
+            OT : shape (n_sourse, n_target)
+                Transportation matrix of sourse→target
 
         Returns:
-            new_embedding_2 : shape (n_2, m)
+            new_embedding_sourse : shape (n_sourse, m)
         """
         assert self.source.shuffle == False, "you cannot use procrustes method if 'shuffle' is True."
 
-        U, S, Vt = np.linalg.svd(np.matmul(embedding_2.T, np.matmul(Pi, embedding_1)))
+        U, S, Vt = np.linalg.svd(np.matmul(embedding_sourse.T, np.matmul(OT, embedding_target)))
         Q = np.matmul(U, Vt)
-        new_embedding_2 = np.matmul(embedding_2, Q)
+        new_embedding_sourse = np.matmul(embedding_sourse, Q)
 
-        return new_embedding_2
+        return new_embedding_sourse
 
+    def wasserstein_alignment(self, metric):
+        a = ot.unif(len(self.source.embedding))
+        b = ot.unif(len(self.target.embedding))
+        
+        M = distance.cdist(self.source.embedding, self.target.embedding, metric=metric)
+
+        self.OT, log = ot.emd(a, b, M, log=True)     
+        
+        return log["cost"]
+           
+        
     def get_new_source_embedding(self):
         return self.procrustes(self.target.embedding, self.source.embedding, self.OT)
 
@@ -760,6 +777,7 @@ class Align_Representations:
                      fig_dir = None,
                      ticks = None
                      ):
+        OT_list = []
         """
         Args:
             results_dir (_type_): _description_
@@ -773,7 +791,7 @@ class Align_Representations:
         """
         for pair_number in self.pair_number_list:
             pairwise = self.pairwise_list[pair_number]
-            pairwise.run_gw(results_dir = results_dir,
+            OT = pairwise.run_gw(results_dir = results_dir,
                             load_OT = load_OT,
                             returned = returned,
                             OT_format = OT_format,
@@ -782,19 +800,116 @@ class Align_Representations:
                             fig_dir = fig_dir, 
                             ticks = ticks
                             )
-            
-    def barycenter_alignment(self):
-        pass
+            OT_list.append(OT)
 
-    def calc_accuracy(self, top_k_list, eval_type="ot_plan"):
+        if returned == "row_data":
+            return OT_list
+    
+    def calc_barycenter(self, X_init=None):
+        embedding_list = [representation.embedding for representation in self.representations_list]
+        
+        if X_init is None:
+            X_init = np.mean(embedding_list, axis=0) # initial Dirac locations
+            
+        b = ot.unif(len(X_init)) # weights of the barycenter
+        
+        weights_list = []# measures weights
+        for representation in self.representations_list:
+            weights = ot.unif(len(representation.embedding))
+            weights_list.append(weights)
+        
+        X = ot.lp.free_support_barycenter(embedding_list, weights_list, X_init, b) # # new location of the barycenter
+        
+        return X
+        
+    def barycenter_alignment(self, 
+                             pivot, 
+                             n_iter, 
+                             results_dir, 
+                             load_OT=False, 
+                             returned="figure", 
+                             OT_format="default", 
+                             visualization_config:Visualization_Config=Visualization_Config(), 
+                             show_log=False, 
+                             fig_dir=None, 
+                             ticks=None):
+        
+        ### Select the pivot
+        pivot_representation = self.representations_list[pivot]
+        others_representaions = self.representations_list[:pivot] + self.representations_list[pivot + 1:]
+        
+        ### GW alignment to the pivot
+        # ここの部分はあとでself.gw_alignmentの中に組み込む
+        for representation in others_representaions:
+            pairwise = Pairwise_Analysis(config=self.config, source=representation, target=pivot_representation)
+
+            pairwise.run_gw(results_dir=results_dir,
+                            load_OT=load_OT,
+                            returned=returned,
+                            OT_format=OT_format,
+                            visualization_config=visualization_config,
+                            show_log=show_log,
+                            fig_dir=fig_dir, 
+                            ticks=ticks
+                            )
+
+            pairwise.source.embedding = pairwise.get_new_source_embedding()
+
+        ### Set up barycenter
+        init_embedding = self.calc_barycenter()
+        barycenter = Representation(name="barycenter",
+                                    embedding=init_embedding,
+                                    category_mat=self.representations_list[0].category_mat,
+                                    category_name_list=self.representations_list[0].category_name_list
+                                    )
+        
+        ### Set pairwises whose target is the barycenter
+        self.pairwise_barycenters = []
+        for representation in self.representations_list:
+            pairwise = Pairwise_Analysis(config=self.config, source=representation, target=barycenter)
+            self.pairwise_barycenters.append(pairwise)
+        
+        ### Barycenter alignment
+        loss_list = []
+        embedding_barycenter = init_embedding
+        for i in range(n_iter):   
+            embedding_barycenter = self.calc_barycenter(X_init=embedding_barycenter)
+            
+            loss = 0
+            for pairwise in self.pairwise_barycenters:
+                # update the embedding of the barycenter
+                pairwise.target.embedding = embedding_barycenter
+                
+                # OT to the barycenter
+                loss += pairwise.wasserstein_alignment(metric=self.metric)
+                
+                # update the embeddings of each representation
+                pairwise.source.embedding = pairwise.get_new_source_embedding()
+                
+            loss /= len(self.pairwise_barycenters)
+            loss_list.append(loss)
+        
+        plt.figure()
+        plt.plot(loss_list)
+        plt.xlabel("iteration")
+        plt.ylabel("Mean Wasserstein distance")
+            
+    def calc_accuracy(self, top_k_list, eval_type="ot_plan", barycenter=False):
         accuracy = pd.DataFrame()
         accuracy["top_n"] = top_k_list
 
-        for pair_number in self.pair_number_list:
-            pairwise = self.pairwise_list[pair_number]
-            df = pairwise.eval_accuracy(top_k_list, eval_type=eval_type, metric=self.metric)
+        if barycenter:
+            for pairwise in self.pairwise_barycenters:
+                df = pairwise.eval_accuracy(top_k_list, eval_type=eval_type, metric=self.metric, barycenter=True)
 
-            accuracy = pd.merge(accuracy, df, on="top_n")
+                accuracy = pd.merge(accuracy, df, on="top_n")
+        
+        else:
+            for pair_number in self.pair_number_list:
+                pairwise = self.pairwise_list[pair_number]
+                df = pairwise.eval_accuracy(top_k_list, eval_type=eval_type, metric=self.metric)
+
+                accuracy = pd.merge(accuracy, df, on="top_n")
 
         accuracy = accuracy.set_index("top_n")
 
@@ -808,15 +923,25 @@ class Align_Representations:
 
         print("Mean : \n", accuracy.iloc[:, 1:].mean(axis="columns"))
 
-    def calc_category_level_accuracy(
-        self, make_hist=False, fig_dir=None, fig_name="Category_level_accuracy.png", category_mat=None
-    ):
+    def calc_category_level_accuracy(self, 
+                                     barycenter=False,
+                                     make_hist=False, 
+                                     fig_dir=None, 
+                                     fig_name="Category_level_accuracy.png", 
+                                     category_mat=None):
         acc_list = []
-        for pairnumber in self.pair_number_list:
-            pairwise = self.pairwise_list[pairnumber]
-            acc = pairwise.calc_category_level_accuracy(category_mat=category_mat)
-            print(f"{pairwise.pair_name} :  {acc}")
-            acc_list.append(acc)
+        if barycenter:
+            for pairwise in self.pairwise_barycenters:
+                acc = pairwise.calc_category_level_accuracy(category_mat=category_mat)
+                print(f"{pairwise.pair_name} :  {acc}")
+                acc_list.append(acc)
+        
+        else:  
+            for pairnumber in self.pair_number_list:
+                pairwise = self.pairwise_list[pairnumber]
+                acc = pairwise.calc_category_level_accuracy(category_mat=category_mat)
+                print(f"{pairwise.pair_name} :  {acc}")
+                acc_list.append(acc)
 
         if make_hist:
             plt.figure()
@@ -865,8 +990,12 @@ class Align_Representations:
             plt.savefig(os.path.join(fig_dir, fig_name))
         plt.show()
     
+    def procrustes_to_pivot(self):
+        pass
+    
     def visualize_embedding(self, 
                             dim, 
+                            pivot = 0,
                             returned = "figure", 
                             visualization_config : Visualization_Config = Visualization_Config(), 
                             category_name_list = None, 
@@ -880,6 +1009,7 @@ class Align_Representations:
 
         Args:
             dim (_type_): The number of dimensions the points are embedded.  
+            pivot (str, optional) : The pivot or "barycenter" to which all embeddings are aligned. Defaults to 0.
             returned (str, optional): "figure" or "row_data. Defaults to "figure".
             visualization_config (Visualization_Config, optional): _description_. Defaults to Visualization_Config().
             category_name_list (_type_, optional): _description_. Defaults to None.
@@ -899,9 +1029,14 @@ class Align_Representations:
         else:
             fig_path = None
 
-        for i in range(len(self.pairwise_list) // 2):
-            pair = self.pairwise_list[i]
-            pair.source.embedding = pair.get_new_source_embedding()
+        if pivot != "barycenter":
+            # self.procrustes_to_pivot()
+            for i in range(len(self.pairwise_list) // 2):
+                pair = self.pairwise_list[i]
+                pair.source.embedding = pair.get_new_source_embedding()
+        
+        else:
+            assert(self.pairwise_barycenters is not None)
 
         name_list = []
         embedding_list = []
