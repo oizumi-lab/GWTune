@@ -479,7 +479,7 @@ class Pairwise_Analysis():
             q = ot.unif(len(self.RDM_target))
 
             # generate instance solves gw_alignment
-            test_gw = GW_Alignment(
+            gw = GW_Alignment(
                 self.RDM_source,
                 self.RDM_target,
                 p,
