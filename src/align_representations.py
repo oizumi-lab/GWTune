@@ -432,7 +432,7 @@ class Pairwise_Analysis():
 
         filename = self.config.data_name + " " + self.pair_name
 
-        save_path = save_path = os.path.join(results_dir, filename)
+        save_path = os.path.join(results_dir, filename)
         
         storage = "sqlite:///" + save_path + "/" + filename + ".db"
 
