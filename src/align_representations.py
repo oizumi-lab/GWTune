@@ -59,26 +59,27 @@ class Optimization_Config:
         self.pruner_params = pruner_params
         
 class Visualization_Config():
-    def __init__(self, 
-                 figsize = (8, 6),
-                 cbar_size = 1.0,
-                 cbar_ticks_size = 5,
-                 ticks_size = 5,
-                 xticks_rotation = 90,
-                 yticks_rotation = 0,
-                 title_size = 20,
-                 legend_size = 5, 
-                 xlabel = None,
-                 xlabel_size = 15,
-                 ylabel = None,
-                 ylabel_size = 15,
-                 zlabel = None,
-                 zlabel_size = 15, 
-                 color_labels = None, 
-                 color_hue = None, 
-                 markers_list = None, 
-                 marker_size = 30
-                 ) -> None:
+    def __init__(
+        self, 
+        figsize = (8, 6),
+        cbar_size = 1.0,
+        cbar_ticks_size = 5,
+        ticks_size = 5,
+        xticks_rotation = 90,
+        yticks_rotation = 0,
+        title_size = 20,
+        legend_size = 5, 
+        xlabel = None,
+        xlabel_size = 15,
+        ylabel = None,
+        ylabel_size = 15,
+        zlabel = None,
+        zlabel_size = 15, 
+        color_labels = None, 
+        color_hue = None, 
+        markers_list = None, 
+        marker_size = 30
+    ) -> None:
         
         self.visualization_params = {
             'figsize': figsize,
@@ -209,7 +210,14 @@ class Representation:
 
         return object_labels, category_idx_list, category_num_list, new_category_name_list
         
-    def show_sim_mat(self, returned = "figure", sim_mat_format = "default", visualization_config : Visualization_Config = Visualization_Config(), fig_dir = None, ticks = None):
+    def show_sim_mat(
+        self, 
+        returned = "figure", 
+        sim_mat_format = "default", 
+        visualization_config : Visualization_Config = Visualization_Config(), 
+        fig_dir = None, 
+        ticks = None
+    ):
         """_summary_
 
         Args:
@@ -271,17 +279,18 @@ class Representation:
         plt.title(f"Distribution of RDM ({self.name})")
         plt.show()
         
-    def show_embedding(self, 
-                       dim, 
-                       visualization_config : Visualization_Config = Visualization_Config(),
-                       category_name_list = None, 
-                       num_category_list = None, 
-                       category_idx_list = None, 
-                       title = None, 
-                       legend = True, 
-                       fig_dir = None, 
-                       fig_name = "Aligned_embedding.png"
-                       ):
+    def show_embedding(
+        self, 
+        dim, 
+        visualization_config : Visualization_Config = Visualization_Config(),
+        category_name_list = None, 
+        num_category_list = None, 
+        category_idx_list = None, 
+        title = None, 
+        legend = True, 
+        fig_dir = None, 
+        fig_name = "Aligned_embedding.png"
+    ):
         
         if fig_dir is not None:
             fig_path = os.path.join(fig_dir, fig_name)  
@@ -534,13 +543,15 @@ class Pairwise_Analysis():
         plt.tight_layout()
         plt.show()
     
-    def show_OT(self, 
-                 title, 
-                 returned = "figure",
-                 OT_format = "default",
-                 visualization_config : Visualization_Config = Visualization_Config(),
-                 fig_dir = None,
-                 ticks = None):
+    def show_OT(
+        self, 
+        title, 
+        returned = "figure",
+        OT_format = "default",
+        visualization_config : Visualization_Config = Visualization_Config(),
+        fig_dir = None,
+        ticks = None
+        ):
         
         if self.source.category_idx_list is not None:
             OT_sorted = sort_matrix_with_categories(self.OT, category_idx_list=self.source.category_idx_list)
@@ -742,13 +753,15 @@ class Align_Representations:
             self.RSA_corr[pairwise.pair_name] = corr
             print(f"Correlation {pairwise.pair_name} : {corr}")
     
-    def show_sim_mat(self, 
-                     returned = "figure", 
-                     sim_mat_format = "default", 
-                     visualization_config : Visualization_Config = Visualization_Config(), 
-                     fig_dir = None, 
-                     show_distribution = True, 
-                     ticks = None):
+    def show_sim_mat(
+        self, 
+        returned = "figure", 
+        sim_mat_format = "default", 
+        visualization_config : Visualization_Config = Visualization_Config(), 
+        fig_dir = None, 
+        show_distribution = True, 
+        ticks = None
+    ):
         """_summary_
 
         Args:
@@ -767,16 +780,17 @@ class Align_Representations:
             if show_distribution:
                 representation.show_sim_mat_distribution()
     
-    def gw_alignment(self, 
-                     results_dir, 
-                     load_OT = False, 
-                     returned = "figure", 
-                     OT_format = "default", 
-                     visualization_config : Visualization_Config = Visualization_Config(),
-                     show_log = False,
-                     fig_dir = None,
-                     ticks = None
-                     ):
+    def gw_alignment(
+        self, 
+        results_dir, 
+        load_OT = False, 
+        returned = "figure", 
+        OT_format = "default", 
+        visualization_config : Visualization_Config = Visualization_Config(),
+        show_log = False,
+        fig_dir = None,
+        ticks = None
+    ):
         OT_list = []
         """
         Args:
@@ -822,17 +836,19 @@ class Align_Representations:
         
         return X
         
-    def barycenter_alignment(self, 
-                             pivot, 
-                             n_iter, 
-                             results_dir, 
-                             load_OT=False, 
-                             returned="figure", 
-                             OT_format="default", 
-                             visualization_config:Visualization_Config=Visualization_Config(), 
-                             show_log=False, 
-                             fig_dir=None, 
-                             ticks=None):
+    def barycenter_alignment(
+        self, 
+        pivot, 
+        n_iter, 
+        results_dir, 
+        load_OT=False, 
+        returned="figure", 
+        OT_format="default", 
+        visualization_config:Visualization_Config=Visualization_Config(), 
+        show_log=False, 
+        fig_dir=None, 
+        ticks=None
+    ):
         
         ### Select the pivot
         pivot_representation = self.representations_list[pivot]
@@ -923,12 +939,15 @@ class Align_Representations:
 
         print("Mean : \n", accuracy.iloc[:, 1:].mean(axis="columns"))
 
-    def calc_category_level_accuracy(self, 
-                                     barycenter=False,
-                                     make_hist=False, 
-                                     fig_dir=None, 
-                                     fig_name="Category_level_accuracy.png", 
-                                     category_mat=None):
+    def calc_category_level_accuracy(
+        self, 
+        barycenter=False,
+        make_hist=False, 
+        fig_dir=None, 
+        fig_name="Category_level_accuracy.png", 
+        category_mat=None
+    ):
+        
         acc_list = []
         if barycenter:
             for pairwise in self.pairwise_barycenters:
@@ -965,7 +984,12 @@ class Align_Representations:
         return df
 
     def plot_accuracy(
-        self, eval_type="ot_plan", shuffle=False, fig_dir=None, fig_name="Accuracy_ot_plan.png", scatter=True
+        self, 
+        eval_type="ot_plan", 
+        shuffle=False, 
+        fig_dir=None, 
+        fig_name="Accuracy_ot_plan.png", 
+        scatter=True
     ):
         plt.figure(figsize=(5, 3))
 
@@ -993,18 +1017,20 @@ class Align_Representations:
     def procrustes_to_pivot(self):
         pass
     
-    def visualize_embedding(self, 
-                            dim, 
-                            pivot = 0,
-                            returned = "figure", 
-                            visualization_config : Visualization_Config = Visualization_Config(), 
-                            category_name_list = None, 
-                            num_category_list = None, 
-                            category_idx_list = None, 
-                            title = None, 
-                            legend = True, 
-                            fig_dir = None, 
-                            fig_name = "Aligned_embedding.png"):
+    def visualize_embedding(
+        self, 
+        dim, 
+        pivot = 0,
+        returned = "figure", 
+        visualization_config : Visualization_Config = Visualization_Config(), 
+        category_name_list = None, 
+        num_category_list = None, 
+        category_idx_list = None, 
+        title = None, 
+        legend = True, 
+        fig_dir = None, 
+        fig_name = "Aligned_embedding.png"
+    ):
         """_summary_
 
         Args:
