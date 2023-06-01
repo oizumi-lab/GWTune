@@ -406,15 +406,17 @@ class Pairwise_Analysis():
         else:
             self.RDM_target = new_target
     
-    def run_gw(self, 
-               results_dir,
-               compute_again = False, # 全然いい名前が思いつかなかったです・・・(2023.5.31 佐々木)
-               returned = "figure", 
-               OT_format = "default", 
-               visualization_config : Visualization_Config = Visualization_Config(), 
-               show_log = False,
-               fig_dir = None, 
-               ticks = None):
+    def run_gw(
+        self, 
+        results_dir,
+        compute_again = False, # 全然いい名前が思いつかなかったです・・・(2023.5.31 佐々木)
+        returned = "figure", 
+        OT_format = "default", 
+        visualization_config : Visualization_Config = Visualization_Config(), 
+        show_log = False,
+        fig_dir = None, 
+        ticks = None
+    ):
         """
         Main computation
         """            
@@ -438,7 +440,6 @@ class Pairwise_Analysis():
 
         filename = self.config.data_name + " " + self.pair_name
 
-        save_path = os.path.join(results_dir, filename)
         save_path = os.path.join(results_dir, filename)
         
         storage = "sqlite:///" + save_path + "/" + filename + ".db"
@@ -551,7 +552,7 @@ class Pairwise_Analysis():
         visualization_config : Visualization_Config = Visualization_Config(),
         fig_dir = None,
         ticks = None
-        ):
+    ):
         
         if self.source.category_idx_list is not None:
             OT_sorted = sort_matrix_with_categories(self.OT, category_idx_list=self.source.category_idx_list)
@@ -566,15 +567,16 @@ class Pairwise_Analysis():
                 visualize_functions.show_heatmap(self.OT, title = title, file_name = fig_path, **visualization_config())
             
             elif OT_format == "sorted":
-                visualize_functions.show_heatmap(OT_sorted, 
-                                                 title = title, 
-                                                 file_name = fig_path, 
-                                                 ticks = ticks, 
-                                                 category_name_list = self.source.category_name_list, 
-                                                 num_category_list = self.source.num_category_list, 
-                                                 object_labels = self.source.object_labels, 
-                                                 **visualization_config()
-                                                 )
+                visualize_functions.show_heatmap(
+                    OT_sorted, 
+                    title = title, 
+                    file_name = fig_path, 
+                    ticks = ticks, 
+                    category_name_list = self.source.category_name_list, 
+                    num_category_list = self.source.num_category_list, 
+                    object_labels = self.source.object_labels, 
+                    **visualization_config()
+                    )
             
             elif OT_format == "both":
                 OT_list = [self.OT, OT_sorted]
@@ -859,25 +861,27 @@ class Align_Representations:
         for representation in others_representaions:
             pairwise = Pairwise_Analysis(config=self.config, source=representation, target=pivot_representation)
 
-            pairwise.run_gw(results_dir=results_dir,
-                            load_OT=load_OT,
-                            returned=returned,
-                            OT_format=OT_format,
-                            visualization_config=visualization_config,
-                            show_log=show_log,
-                            fig_dir=fig_dir, 
-                            ticks=ticks
-                            )
+            pairwise.run_gw(
+                results_dir=results_dir,
+                load_OT=load_OT,
+                returned=returned,
+                OT_format=OT_format,
+                visualization_config=visualization_config,
+                show_log=show_log,
+                fig_dir=fig_dir, 
+                ticks=ticks
+            )
 
             pairwise.source.embedding = pairwise.get_new_source_embedding()
 
         ### Set up barycenter
         init_embedding = self.calc_barycenter()
-        barycenter = Representation(name="barycenter",
-                                    embedding=init_embedding,
-                                    category_mat=self.representations_list[0].category_mat,
-                                    category_name_list=self.representations_list[0].category_name_list
-                                    )
+        barycenter = Representation(
+            name="barycenter",
+            embedding=init_embedding,
+            category_mat=self.representations_list[0].category_mat,
+            category_name_list=self.representations_list[0].category_name_list
+        )
         
         ### Set pairwises whose target is the barycenter
         self.pairwise_barycenters = []
