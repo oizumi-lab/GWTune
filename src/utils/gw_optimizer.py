@@ -23,7 +23,7 @@ from joblib import parallel_backend
 # %%
 def load_optimizer(
     save_path,
-    n_jobs=4,
+    n_jobs=1,
     num_trial=20,
     to_types="torch",
     method="optuna",
