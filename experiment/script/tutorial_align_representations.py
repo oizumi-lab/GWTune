@@ -91,35 +91,37 @@ GW alignment
 ## If no need for computation, turn load_OT True, then OT plans calculated before is loaded.
 align_representation.gw_alignment(results_dir = "../../results/", load_OT = True, returned = "row_data", OT_format = "sorted", visualization_config = visualization_config, show_log = False, fig_dir = "../../figures")
 
-## Calculate the accuracy of the optimized OT matrix
-align_representation.calc_accuracy(top_k_list = [1, 5, 10], eval_type = "ot_plan")
-align_representation.plot_accuracy(eval_type = "ot_plan", scatter = True)
-
-## Calclate the category level accuracy
-align_representation.calc_category_level_accuracy()
-
 #%%
 '''
 Barycenter alignment (optional)
 '''
-align_representation.barycenter_alignment(pivot = 0, 
-                                          n_iter = 30, 
-                                          results_dir = "../../results/", 
-                                          load_OT = True, 
-                                          returned = "figure", 
-                                          OT_format = "sorted", 
-                                          visualization_config = visualization_config, 
-                                          show_log = False, 
-                                          fig_dir = "../../figures")
-
+barycenter = True
+if barycenter:
+    align_representation.barycenter_alignment(pivot = 0, 
+                                              n_iter = 30, 
+                                              results_dir = "../../results/", 
+                                              load_OT = True, 
+                                              returned = "figure", 
+                                              OT_format = "sorted", 
+                                              visualization_config = visualization_config, 
+                                              show_log = False, 
+                                              fig_dir = "../../figures")
 
 #%%
 '''
-Align embeddings with OT plans
+Evalation of usupervised alignment
 '''
+## Calculate the accuracy of the optimized OT matrix
+align_representation.calc_accuracy(top_k_list = [1, 5, 10], eval_type = "ot_plan", barycenter=barycenter)
+align_representation.plot_accuracy(eval_type = "ot_plan", scatter = True)
+
+## Calclate the category level accuracy
+align_representation.calc_category_level_accuracy(barycenter=barycenter)
+
+#%%
 ## Calculate the matching rate of k-nearest neighbors of embeddings
 ## Matching rate of k-nearest neighbors 
-align_representation.calc_accuracy(top_k_list = [1, 5, 10], eval_type = "k_nearest")
+align_representation.calc_accuracy(top_k_list = [1, 5, 10], eval_type = "k_nearest", barycenter=barycenter)
 align_representation.plot_accuracy(eval_type = "k_nearest", scatter = True)
 
 #%%
