@@ -61,7 +61,7 @@ config = Optimization_Config(data_name = data_select,
                              n_iter = 2,
                              max_iter = 1000,
                              sampler_name = 'tpe',
-                             eps_list = [0.1, 10], # [1, 10] for THINGS data, [0.02, 0.2] for colors data
+                             eps_list = [0.01, 10], # [1, 10] for THINGS data, [0.02, 0.2] for colors data
                              eps_log = True,
                              pruner_name = 'hyperband',
                              pruner_params = {'n_startup_trials': 1, 'n_warmup_steps': 2, 'min_resource': 2, 'reduction_factor' : 3}
@@ -89,7 +89,7 @@ align_representation.RSA_get_corr()
 GW alignment
 '''
 ## If no need for computation, turn load_OT True, then OT plans calculated before is loaded.
-align_representation.gw_alignment(results_dir = "../../results/", load_OT = True, returned = "row_data", OT_format = "sorted", visualization_config = visualization_config, show_log = True)
+align_representation.gw_alignment(results_dir = "../../results/", load_OT = True, returned = "row_data", OT_format = "sorted", visualization_config = visualization_config, show_log = False, fig_dir = "../../figures")
 
 ## Calculate the accuracy of the optimized OT matrix
 align_representation.calc_accuracy(top_k_list = [1, 5, 10], eval_type = "ot_plan")
@@ -97,6 +97,22 @@ align_representation.plot_accuracy(eval_type = "ot_plan", scatter = True)
 
 ## Calclate the category level accuracy
 align_representation.calc_category_level_accuracy()
+
+#%%
+'''
+Barycenter alignment (optional)
+'''
+align_representation.barycenter_alignment(pivot = 0, 
+                                          n_iter = 30, 
+                                          results_dir = "../../results/", 
+                                          load_OT = True, 
+                                          returned = "figure", 
+                                          OT_format = "sorted", 
+                                          visualization_config = visualization_config, 
+                                          show_log = False, 
+                                          fig_dir = "../../figures")
+
+
 #%%
 '''
 Align embeddings with OT plans
@@ -119,7 +135,7 @@ if data_select == "THINGS":
     # Set the configuration
     visualization_config = Visualization_Config(figsize = (15, 15), xlabel = "PC1", ylabel = "PC2", zlabel = "PC3", legend_size = 10, marker_size = 20) 
 
-    align_representation.visualize_embedding(dim = 2, visualization_config = visualization_config, category_name_list = category_name_list, category_idx_list = category_idx_list, num_category_list = num_category_list)#, fig_dir = "../figures")
+    align_representation.visualize_embedding(dim = 2, pivot="barycenter", visualization_config = visualization_config, category_name_list = category_name_list, category_idx_list = category_idx_list, num_category_list = num_category_list)#, fig_dir = "../figures")
 
 elif data_select == "color":
     file_path = "../../data/color_dict.csv"

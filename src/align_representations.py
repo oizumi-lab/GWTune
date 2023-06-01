@@ -20,6 +20,7 @@ from typing import List
 from utils.utils_functions import get_category_idx, sort_matrix_with_categories
 from utils import visualize_functions, backend, init_matrix, gw_optimizer
 from gw_alignment import GW_Alignment
+from barycenter_alignment import Barycenter_Alignment
 from histogram_matching import SimpleHistogramMatching
 
 
@@ -433,7 +434,7 @@ class Pairwise_Analysis():
         q = ot.unif(len(self.RDM_target))
 
         # generate instance solves gw_alignment
-        test_gw = GW_Alignment(
+        gw = GW_Alignment(
             self.RDM_source,
             self.RDM_target,
             p,
@@ -471,7 +472,7 @@ class Pairwise_Analysis():
 
             # 2. run optimzation
             study = opt.run_study(
-                test_gw,
+                gw,
                 self.config.device,
                 init_plans_list=init_plans,
                 eps_list=self.config.eps_list,
@@ -512,6 +513,7 @@ class Pairwise_Analysis():
         if fig_dir is not None:
             fig_path = os.path.join(fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png")
             plt.savefig(fig_path)
+        plt.tight_layout()
         plt.show()
         
         # 　figure plotting GWD as x-axis and accuracy as y-axis
@@ -521,6 +523,7 @@ class Pairwise_Analysis():
         if fig_dir is not None:
             fig_path = os.path.join(fig_dir, f"Optim_log_acc_GWD_{self.pair_name}.png")
             plt.savefig(fig_path)
+        plt.tight_layout()
         plt.show()
     
     def _show_OT(self, title, returned = "figure", OT_format = "default", visualization_config : Visualization_Config = Visualization_Config(), fig_dir = None, ticks = None):
@@ -730,9 +733,10 @@ class Align_Representations:
                 representation.show_sim_mat_distribution()
     
     def gw_alignment(self, results_dir, load_OT = False, returned = "figure", OT_format = "default", visualization_config : Visualization_Config = Visualization_Config(), show_log = False, fig_dir = None, ticks = None):
+        OT_list = []
         for pair_number in self.pair_number_list:
             pairwise = self.pairwise_list[pair_number]
-            pairwise.run_gw(results_dir = results_dir,
+            OT = pairwise.run_gw(results_dir = results_dir,
                             load_OT = load_OT,
                             returned = returned,
                             OT_format = OT_format,
@@ -741,10 +745,90 @@ class Align_Representations:
                             fig_dir = fig_dir, 
                             ticks = ticks
                             )
-            
-    def barycenter_alignment(self):
-        pass
+            OT_list.append(OT)
 
+        if returned == "row_data":
+            return OT_list
+            
+    def barycenter_alignment(self, pivot, n_iter, results_dir, load_OT=False, returned="figure", OT_format="default", visualization_config:Visualization_Config=Visualization_Config(), show_log=False, fig_dir=None, ticks=None):
+        ### Select the pivot
+        pivot_representation = self.representations_list[pivot]
+        others_representaions = self.representations_list[:pivot] + self.representations_list[pivot + 1:]
+        
+        ### GW alignment to the pivot
+        # ここの部分はあとでself.gw_alignmentの中に組み込む
+        OT_to_pivot_list = []
+        for representation in others_representaions:
+            pairwise = Pairwise_Analysis(config=self.config, source=representation, target=pivot_representation)
+
+            pairwise.run_gw(results_dir=results_dir,
+                            load_OT=load_OT,
+                            returned=returned,
+                            OT_format=OT_format,
+                            visualization_config=visualization_config,
+                            show_log=show_log,
+                            fig_dir=fig_dir, 
+                            ticks=ticks
+                            )
+
+            OT_to_pivot_list.append(pairwise.OT)
+
+        embedding_list = [representation.embedding for representation in self.representations_list]
+        
+        ### Barycenter alignment
+        barycenter = Barycenter_Alignment(embedding_list=embedding_list, 
+                                          pivot_number=pivot,
+                                          OT_to_pivot_list=OT_to_pivot_list)
+
+        self.embedding_barycenter, OT_list, embedding_list = barycenter.main_compute(n_iter=n_iter, metric=self.metric, plot_log=True)
+        
+        # update embeddings for each representation
+        for i, representation in enumerate(self.representations_list):
+            representation.embedding = embedding_list[i]
+        
+        
+        ### visualize
+        if returned == "figure" or returned == "both":
+            for i, OT in enumerate(OT_list):
+                representation = self.representations_list[i]
+                
+                if representation.category_idx_list is not None:
+                    OT_sorted = sort_matrix_with_categories(OT, category_idx_list=representation.category_idx_list)
+                    
+                title = f"barycenter vs {self.representations_list[i].name}"
+                
+                if fig_dir is not None:
+                    fig_path = os.path.join(fig_dir, f"OT_{title}.png")
+                else:
+                    fig_path = None
+                
+                if OT_format == "default":
+                    visualize_functions.show_heatmap(OT, title = title, file_name = fig_path, **visualization_config())
+
+                elif OT_format == "sorted":
+                    visualize_functions.show_heatmap(OT_sorted, 
+                                                     title = title, 
+                                                     file_name = fig_path, 
+                                                     ticks = ticks, 
+                                                     category_name_list = representation.category_name_list, 
+                                                     num_category_list = representation.num_category_list, 
+                                                     object_labels = representation.object_labels, 
+                                                     **visualization_config()
+                                                     )
+                    
+                elif OT_format == "both":
+                    OTs = [OT, OT_sorted]
+                    for ot in OTs:
+                        visualize_functions.show_heatmap(ot, title = title, file_name = fig_path, **visualization_config())
+        
+        elif returned == "row_data" or returned == "both":
+            if OT_format == "default":
+                return OT_list
+
+            else:
+                raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
+            
+        
     def calc_accuracy(self, top_k_list, eval_type="ot_plan"):
         accuracy = pd.DataFrame()
         accuracy["top_n"] = top_k_list
@@ -824,8 +908,10 @@ class Align_Representations:
             plt.savefig(os.path.join(fig_dir, fig_name))
         plt.show()
     
+    
     def visualize_embedding(self, 
                             dim, 
+                            pivot = 0,
                             returned = "figure", 
                             visualization_config : Visualization_Config = Visualization_Config(), 
                             category_name_list = None, 
@@ -839,6 +925,7 @@ class Align_Representations:
 
         Args:
             dim (_type_): The number of dimensions the points are embedded.  
+            pivot (str, optional) : The pivot or "barycenter" to which all embeddings are aligned. Defaults to 0.
             returned (str, optional): "figure" or "row_data. Defaults to "figure".
             visualization_config (Visualization_Config, optional): _description_. Defaults to Visualization_Config().
             category_name_list (_type_, optional): _description_. Defaults to None.
@@ -858,9 +945,13 @@ class Align_Representations:
         else:
             fig_path = None
 
-        for i in range(len(self.pairwise_list) // 2):
-            pair = self.pairwise_list[i]
-            pair.source.embedding = pair.get_new_source_embedding()
+        if pivot != "barycenter":
+            for i in range(len(self.pairwise_list) // 2):
+                pair = self.pairwise_list[i]
+                pair.source.embedding = pair.get_new_source_embedding()
+        
+        else:
+            assert(self.embedding_barycenter is not None)
 
         name_list = []
         embedding_list = []
