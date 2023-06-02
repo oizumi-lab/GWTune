@@ -137,7 +137,7 @@ def plot_lower_triangular_histogram(matrix, title):
     plt.show()
 
 
-class Visualize_Embedding():
+class VisualizeEmbedding():
     def __init__(self, embedding_list : List[np.ndarray], dim, category_name_list = None, num_category_list = None, category_idx_list = None) -> None:
         self.embedding_list = embedding_list
         if category_idx_list is not None:

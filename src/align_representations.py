@@ -24,7 +24,7 @@ from gw_alignment import GW_Alignment
 from histogram_matching import SimpleHistogramMatching
 
 
-class Optimization_Config:
+class OptimizationConfig:
     def __init__(
         self,
         data_name="THINGS",
@@ -58,7 +58,7 @@ class Optimization_Config:
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
         
-class Visualization_Config():
+class VisualizationConfig():
     def __init__(
         self, 
         figsize = (8, 6),
@@ -120,7 +120,7 @@ class Representation:
         metric = "cosine",
         shuffle = False,
         category_mat: pd.DataFrame = None,
-        category_name_list = ["all"],
+        category_name_list = ["all"],#
     ) -> None:
         """
         Args:
@@ -214,7 +214,7 @@ class Representation:
         self, 
         returned = "figure", 
         sim_mat_format = "default", 
-        visualization_config : Visualization_Config = Visualization_Config(), 
+        VisualizationConfig : VisualizationConfig = VisualizationConfig(), 
         fig_dir = None, 
         ticks = None
     ):
@@ -237,23 +237,34 @@ class Representation:
                 fig_path = None
 
             if sim_mat_format == "default":
-                visualize_functions.show_heatmap(self.sim_mat, title = self.name, file_name = fig_path, **visualization_config())
+                visualize_functions.show_heatmap(
+                    self.sim_mat, 
+                    title = self.name, 
+                    file_name = fig_path, 
+                    **VisualizationConfig()
+                )
             
             elif sim_mat_format == "sorted":
-                visualize_functions.show_heatmap(sim_mat_sorted, 
-                                                 title = self.name, 
-                                                 file_name = fig_path, 
-                                                 ticks = ticks, 
-                                                 category_name_list = self.category_name_list, 
-                                                 num_category_list = self.num_category_list, 
-                                                 object_labels = self.object_labels, 
-                                                 **visualization_config()
-                                                 )
+                visualize_functions.show_heatmap(
+                    sim_mat_sorted, 
+                    title = self.name, 
+                    file_name = fig_path, 
+                    ticks = ticks, 
+                    category_name_list = self.category_name_list, 
+                    num_category_list = self.num_category_list, 
+                    object_labels = self.object_labels, 
+                    **VisualizationConfig()
+                )
             
             elif sim_mat_format == "both":
                 sim_mat_list = [self.sim_mat, sim_mat_sorted]
                 for sim_mat in sim_mat_list:
-                    visualize_functions.show_heatmap(sim_mat, title = self.name, file_name = fig_path, **visualization_config())
+                    visualize_functions.show_heatmap(
+                        sim_mat, 
+                        title = self.name, 
+                        file_name = fig_path, 
+                        **VisualizationConfig()
+                    )
                 
             else:
                 raise ValueError("sim_mat_format must be either 'default', 'sorted', or 'both'.")
@@ -281,8 +292,8 @@ class Representation:
         
     def show_embedding(
         self, 
-        dim, 
-        visualization_config : Visualization_Config = Visualization_Config(),
+        dim = 3, 
+        VisualizationConfig : VisualizationConfig = VisualizationConfig(),
         category_name_list = None, 
         num_category_list = None, 
         category_idx_list = None, 
@@ -303,7 +314,7 @@ class Representation:
                 num_category_list = self.num_category_list
                 category_idx_list = self.category_idx_list
             
-        visualize_embedding = visualize_functions.Visualize_Embedding(
+        visualize_embedding = visualize_functions.VisualizeEmbedding(
             embedding_list = [self.embedding],
             dim = dim, 
             category_name_list = category_name_list,
@@ -311,15 +322,15 @@ class Representation:
             category_idx_list = category_idx_list
         )
         
-        visualize_embedding.plot_embedding(name_list = [self.name], title = title, legend = legend, save_dir = fig_path, **visualization_config())
+        visualize_embedding.plot_embedding(name_list = [self.name], title = title, legend = legend, save_dir = fig_path, **VisualizationConfig())
     
-class Pairwise_Analysis():
+class PairwiseAnalysis():
     """
     A class object that has methods conducting gw-alignment and corresponding results
     This object has information of a pair of Representations.
     """
 
-    def __init__(self, config: Optimization_Config, source: Representation, target: Representation) -> None:
+    def __init__(self, config: OptimizationConfig, source: Representation, target: Representation) -> None:
         """
         Args:
             config (Optimization_Config) : instance of Optimization_Config
@@ -343,6 +354,8 @@ class Pairwise_Analysis():
             self.pair_name = f"{target.name} vs {source.name}"
 
         assert self.RDM_source.shape == self.RDM_target.shape, "the shape of sim_mat is not the same."
+        
+        assert self.source.category_mat == self.target.category_mat, "the category_mat is not the same."
 
         self.backend = backend.Backend(device=self.config.device, to_types=self.config.to_types)
 
@@ -389,10 +402,10 @@ class Pairwise_Analysis():
 
         return corr
 
-    def match_sim_mat_distribution(self, returned=False):
+    def match_sim_mat_distribution(self, return_data=False):
         """
         Args:
-            returned (bool, optional): _description_. Defaults to False.
+            return_data (bool, optional): _description_. Defaults to False.
 
         Returns:
             _type_: _description_
@@ -401,7 +414,7 @@ class Pairwise_Analysis():
 
         new_target = matching.simple_histogram_matching()
         
-        if returned:
+        if return_data:
             return new_target
         else:
             self.RDM_target = new_target
@@ -412,7 +425,7 @@ class Pairwise_Analysis():
         compute_again = False, # 全然いい名前が思いつかなかったです・・・(2023.5.31 佐々木)
         returned = "figure", 
         OT_format = "default", 
-        visualization_config : Visualization_Config = Visualization_Config(), 
+        VisualizationConfig : VisualizationConfig = VisualizationConfig(), 
         show_log = False,
         fig_dir = None, 
         ticks = None
@@ -426,7 +439,7 @@ class Pairwise_Analysis():
             title = f"$\Gamma$ ({self.pair_name})", 
             returned = returned, 
             OT_format = OT_format, 
-            visualization_config = visualization_config, 
+            VisualizationConfig = VisualizationConfig, 
             fig_dir = fig_dir, 
             ticks = ticks
         )
@@ -549,7 +562,7 @@ class Pairwise_Analysis():
         title, 
         returned = "figure",
         OT_format = "default",
-        visualization_config : Visualization_Config = Visualization_Config(),
+        VisualizationConfig : VisualizationConfig = VisualizationConfig(),
         fig_dir = None,
         ticks = None
     ):
@@ -564,7 +577,12 @@ class Pairwise_Analysis():
                 fig_path = None
 
             if OT_format == "default":
-                visualize_functions.show_heatmap(self.OT, title = title, file_name = fig_path, **visualization_config())
+                visualize_functions.show_heatmap(
+                    self.OT, 
+                    title = title, 
+                    file_name = fig_path, 
+                    **VisualizationConfig()
+                )
             
             elif OT_format == "sorted":
                 visualize_functions.show_heatmap(
@@ -575,13 +593,18 @@ class Pairwise_Analysis():
                     category_name_list = self.source.category_name_list, 
                     num_category_list = self.source.num_category_list, 
                     object_labels = self.source.object_labels, 
-                    **visualization_config()
-                    )
+                    **VisualizationConfig()
+                )
             
             elif OT_format == "both":
                 OT_list = [self.OT, OT_sorted]
                 for OT in OT_list:
-                    visualize_functions.show_heatmap(OT, title = title, file_name = fig_path, **visualization_config())
+                    visualize_functions.show_heatmap(
+                        OT, 
+                        title = title, 
+                        file_name = fig_path,
+                        **VisualizationConfig()
+                    )
                     
             else:
                 raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
@@ -705,7 +728,7 @@ class Pairwise_Analysis():
         return self.procrustes(self.target.embedding, self.source.embedding, self.OT)
 
 
-class Align_Representations:
+class AlignRepresentations:
     """
     This object has methods for conducting N groups level analysis and corresponding results.
     This has information of all pairs of representations.
@@ -713,7 +736,7 @@ class Align_Representations:
 
     def __init__(
         self,
-        config: Optimization_Config,
+        config: OptimizationConfig,
         representations_list: List[Representation],
         pair_number_list="all",
         metric="cosine",
@@ -738,12 +761,12 @@ class Align_Representations:
 
         self.pair_number_list = pair_number_list
 
-    def _get_pairwise_list(self) -> List[Pairwise_Analysis]:
+    def _get_pairwise_list(self) -> List[PairwiseAnalysis]:
         pairs = list(itertools.combinations(self.representations_list, 2))
 
         pairwise_list = list()
         for i, pair in enumerate(pairs):
-            pairwise = Pairwise_Analysis(config=self.config, source=pair[1], target=pair[0])
+            pairwise = PairwiseAnalysis(config=self.config, source=pair[1], target=pair[0])
             pairwise_list.append(pairwise)
             print(f"Pair number {i} : {pairwise.pair_name}")
 
@@ -759,7 +782,7 @@ class Align_Representations:
         self, 
         returned = "figure", 
         sim_mat_format = "default", 
-        visualization_config : Visualization_Config = Visualization_Config(), 
+        VisualizationConfig : VisualizationConfig = VisualizationConfig(), 
         fig_dir = None, 
         show_distribution = True, 
         ticks = None
@@ -769,13 +792,13 @@ class Align_Representations:
         Args:
             returned (str, optional): "figure", "row_data" or "both" . Defaults to "figure".
             sim_mat_format (str, optional): "default", "sorted" or "both". Defaults to "default".
-            visualization_config (Visualization_Config, optional): The instance of Visualization_Config. Defaults to None.
+            VisualizationConfig (VisualizationConfig, optional): The instance of VisualizationConfig. Defaults to None.
             fig_dir (_type_, optional): _description_. Defaults to None.
         """
         for representation in self.representations_list:
             representation.show_sim_mat(returned = returned,
                                         sim_mat_format = sim_mat_format,
-                                        visualization_config = visualization_config,
+                                        VisualizationConfig = VisualizationConfig,
                                         fig_dir = fig_dir, 
                                         ticks = ticks
                                         )
@@ -788,7 +811,7 @@ class Align_Representations:
         load_OT = False, 
         returned = "figure", 
         OT_format = "default", 
-        visualization_config : Visualization_Config = Visualization_Config(),
+        VisualizationConfig : VisualizationConfig = VisualizationConfig(),
         show_log = False,
         fig_dir = None,
         ticks = None
@@ -800,7 +823,7 @@ class Align_Representations:
             load_OT (bool, optional): _description_. Defaults to False.
             returned (str, optional): _description_. Defaults to "figure".
             OT_format (str, optional): _description_. Defaults to "default".
-            visualization_config (Visualization_Config, optional): _description_. Defaults to Visualization_Config().
+            VisualizationConfig (VisualizationConfig, optional): _description_. Defaults to VisualizationConfig().
             show_log (bool, optional): _description_. Defaults to False.
             fig_dir (_type_, optional): _description_. Defaults to None.
             ticks (_type_, optional): _description_. Defaults to None.
@@ -811,7 +834,7 @@ class Align_Representations:
                             load_OT = load_OT,
                             returned = returned,
                             OT_format = OT_format,
-                            visualization_config = visualization_config,
+                            VisualizationConfig = VisualizationConfig,
                             show_log = show_log,
                             fig_dir = fig_dir, 
                             ticks = ticks
@@ -846,7 +869,7 @@ class Align_Representations:
         load_OT=False, 
         returned="figure", 
         OT_format="default", 
-        visualization_config:Visualization_Config=Visualization_Config(), 
+        VisualizationConfig:VisualizationConfig=VisualizationConfig(), 
         show_log=False, 
         fig_dir=None, 
         ticks=None
@@ -859,14 +882,14 @@ class Align_Representations:
         ### GW alignment to the pivot
         # ここの部分はあとでself.gw_alignmentの中に組み込む
         for representation in others_representaions:
-            pairwise = Pairwise_Analysis(config=self.config, source=representation, target=pivot_representation)
+            pairwise = PairwiseAnalysis(config=self.config, source=representation, target=pivot_representation)
 
             pairwise.run_gw(
                 results_dir=results_dir,
                 load_OT=load_OT,
                 returned=returned,
                 OT_format=OT_format,
-                visualization_config=visualization_config,
+                VisualizationConfig=VisualizationConfig,
                 show_log=show_log,
                 fig_dir=fig_dir, 
                 ticks=ticks
@@ -886,7 +909,7 @@ class Align_Representations:
         ### Set pairwises whose target is the barycenter
         self.pairwise_barycenters = []
         for representation in self.representations_list:
-            pairwise = Pairwise_Analysis(config=self.config, source=representation, target=barycenter)
+            pairwise = PairwiseAnalysis(config=self.config, source=representation, target=barycenter)
             self.pairwise_barycenters.append(pairwise)
         
         ### Barycenter alignment
@@ -1026,7 +1049,7 @@ class Align_Representations:
         dim, 
         pivot = 0,
         returned = "figure", 
-        visualization_config : Visualization_Config = Visualization_Config(), 
+        VisualizationConfig : VisualizationConfig = VisualizationConfig(), 
         category_name_list = None, 
         num_category_list = None, 
         category_idx_list = None, 
@@ -1041,7 +1064,7 @@ class Align_Representations:
             dim (_type_): The number of dimensions the points are embedded.  
             pivot (str, optional) : The pivot or "barycenter" to which all embeddings are aligned. Defaults to 0.
             returned (str, optional): "figure" or "row_data. Defaults to "figure".
-            visualization_config (Visualization_Config, optional): _description_. Defaults to Visualization_Config().
+            VisualizationConfig (VisualizationConfig, optional): _description_. Defaults to VisualizationConfig().
             category_name_list (_type_, optional): _description_. Defaults to None.
             num_category_list (_type_, optional): _description_. Defaults to None.
             category_idx_list (_type_, optional): _description_. Defaults to None.
@@ -1081,7 +1104,7 @@ class Align_Representations:
                     num_category_list = self.representations_list[0].num_category_list
                     category_idx_list = self.representations_list[0].category_idx_list
 
-            visualize_embedding = visualize_functions.Visualize_Embedding(
+            visualize_embedding = visualize_functions.VisualizeEmbedding(
                 embedding_list = embedding_list,
                 dim = dim, 
                 category_name_list = category_name_list,
@@ -1089,7 +1112,7 @@ class Align_Representations:
                 category_idx_list = category_idx_list
             )
 
-            visualize_embedding.plot_embedding(name_list = name_list, title = title, legend = legend, save_dir = fig_path, **visualization_config())
+            visualize_embedding.plot_embedding(name_list = name_list, title = title, legend = legend, save_dir = fig_path, **VisualizationConfig())
 
         elif returned == "row_data":
             return embedding_list
