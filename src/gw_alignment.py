@@ -367,6 +367,7 @@ class MainGromovWasserstainComputation:
         else:
             raise ValueError("Not defined initialize matrix.")
 
+
 # %%
 if __name__ == "__main__":
 
