@@ -5,9 +5,9 @@ import ot
 # %%
 class InitMatrix():
     def __init__(self, matrix_size = None):
-        self.matrix_size = matrix_size  
+        self.matrix_size = matrix_size
         self.initialize = ['uniform', 'random', 'permutation', 'diag'] # 実装済みの方法の名前を入れる。
-        
+
     def implemented_init_plans(self, init_plans_list): # リストを入力して、実行可能な方法のみをリストにして返す。
         """
         ここから、初期値の条件を1個または複数個選択することができる。
@@ -42,7 +42,7 @@ class InitMatrix():
             ts = np.zeros(self.matrix_size)
             ts[0] = 1 / self.matrix_size
             T = self.initialize_matrix(ts=ts)
-    
+
         elif initialize == 'any_permutation':
             T = self.initialize_matrix()
 
@@ -59,7 +59,7 @@ class InitMatrix():
 
         else:
             raise ValueError('Not defined initialize matrix.')
-             
+
         return T
 
     def randOrderedMatrix(self):

@@ -1,30 +1,21 @@
 #%%
-# Standard Library
 import gc
 import math
 import os
-import sys
 import time
-import warnings
 
-# Third Party Library
 import matplotlib.pyplot as plt
 import matplotlib.style as mplstyle
 import numpy as np
 import optuna
 import ot
-import pandas as pd
-
-# warnings.simplefilter("ignore")
 import seaborn as sns
 import torch
-from scipy.spatial import distance
 from tqdm.auto import tqdm
+# warnings.simplefilter("ignore")
 
-# First Party Library
-from utils.backend import Backend
-from utils.gw_optimizer import load_optimizer
-from utils.init_matrix import InitMatrix
+from .utils.backend import Backend
+from .utils.init_matrix import InitMatrix
 
 # nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
 
@@ -366,6 +357,7 @@ class MainGromovWasserstainComputation:
 
         else:
             raise ValueError("Not defined initialize matrix.")
+
 
 # %%
 if __name__ == "__main__":

@@ -1,26 +1,27 @@
 #%%
-import os, sys
+import os
+import sys
+import itertools
+import os
+import sys
+from typing import List
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
 
-import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
+import ot
+import pandas as pd
 import seaborn as sns
-import itertools
 import torch
 from scipy.spatial import distance
-from scipy.stats import spearmanr, pearsonr
+from scipy.stats import pearsonr, spearmanr
 from sklearn import manifold
-import ot
-import sys
-import os
-from typing import List
 
-from utils.utils_functions import get_category_idx, sort_matrix_with_categories
-from utils import visualize_functions, backend, init_matrix, gw_optimizer
-from gw_alignment import GW_Alignment
-from histogram_matching import SimpleHistogramMatching
+from .gw_alignment import GW_Alignment
+from .histogram_matching import SimpleHistogramMatching
+from .utils import backend, gw_optimizer, init_matrix, visualize_functions
+from .utils.utils_functions import get_category_idx, sort_matrix_with_categories
 
 
 class Optimization_Config:
