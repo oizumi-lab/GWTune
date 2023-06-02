@@ -1,5 +1,4 @@
 #%%
-# Standard Library
 import gc
 import math
 import os
@@ -8,7 +7,6 @@ import time
 import warnings
 from typing import Any, Union, Optional
 
-# Third Party Library
 # import jax
 # import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -26,9 +24,9 @@ from scipy.spatial import distance
 from tqdm.auto import tqdm
 
 # First Party Library
-from utils.backend import Backend
-from utils.gw_optimizer import load_optimizer
-from utils.init_matrix import InitMatrix
+from .utils.backend import Backend
+from .utils.gw_optimizer import load_optimizer
+from .utils.init_matrix import InitMatrix
 
 
 def fixed_weight_barycenter(
