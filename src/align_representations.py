@@ -22,7 +22,7 @@ import os
 from typing import List
 import warnings
 
-from .utils.utils_functions import get_category_idx, sort_matrix_with_categories
+from .utils.utils_functions import get_category_data, sort_matrix_with_categories
 from .utils import visualize_functions, backend, init_matrix, gw_optimizer
 from .gw_alignment import GW_Alignment
 from .histogram_matching import SimpleHistogramMatching
@@ -523,12 +523,9 @@ class PairwiseAnalysis():
                 
         else:
             study = opt.load_study()
-            best_trial = study.best_trial
-            df_trial = study.trials_dataframe()
-            
-            if self.config.to_types == 'numpy':
-                OT = np.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.npy")
-
+        
+        return study
+    
     def _get_optimization_log(self, df_trial, fig_dir):
         # figure plotting epsilon as x-axis and GWD as y-axis
         sns.scatterplot(data = df_trial, x = "params_eps", y = "value", s = 50)
