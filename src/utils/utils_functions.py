@@ -20,7 +20,7 @@ def fix_random_seed(seed = 42):
 
 
 def get_category_data(category_mat: pd.DataFrame, category_name_list=None, show_numbers=False):
-    if category_name_list == ["all"]:
+    if category_name_list is None:
         new_category_name_list = category_mat.columns.tolist()
     else:
         new_category_name_list = category_name_list
@@ -58,7 +58,7 @@ def sort_matrix_with_categories(matrix, category_idx_list):
 if __name__ == '__main__':
     os.chdir(os.path.dirname(__file__))
     category_mat = pd.read_csv("../../data/category_mat_manual_preprocessed.csv", sep = ",", index_col = 0)  
-    object_labels, category_idx_list, category_num_list, new_category_name_list = get_category_data(category_mat = category_mat, category_name_list = ["all"])
+    object_labels, category_idx_list, category_num_list, new_category_name_list = get_category_data(category_mat = category_mat)
 
     a = torch.load('../../data/mean_all_images_vgg19.pt').to('cpu').numpy()
     b = sort_matrix_with_categories(a, category_idx_list)

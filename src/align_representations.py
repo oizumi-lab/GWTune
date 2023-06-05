@@ -22,12 +22,12 @@ import os
 from typing import List
 import warnings
 
-from .utils.utils_functions import get_category_data, sort_matrix_with_categories
-from .utils import visualize_functions, backend, init_matrix, gw_optimizer
+# %%
+from .utils import visualize_functions, init_matrix, gw_optimizer
 from .gw_alignment import GW_Alignment
 from .histogram_matching import SimpleHistogramMatching
 
-
+# %%
 class OptimizationConfig:
     def __init__(
         self,
@@ -44,7 +44,12 @@ class OptimizationConfig:
         eps_list=[1, 10],
         eps_log=True,
         pruner_name="hyperband",
-        pruner_params={"n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3},
+        pruner_params={
+            "n_startup_trials": 1, 
+            "n_warmup_steps": 2, 
+            "min_resource": 2,
+            "reduction_factor": 3
+        },
     ) -> None:
 
         self.data_name = data_name
@@ -113,62 +118,60 @@ class Representation:
     """
     A class object that has information of a representation, such as embeddings and similarity matrices
     """
-
     def __init__(
         self,
         name,
-        sim_mat = None,
-        get_embedding = True,
-        MDS_dim = 3,
-        embedding = None,
         metric = "cosine",
         shuffle = False,
-        category_mat: pd.DataFrame = None,
-        category_name_list = ["all"],
-        get_category_function: callable = get_category_data,
-        sort_sim_mat_function: callable = sort_matrix_with_categories,
+        sim_mat : np.ndarray = None,
+        embedding : np.ndarray = None,
+        get_embedding = True,
+        MDS_dim = 3,
+        object_labels = None,
+        category_name_list = None, 
+        num_category_list = None, 
+        category_idx_list = None,
+        func_for_sort_sim_mat = None,
     ) -> None:
-        """
-        Args:
-            name (_type_): The name of Representation (e.g. "Group 1")
-            sim_mat (_type_, optional): RDM (Representational Dissimilarity Matrix) of the representation. Defaults to None.
-            embedding (_type_, optional): The embedding of the representaion. Defaults to None.
-            metric (str, optional): The distance metric for computing dissimilarity matrix. Defaults to "cosine".
-        """
-
+        
+        # meta data for the representation matrix (dis-similarity matrix).
         self.name = name
         self.metric = metric
         self.shuffle = shuffle
 
+        # parameters for label information (e.g. pictures of dog, cat,...) in the dataset for the representation matrix.
+        self.object_labels = object_labels
+        self.category_name_list = category_name_list
+        self.category_idx_list = category_idx_list
+        self.num_category_list = num_category_list
+        
+        # define the function to sort the representation matrix by the label parameters above (Default is None). Users can define it by themselves.
+        self.func_for_sort_sim_mat = func_for_sort_sim_mat
+        
+        # computing the representation matrix (or embedding) from embedding (or representation matrix) if sim_mat is None.
+        assert (sim_mat is not None) or (embedding is not None), "sim_mat and embedding are None."
+        
         if sim_mat is None:
+            assert isinstance(embedding, np.ndarray), "'embedding' needs to be numpy.ndarray. "
             self.embedding = embedding
             self.sim_mat = self._get_sim_mat()
         else:
+            assert isinstance(sim_mat, np.ndarray), "'sim_mat' needs to be numpy.ndarray. "
             self.sim_mat = sim_mat
 
         if embedding is None:
+            assert isinstance(sim_mat, np.ndarray), "'sim_mat' needs to be numpy.ndarray. "
             self.sim_mat = sim_mat
             if get_embedding:
                 self.embedding = self._get_embedding(dim = MDS_dim)
         else:
+            assert isinstance(embedding, np.ndarray), "'embedding' needs to be numpy.ndarray. "
             self.embedding = embedding
 
         if self.shuffle:
             self.shuffled_sim_mat = self._get_shuffled_sim_mat()
-
-        self.category_mat = category_mat
-        
-        self.get_category_function = get_category_function
-        
-        (self.object_labels,
-         self.category_idx_list,
-         self.num_category_list,
-         self.category_name_list,
-        ) = self.get_category_function(category_mat, category_name_list)
-        
-        self.sort_sim_mat_function = sort_sim_mat_function
-
-    def _get_shuffled_sim_mat(self):  # ここも、torchでも対応できるようにする必要がある。
+     
+    def _get_shuffled_sim_mat(self):
         """
         The function for shuffling the lower trianglar matrix.
         """
@@ -192,10 +195,12 @@ class Representation:
             metric = self.metric
 
         return distance.cdist(
-            self.embedding, self.embedding, metric=metric
-        )  # ここも、torchでも対応できるようにする必要がある。backendにdistを定義すたら良いと思う。
-
-    def _get_embedding(self, dim):  # ここも、torchでも対応できるようにする必要がある。sklearnはtorchで使えない。
+            self.embedding, 
+            self.embedding, 
+            metric=metric
+        )
+        
+    def _get_embedding(self, dim):
         MDS_embedding = manifold.MDS(n_components = dim, dissimilarity = "precomputed", random_state = 0)
         embedding = MDS_embedding.fit_transform(self.sim_mat)
         return embedding
@@ -218,7 +223,7 @@ class Representation:
             ticks : "None", "object", "category" or "numbers". Defaults to None.
         """
         if self.category_idx_list is not None:
-            sim_mat_sorted = self.sort_sim_mat_function(self.sim_mat, category_idx_list=self.category_idx_list)
+            sim_mat_sorted = self.func_for_sort_sim_mat(self.sim_mat, category_idx_list=self.category_idx_list)
 
         if returned == "figure" or returned == "both":
             if fig_dir is not None:
@@ -265,9 +270,11 @@ class Representation:
                 return self.sim_mat
 
             elif sim_mat_format == "sorted":
+                assert self.shuffle == False, "the sorted results is not guaranteed because shuffled results doesn't reflected on label info."
                 return sim_mat_sorted
 
             elif sim_mat_format == "both":
+                assert self.shuffle == False, "the sorted results is not guaranteed because shuffled results doesn't reflected on label info."
                 return self.sim_mat, sim_mat_sorted
 
             else:
@@ -312,7 +319,13 @@ class Representation:
             category_idx_list = category_idx_list
         )
 
-        visualize_embedding.plot_embedding(name_list = [self.name], title = title, legend = legend, save_dir = fig_path, **visualization_config())
+        visualize_embedding.plot_embedding(
+            name_list = [self.name], 
+            title = title, 
+            legend = legend, 
+            save_dir = fig_path, 
+            **visualization_config()
+        )
     
 class PairwiseAnalysis():
     """
@@ -320,7 +333,12 @@ class PairwiseAnalysis():
     This object has information of a pair of Representations.
     """
 
-    def __init__(self, config: OptimizationConfig, source: Representation, target: Representation) -> None:
+    def __init__(
+        self, 
+        config: OptimizationConfig, 
+        source: Representation, 
+        target: Representation
+    ) -> None:
         """
         Args:
             config (Optimization_Config) : instance of Optimization_Config
@@ -331,8 +349,6 @@ class PairwiseAnalysis():
         self.target = target
         self.config = config
 
-        assert self.source.shuffle == self.target.shuffle, "please use the same 'shuffle' both for source and target."
-
         if self.source.shuffle:
             self.RDM_source = self.source.shuffled_sim_mat
             self.RDM_target = self.target.shuffled_sim_mat
@@ -342,13 +358,15 @@ class PairwiseAnalysis():
             self.RDM_source = self.source.sim_mat
             self.RDM_target = self.target.sim_mat
             self.pair_name = f"{target.name} vs {source.name}"
-
+        
+        assert self.source.shuffle == self.target.shuffle, "please use the same 'shuffle' both for source and target."
+        
         assert self.RDM_source.shape == self.RDM_target.shape, "the shape of sim_mat is not the same."
         
-        assert self.source.category_mat.equals(self.target.category_mat), "the category_mat is not the same."
-
-        self.backend = backend.Backend(device=self.config.device, to_types=self.config.to_types)
-
+        assert np.array_equal(self.source.num_category_list, self.target.num_category_list), "the label information doesn't seem to be the same."
+        
+        assert np.array_equal(self.source.object_labels, self.target.object_labels), "the label information doesn't seem to be the same."
+        
     def show_both_sim_mats(self):
 
         a = self.RDM_source
@@ -381,14 +399,21 @@ class PairwiseAnalysis():
         plt.tight_layout()
         plt.show()
 
-    def RSA(self, metric="spearman"):
-        upper_tri_source = self.RDM_source[np.triu_indices(self.RDM_source.shape[0], k=1)]
-        upper_tri_target = self.RDM_target[np.triu_indices(self.RDM_target.shape[0], k=1)]
+    def RSA(self, metric="spearman", method = 'normal'):
+        if method == 'normal':
+            upper_tri_source = self.RDM_source[np.triu_indices(self.RDM_source.shape[0], k=1)]
+            upper_tri_target = self.RDM_target[np.triu_indices(self.RDM_target.shape[0], k=1)]
 
-        if metric == "spearman":
-            corr, _ = spearmanr(upper_tri_source, upper_tri_target)
-        elif metric == "pearson":
-            corr, _ = pearsonr(upper_tri_source, upper_tri_target)
+            if metric == "spearman":
+                corr, _ = spearmanr(upper_tri_source, upper_tri_target)
+            elif metric == "pearson":
+                corr, _ = pearsonr(upper_tri_source, upper_tri_target)
+        
+        elif method == 'all':
+            if metric == "spearman":
+                corr, _ = spearmanr(self.RDM_source.flatten(), self.RDM_target.flatten())
+            elif metric == "pearson":
+                corr, _ = pearsonr(self.RDM_source.flatten(), self.RDM_target.flatten())
 
         return corr
 
@@ -459,11 +484,10 @@ class PairwiseAnalysis():
         df_trial = study.trials_dataframe()
 
         if self.config.to_types == 'numpy':
-            ## ここはバグになる。init_plans_listの二番目が来ても対応できるようにしないといけない。
-            OT = np.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.npy")
+            OT = np.load(save_path + "/" + best_trial.params['initialize'] + f"/gw_{best_trial.number}.npy")
 
         elif self.config.to_types == "torch":
-            OT = torch.load(save_path + f"/{self.config.init_plans_list[0]}/gw_{best_trial.number}.pt")
+            OT = torch.load(save_path +  "/" + best_trial.params['initialize'] + f"/gw_{best_trial.number}.pt")
             
             OT = OT.to('cpu').numpy()
         
@@ -558,7 +582,7 @@ class PairwiseAnalysis():
     ):
         
         if self.source.category_idx_list is not None:
-            OT_sorted = sort_matrix_with_categories(self.OT, category_idx_list=self.source.category_idx_list)
+            OT_sorted = self.source.func_for_sort_sim_mat(self.OT, category_idx_list=self.source.category_idx_list)
 
         if returned == "figure" or returned == "both":
             if fig_dir is not None:
@@ -605,8 +629,6 @@ class PairwiseAnalysis():
                 return self.OT
 
             elif OT_format == "sorted":
-                plt.figure()
-                plt.imshow(OT_sorted)
                 return OT_sorted
 
             elif OT_format == "both":
@@ -637,7 +659,7 @@ class PairwiseAnalysis():
         df["top_n"] = top_k_list
 
         if supervised:
-            OT = np.diag([1 / len(self.target.sim_mat) for _ in range(len(self.target.sim_mat))])
+            OT = np.diag([1 / len(self.target.sim_mat)] * len(self.target.sim_mat))
         else:
             OT = self.OT
 
@@ -764,9 +786,9 @@ class AlignRepresentations:
 
         return pairwise_list
 
-    def RSA_get_corr(self, metric="spearman"):
+    def RSA_get_corr(self, metric="spearman", method='normal'):
         for pairwise in self.pairwise_list:
-            corr = pairwise.RSA(metric=metric)
+            corr = pairwise.RSA(metric = metric, method = method)
             self.RSA_corr[pairwise.pair_name] = corr
             print(f"Correlation {pairwise.pair_name} : {corr}")
     
