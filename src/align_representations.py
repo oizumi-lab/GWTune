@@ -332,7 +332,6 @@ class PairwiseAnalysis():
     A class object that has methods conducting gw-alignment and corresponding results
     This object has information of a pair of Representations.
     """
-
     def __init__(
         self, 
         config: OptimizationConfig, 
@@ -399,7 +398,7 @@ class PairwiseAnalysis():
         plt.tight_layout()
         plt.show()
 
-    def RSA(self, metric="spearman", method = 'normal'):
+    def RSA(self, metric="spearman", method='normal'):
         if method == 'normal':
             upper_tri_source = self.RDM_source[np.triu_indices(self.RDM_source.shape[0], k=1)]
             upper_tri_target = self.RDM_target[np.triu_indices(self.RDM_target.shape[0], k=1)]
@@ -437,9 +436,10 @@ class PairwiseAnalysis():
     def run_gw(
         self, 
         results_dir,
-        compute_again = False, # 全然いい名前が思いつかなかったです・・・(2023.5.31 佐々木)
-        returned = "figure", 
-        OT_format = "default", 
+        compute_again = False,
+        OT_format = "default",
+        return_data = False,
+        return_figure = True,
         visualization_config : VisualizationConfig = VisualizationConfig(), 
         show_log = False,
         fig_dir = None, 
@@ -452,7 +452,8 @@ class PairwiseAnalysis():
         
         OT = self._show_OT(
             title = f"$\Gamma$ ({self.pair_name})", 
-            returned = returned, 
+            return_data = return_data,
+            return_figure = return_figure,
             OT_format = OT_format, 
             visualization_config = visualization_config, 
             fig_dir = fig_dir, 
@@ -574,17 +575,15 @@ class PairwiseAnalysis():
     def _show_OT(
         self, 
         title, 
-        returned = "figure",
         OT_format = "default",
+        return_data = False,
+        return_figure = True,
         visualization_config : VisualizationConfig = VisualizationConfig(),
         fig_dir = None,
         ticks = None
     ):
-        
-        if self.source.category_idx_list is not None:
-            OT_sorted = self.source.func_for_sort_sim_mat(self.OT, category_idx_list=self.source.category_idx_list)
 
-        if returned == "figure" or returned == "both":
+        if return_figure:
             if fig_dir is not None:
                 fig_path = os.path.join(fig_dir, f"{title}.png")
             else:
@@ -599,6 +598,9 @@ class PairwiseAnalysis():
                 )
 
             elif OT_format == "sorted":
+                assert self.source.category_idx_list is not None, "No label info to sort the 'sim_mat'."
+                OT_sorted = self.source.func_for_sort_sim_mat(self.OT, category_idx_list=self.source.category_idx_list)
+                
                 visualize_functions.show_heatmap(
                     OT_sorted,
                     title = title,
@@ -619,12 +621,10 @@ class PairwiseAnalysis():
                         file_name = fig_path,
                         **visualization_config()
                     )
-                    
             else:
                 raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
 
-
-        elif returned == "row_data" or returned == "both":
+        if return_data:
             if OT_format == "default":
                 return self.OT
 
@@ -637,11 +637,9 @@ class PairwiseAnalysis():
             else:
                 raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
 
-    def calc_category_level_accuracy(self, category_mat=None):
-        if category_mat is None:
-            category_mat = self.source.category_mat.values
-        else:
-            category_mat = category_mat.values
+    def calc_category_level_accuracy(self, category_mat:pd.DataFrame):
+   
+        category_mat = category_mat.values
         count = 0
 
         for i in range(self.OT.shape[0]):
@@ -810,19 +808,22 @@ class AlignRepresentations:
             fig_dir (_type_, optional): _description_. Defaults to None.
         """
         for representation in self.representations_list:
-            representation.show_sim_mat(returned = returned,
-                                        sim_mat_format = sim_mat_format,
-                                        visualization_config = visualization_config,
-                                        fig_dir = fig_dir,
-                                        ticks = ticks
-                                        )
+            representation.show_sim_mat(
+                returned = returned,
+                sim_mat_format = sim_mat_format,
+                visualization_config = visualization_config,
+                fig_dir = fig_dir,
+                ticks = ticks
+            )
+            
             if show_distribution:
                 representation.show_sim_mat_distribution()
     
     def gw_alignment(
         self, 
         results_dir, 
-        returned = "figure", 
+        return_data = False,
+        return_figure = True,
         OT_format = "default", 
         visualization_config : VisualizationConfig = VisualizationConfig(),
         show_log = False,
@@ -845,7 +846,8 @@ class AlignRepresentations:
             pairwise = self.pairwise_list[pair_number]
             OT = pairwise.run_gw(
                 results_dir = results_dir,
-                returned = returned,
+                return_data = return_data,
+                return_figure = return_figure,
                 OT_format = OT_format,
                 visualization_config = visualization_config,
                 show_log = show_log,
@@ -854,7 +856,7 @@ class AlignRepresentations:
             )
             OT_list.append(OT)
 
-        if returned == "row_data":
+        if return_data:
             return OT_list
 
     def calc_barycenter(self, X_init=None):
@@ -958,12 +960,14 @@ class AlignRepresentations:
         ### visualize
         OT_list = []
         for pairwise in self.pairwise_list:
-            OT = pairwise.show_OT(title = f"$\Gamma$ ({pairwise.pair_name})",
-                                returned = returned,
-                                OT_format = OT_format,
-                                visualization_config = visualization_config,
-                                fig_dir = fig_dir,
-                                ticks = ticks)
+            OT = pairwise.show_OT(
+                title = f"$\Gamma$ ({pairwise.pair_name})",
+                returned = returned,
+                OT_format = OT_format,
+                visualization_config = visualization_config,
+                fig_dir = fig_dir,
+                ticks = ticks
+            )
             OT_list.append(OT)
 
         if returned == "row_data":
