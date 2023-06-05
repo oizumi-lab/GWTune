@@ -12,6 +12,7 @@ import ot
 import seaborn as sns
 import torch
 from tqdm.auto import tqdm
+
 # warnings.simplefilter("ignore")
 
 from .utils.backend import Backend
@@ -116,10 +117,7 @@ class GW_Alignment:
         eps = best_trial.params["eps"]
         init_plan = best_trial.params["initialize"]
 
-        if init_plan in ["uniform", "diag"]:
-            acc = best_trial.user_attrs["acc"]
-        else:
-            acc = best_trial.user_attrs["best_acc"]
+        acc = best_trial.user_attrs["best_acc"]
 
         # size = best_trial.user_attrs['size']
         number = best_trial.number
@@ -260,12 +258,10 @@ class MainGromovWasserstainComputation:
 
         gw_loss, acc = self.back_end.get_item_from_torch_or_jax(gw_loss, acc)
 
+        trial.set_user_attr("best_acc", acc)
         if init_mat_plan in ["random", "permutation"]:
-            trial.set_user_attr("best_acc", acc)
             trial.set_user_attr("best_iter", num_iter)
             trial.set_user_attr("best_seed", int(seed))  # ここはint型に変換しないと、謎のエラーが出る (2023.3.18 佐々木)。
-        else:
-            trial.set_user_attr("acc", acc)
 
         return trial
 
