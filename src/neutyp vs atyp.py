@@ -25,7 +25,7 @@ import ot
 from sklearn.metrics import pairwise_distances
 
 # from src.embedding_model import EmbeddingModel, ModelTraining
-from GW_methods.src.align_representations import Representation, Pairwise_Analysis, Visualization_Config, Align_Representations, Optimization_Config
+from align_representations import Representation, PairwiseAnalysis, VisualizationConfig, AlignRepresentations, OptimizationConfig
 
 #%%
 
@@ -44,39 +44,43 @@ for data, N_groups in zip(data_list, N_groups_list):
     list_of_representation_list.append(representation_list)
 
 
-opt_config = Optimization_Config(data_name=f"color_N-A_Ngroup={N_groups_list[0]}&{N_groups_list[1]}", 
-                                    init_plans_list=["random"],
-                                    num_trial=5,
-                                    n_iter=5, 
-                                    max_iter=200,
-                                    sampler_name="tpe", 
-                                    eps_list=[0.02, 0.2],
-                                    eps_log=True,
-                                    )
+opt_config = OptimizationConfig(
+    data_name=f"color_N-A_Ngroup={N_groups_list[0]}&{N_groups_list[1]}", 
+    init_plans_list=["random"],
+    num_trial=5,
+    n_iter=5, 
+    max_iter=200,
+    sampler_name="tpe", 
+    eps_list=[0.02, 0.2],
+    eps_log=True,
+)
 
-alignment = Align_Representations(config=opt_config, 
-                                    representations_list=list_of_representation_list[0]+list_of_representation_list[1],
-                                    metric="euclidean",
-                                    pair_number_list=range(N_groups_list[0]*N_groups_list[1])
-                                    )
+alignment = AlignRepresentations(
+    config=opt_config, 
+    representations_list=list_of_representation_list[0]+list_of_representation_list[1],
+    metric="euclidean",
+    pair_number_list=range(N_groups_list[0]*N_groups_list[1])
+)
 
 ### Set pairs
 # make all the pairs N-A
 pairs = []
 for representation_neutyp in list_of_representation_list[0]:
     for representation_atyp in list_of_representation_list[1]:
-        pair = Pairwise_Analysis(target = representation_atyp, source = representation_neutyp, config = opt_config)
+        pair = PairwiseAnalysis(target = representation_atyp, source = representation_neutyp, config = opt_config)
         pairs.append(pair)
 alignment.pairwise_list = pairs
 
-vis_config = Visualization_Config()
-alignment.gw_alignment(results_dir="../results/gw alignment/",
-                        load_OT=True,
-                        returned="figure",
-                        visualization_config=vis_config,
-                        show_log=False,
-                        fig_dir="../results/figs/"
-                        )
+vis_config = VisualizationConfig()
+
+alignment.gw_alignment(
+    results_dir="../results/gw alignment/",
+    compute_again=False,
+    returne_figure=True,
+    visualization_config=vis_config,
+    show_log=False,
+    fig_dir="../results/figs/"
+)
 
 ## Calculate the accuracy of the optimized OT matrix
 alignment.calc_accuracy(top_k_list = [1, 3, 5], eval_type = "ot_plan")
