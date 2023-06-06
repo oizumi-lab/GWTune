@@ -245,8 +245,8 @@ class Representation:
         elif sim_mat_format == "sorted" or sim_mat_format == "both":
             visualize_functions.show_heatmap(
                 self.sorted_sim_mat, 
-                title = self.name + '_sorted', 
-                file_name = fig_path + '_sorted', 
+                title = self.name + "_sorted", 
+                file_name = fig_path, 
                 ticks = ticks, 
                 category_name_list = self.category_name_list, 
                 num_category_list = self.num_category_list, 
@@ -784,7 +784,6 @@ class AlignRepresentations:
     
     def show_sim_mat(
         self, 
-        returned = "figure", 
         sim_mat_format = "default", 
         visualization_config : VisualizationConfig = VisualizationConfig(), 
         fig_dir = None, 
@@ -801,7 +800,6 @@ class AlignRepresentations:
         """
         for representation in self.representations_list:
             representation.show_sim_mat(
-                returned = returned,
                 sim_mat_format = sim_mat_format,
                 visualization_config = visualization_config,
                 fig_dir = fig_dir,
