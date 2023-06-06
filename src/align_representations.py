@@ -136,7 +136,6 @@ class Representation:
         # meta data for the representation matrix (dis-similarity matrix).
         self.name = name
         self.metric = metric
-        # self.shuffle = shuffle
 
         # parameters for label information (e.g. pictures of dog, cat,...) in the dataset for the representation matrix.
         self.object_labels = object_labels
@@ -551,6 +550,10 @@ class PairwiseAnalysis():
         fig_dir = None,
         ticks = None
     ):
+        
+        if OT_format == "sorted" or OT_format == "both":
+            assert self.source.category_idx_list is not None, "No label info to sort the 'sim_mat'."
+            OT_sorted = self.source.func_for_sort_sim_mat(self.OT, category_idx_list=self.source.category_idx_list)
 
         if return_figure:
             if fig_dir is not None:
@@ -567,9 +570,6 @@ class PairwiseAnalysis():
                 )
 
             elif OT_format == "sorted" or OT_format == "both":
-                assert self.source.category_idx_list is not None, "No label info to sort the 'sim_mat'."
-                OT_sorted = self.source.func_for_sort_sim_mat(self.OT, category_idx_list=self.source.category_idx_list)
-                
                 visualize_functions.show_heatmap(
                     OT_sorted,
                     title = title,
