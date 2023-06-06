@@ -122,7 +122,7 @@ class Representation:
         self,
         name,
         metric = "cosine",
-        shuffle = False,
+        # shuffle = False,
         sim_mat : np.ndarray = None,
         embedding : np.ndarray = None,
         get_embedding = True,
@@ -137,7 +137,7 @@ class Representation:
         # meta data for the representation matrix (dis-similarity matrix).
         self.name = name
         self.metric = metric
-        self.shuffle = shuffle
+        # self.shuffle = shuffle
 
         # parameters for label information (e.g. pictures of dog, cat,...) in the dataset for the representation matrix.
         self.object_labels = object_labels
@@ -168,25 +168,29 @@ class Representation:
             assert isinstance(embedding, np.ndarray), "'embedding' needs to be numpy.ndarray. "
             self.embedding = embedding
 
-        if self.shuffle:
-            self.shuffled_sim_mat = self._get_shuffled_sim_mat()
-     
-    def _get_shuffled_sim_mat(self):
-        """
-        The function for shuffling the lower trianglar matrix.
-        """
-        # Get the lower triangular elements of the matrix
-        lower_tri = self.sim_mat[np.tril_indices(self.sim_mat.shape[0], k=-1)]
+        # if self.shuffle:
+        #     self.shuffled_sim_mat = self._get_shuffled_sim_mat()
+        
+        if self.category_idx_list is not None:
+            self.sorted_sim_mat = self.func_for_sort_sim_mat(self.sim_mat, category_idx_list=self.category_idx_list)
+            
+         
+    # def _get_shuffled_sim_mat(self):
+    #     """
+    #     The function for shuffling the lower trianglar matrix.
+    #     """
+    #     # Get the lower triangular elements of the matrix
+    #     lower_tri = self.sim_mat[np.tril_indices(self.sim_mat.shape[0], k=-1)]
 
-        # Shuffle the lower triangular elements
-        np.random.shuffle(lower_tri)
+    #     # Shuffle the lower triangular elements
+    #     np.random.shuffle(lower_tri)
 
-        # Create a new matrix with the shuffled lower triangular elements
-        shuffled_matrix = np.zeros_like(self.sim_mat)
-        shuffled_matrix[np.tril_indices(shuffled_matrix.shape[0], k=-1)] = lower_tri
-        shuffled_matrix = shuffled_matrix + shuffled_matrix.T
+    #     # Create a new matrix with the shuffled lower triangular elements
+    #     shuffled_matrix = np.zeros_like(self.sim_mat)
+    #     shuffled_matrix[np.tril_indices(shuffled_matrix.shape[0], k=-1)] = lower_tri
+    #     shuffled_matrix = shuffled_matrix + shuffled_matrix.T
 
-        return shuffled_matrix
+    #     return shuffled_matrix
 
     def _get_sim_mat(self):
         if self.metric == "dot":
@@ -207,7 +211,6 @@ class Representation:
 
     def show_sim_mat(
         self, 
-        returned = "figure", 
         sim_mat_format = "default", 
         visualization_config : VisualizationConfig = VisualizationConfig(), 
         fig_dir = None, 
@@ -216,71 +219,45 @@ class Representation:
         """_summary_
 
         Args:
-            returned (str, optional): "figure", "row_data" or "both" . Defaults to "figure".
-            sim_mat_format (str, optional): "default", "sorted" or "both". Defaults to "default".
-            visualize_matrix (Visualize_Matrix, optional): The instance of Visualize_Matrix. Defaults to None.
+            sim_mat_format (str, optional): _description_. Defaults to "default".
+            visualization_config (VisualizationConfig, optional): _description_. Defaults to VisualizationConfig().
             fig_dir (_type_, optional): _description_. Defaults to None.
-            ticks : "None", "object", "category" or "numbers". Defaults to None.
+            ticks (_type_, optional): _description_. Defaults to None.
+
+        Raises:
+            ValueError: _description_
         """
-        if self.category_idx_list is not None:
-            sim_mat_sorted = self.func_for_sort_sim_mat(self.sim_mat, category_idx_list=self.category_idx_list)
-
-        if returned == "figure" or returned == "both":
-            if fig_dir is not None:
-                fig_path = os.path.join(fig_dir, f"RDM_{self.name}")
-            else:
-                fig_path = None
-
-            if sim_mat_format == "default":
-                visualize_functions.show_heatmap(
-                    self.sim_mat, 
-                    title = self.name, 
-                    file_name = fig_path, 
-                    **visualization_config()
-                )
+        
+        if fig_dir is not None:
+            fig_path = os.path.join(fig_dir, f"RDM_{self.name}")
+        else:
+            fig_path = None
             
-            elif sim_mat_format == "sorted":
-                visualize_functions.show_heatmap(
-                    sim_mat_sorted, 
-                    title = self.name, 
-                    file_name = fig_path, 
-                    ticks = ticks, 
-                    category_name_list = self.category_name_list, 
-                    num_category_list = self.num_category_list, 
-                    object_labels = self.object_labels, 
-                    **visualization_config()
-                )
-            
-            elif sim_mat_format == "both":
-                sim_mat_list = [self.sim_mat, sim_mat_sorted]
-                for sim_mat in sim_mat_list:
-                    visualize_functions.show_heatmap(
-                        sim_mat, 
-                        title = self.name, 
-                        file_name = fig_path, 
-                        **visualization_config()
-                    )
 
-            else:
-                raise ValueError("sim_mat_format must be either 'default', 'sorted', or 'both'.")
+        if sim_mat_format == "default" or sim_mat_format == "both":
+            visualize_functions.show_heatmap(
+                self.sim_mat, 
+                title = self.name, 
+                file_name = fig_path, 
+                **visualization_config()
+            )
+        
+        elif sim_mat_format == "sorted" or sim_mat_format == "both":
+            visualize_functions.show_heatmap(
+                self.sorted_sim_mat, 
+                title = self.name + '_sorted', 
+                file_name = fig_path + '_sorted', 
+                ticks = ticks, 
+                category_name_list = self.category_name_list, 
+                num_category_list = self.num_category_list, 
+                object_labels = self.object_labels, 
+                **visualization_config()
+            )
 
+        else:
+            raise ValueError("sim_mat_format must be either 'default', 'sorted', or 'both'.")
 
-        elif returned == "row_data" or returned == "both":
-            if sim_mat_format == "default":
-                return self.sim_mat
-
-            elif sim_mat_format == "sorted":
-                assert self.shuffle == False, "the sorted results is not guaranteed because shuffled results doesn't reflected on label info."
-                return sim_mat_sorted
-
-            elif sim_mat_format == "both":
-                assert self.shuffle == False, "the sorted results is not guaranteed because shuffled results doesn't reflected on label info."
-                return self.sim_mat, sim_mat_sorted
-
-            else:
-                raise ValueError("sim_mat_format must be either 'default', 'sorted', or 'both'.")
-
-    def show_sim_mat_distribution(self):  # ここも、torchでも対応できるようにする必要がある。
+    def show_sim_mat_distribution(self):
         lower_triangular = np.tril(self.sim_mat)
         lower_triangular = lower_triangular.flatten()
         plt.hist(lower_triangular)
@@ -348,17 +325,17 @@ class PairwiseAnalysis():
         self.target = target
         self.config = config
 
-        if self.source.shuffle:
-            self.RDM_source = self.source.shuffled_sim_mat
-            self.RDM_target = self.target.shuffled_sim_mat
-            self.pair_name = f"{target.name} vs {source.name} (shuffle)"
+        # if self.source.shuffle:
+        #     self.RDM_source = self.source.shuffled_sim_mat
+        #     self.RDM_target = self.target.shuffled_sim_mat
+        #     self.pair_name = f"{target.name} vs {source.name} (shuffle)"
 
-        else:
-            self.RDM_source = self.source.sim_mat
-            self.RDM_target = self.target.sim_mat
-            self.pair_name = f"{target.name} vs {source.name}"
+        # else:
+        self.RDM_source = self.source.sim_mat
+        self.RDM_target = self.target.sim_mat
+        self.pair_name = f"{target.name} vs {source.name}"
         
-        assert self.source.shuffle == self.target.shuffle, "please use the same 'shuffle' both for source and target."
+        # assert self.source.shuffle == self.target.shuffle, "please use the same 'shuffle' both for source and target."
         
         assert self.RDM_source.shape == self.RDM_target.shape, "the shape of sim_mat is not the same."
         
@@ -446,8 +423,22 @@ class PairwiseAnalysis():
         ticks = None
     ):
         """
-        Main computation
-        """            
+        Main Computation
+
+        Args:
+            results_dir,
+            compute_again = False,
+            OT_format = "default",
+            return_data = False,
+            return_figure = True,
+            visualization_config : VisualizationConfig = VisualizationConfig(), 
+            show_log = False,
+            fig_dir = None, 
+            ticks = None
+        
+        Returns:
+            OT : Optimal Transportation matrix
+        """      
         self.OT, df_trial = self._gw_alignment(results_dir, compute_again = compute_again)
         
         OT = self._show_OT(
@@ -466,7 +457,15 @@ class PairwiseAnalysis():
         return OT
     
     def _gw_alignment(self, results_dir, compute_again):
+        """_summary_
 
+        Args:
+            results_dir (_type_): _description_
+            compute_again (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
         filename = self.config.data_name + " " + self.pair_name
 
         save_path = os.path.join(results_dir, filename)
@@ -589,7 +588,7 @@ class PairwiseAnalysis():
             else:
                 fig_path = None
 
-            if OT_format == "default":
+            if OT_format == "default" or OT_format == "both":
                 visualize_functions.show_heatmap(
                     self.OT, 
                     title = title, 
@@ -597,7 +596,7 @@ class PairwiseAnalysis():
                     **visualization_config()
                 )
 
-            elif OT_format == "sorted":
+            elif OT_format == "sorted" or OT_format == "both":
                 assert self.source.category_idx_list is not None, "No label info to sort the 'sim_mat'."
                 OT_sorted = self.source.func_for_sort_sim_mat(self.OT, category_idx_list=self.source.category_idx_list)
                 
@@ -612,15 +611,6 @@ class PairwiseAnalysis():
                     **visualization_config()
                 )
 
-            elif OT_format == "both":
-                OT_list = [self.OT, OT_sorted]
-                for OT in OT_list:
-                    visualize_functions.show_heatmap(
-                        OT, 
-                        title = title, 
-                        file_name = fig_path,
-                        **visualization_config()
-                    )
             else:
                 raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
 
@@ -629,9 +619,11 @@ class PairwiseAnalysis():
                 return self.OT
 
             elif OT_format == "sorted":
+                # assert self.source.shuffle == False, "the sorted results is not guaranteed because shuffled results doesn't reflected on label info."
                 return OT_sorted
 
             elif OT_format == "both":
+                # assert self.source.shuffle == False, "the sorted results is not guaranteed because shuffled results doesn't reflected on label info."
                 return self.OT, OT_sorted
 
             else:
@@ -717,7 +709,7 @@ class PairwiseAnalysis():
         Returns:
             new_embedding_sourse : shape (n_sourse, m)
         """
-        assert self.source.shuffle == False, "you cannot use procrustes method if 'shuffle' is True."
+        # assert self.source.shuffle == False, "you cannot use procrustes method if 'shuffle' is True."
 
         U, S, Vt = np.linalg.svd(np.matmul(embedding_sourse.T, np.matmul(OT, embedding_target)))
         Q = np.matmul(U, Vt)
@@ -752,7 +744,7 @@ class AlignRepresentations:
         representations_list: List[Representation],
         pair_number_list="all",
         metric="cosine",
-        shuffle=False,
+        # shuffle=False,
     ) -> None:
         """
         Args:
@@ -766,7 +758,7 @@ class AlignRepresentations:
 
         self.RSA_corr = dict()
 
-        self.shuffle = shuffle
+        # self.shuffle = shuffle
 
         if pair_number_list == "all":
             pair_number_list = range(len(self.pairwise_list))
@@ -1027,15 +1019,17 @@ class AlignRepresentations:
             plt.savefig(os.path.join(fig_dir, fig_name))
             plt.show()
 
-    def _get_dataframe(self, eval_type="ot_plan", shuffle=False, concat=True):
+    def _get_dataframe(self, eval_type="ot_plan", concat=True):#shuffle=False
         df = self.top_k_accuracy if eval_type == "ot_plan" else self.k_nearest_matching_rate
 
-        if not shuffle:
-            cols = [col for col in df.columns if "shuffle" not in col and "top_n" not in col]
-        else:
-            cols = [col for col in df.columns if "shuffle" in col]
+        # if not shuffle:
+        #     cols = [col for col in df.columns if "shuffle" not in col and "top_n" not in col]
+        # else:
+        #     cols = [col for col in df.columns if "shuffle" in col]
 
+        cols = [col for col in df.columns if "top_n" not in col]
         df = df[cols]
+        
         if concat:
             df = pd.concat([df[i] for i in df.columns], axis=0)
             df = df.rename("matching rate")
@@ -1044,7 +1038,7 @@ class AlignRepresentations:
     def plot_accuracy(
         self, 
         eval_type="ot_plan", 
-        shuffle=False, 
+        # shuffle=False, 
         fig_dir=None, 
         fig_name="Accuracy_ot_plan.png", 
         scatter=True
@@ -1052,13 +1046,13 @@ class AlignRepresentations:
         plt.figure(figsize=(5, 3))
 
         if scatter:
-            df = self._get_dataframe(eval_type, shuffle=shuffle, concat=True)
+            df = self._get_dataframe(eval_type, concat=True) #shuffle=shuffle,
             sns.set_style("darkgrid")
             sns.set_palette("pastel")
             sns.swarmplot(data=pd.DataFrame(df), x="top_n", y="matching rate", size=5, dodge=True)
 
         else:
-            df = self._get_dataframe(eval_type, shuffle=shuffle, concat=False)
+            df = self._get_dataframe(eval_type, concat=False) #shuffle=shuffle,
             for group in df.columns:
                 plt.plot(df.index, df[group], c="blue")
 
