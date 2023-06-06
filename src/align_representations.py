@@ -122,7 +122,6 @@ class Representation:
         self,
         name,
         metric = "cosine",
-        # shuffle = False,
         sim_mat : np.ndarray = None,
         embedding : np.ndarray = None,
         get_embedding = True,
@@ -167,30 +166,9 @@ class Representation:
         else:
             assert isinstance(embedding, np.ndarray), "'embedding' needs to be numpy.ndarray. "
             self.embedding = embedding
-
-        # if self.shuffle:
-        #     self.shuffled_sim_mat = self._get_shuffled_sim_mat()
         
         if self.category_idx_list is not None:
             self.sorted_sim_mat = self.func_for_sort_sim_mat(self.sim_mat, category_idx_list=self.category_idx_list)
-            
-         
-    # def _get_shuffled_sim_mat(self):
-    #     """
-    #     The function for shuffling the lower trianglar matrix.
-    #     """
-    #     # Get the lower triangular elements of the matrix
-    #     lower_tri = self.sim_mat[np.tril_indices(self.sim_mat.shape[0], k=-1)]
-
-    #     # Shuffle the lower triangular elements
-    #     np.random.shuffle(lower_tri)
-
-    #     # Create a new matrix with the shuffled lower triangular elements
-    #     shuffled_matrix = np.zeros_like(self.sim_mat)
-    #     shuffled_matrix[np.tril_indices(shuffled_matrix.shape[0], k=-1)] = lower_tri
-    #     shuffled_matrix = shuffled_matrix + shuffled_matrix.T
-
-    #     return shuffled_matrix
 
     def _get_sim_mat(self):
         if self.metric == "dot":
@@ -324,18 +302,10 @@ class PairwiseAnalysis():
         self.source = source
         self.target = target
         self.config = config
-
-        # if self.source.shuffle:
-        #     self.RDM_source = self.source.shuffled_sim_mat
-        #     self.RDM_target = self.target.shuffled_sim_mat
-        #     self.pair_name = f"{target.name} vs {source.name} (shuffle)"
-
-        # else:
+        
         self.RDM_source = self.source.sim_mat
         self.RDM_target = self.target.sim_mat
         self.pair_name = f"{target.name} vs {source.name}"
-        
-        # assert self.source.shuffle == self.target.shuffle, "please use the same 'shuffle' both for source and target."
         
         assert self.RDM_source.shape == self.RDM_target.shape, "the shape of sim_mat is not the same."
         
@@ -619,11 +589,9 @@ class PairwiseAnalysis():
                 return self.OT
 
             elif OT_format == "sorted":
-                # assert self.source.shuffle == False, "the sorted results is not guaranteed because shuffled results doesn't reflected on label info."
                 return OT_sorted
 
             elif OT_format == "both":
-                # assert self.source.shuffle == False, "the sorted results is not guaranteed because shuffled results doesn't reflected on label info."
                 return self.OT, OT_sorted
 
             else:
@@ -744,7 +712,6 @@ class AlignRepresentations:
         representations_list: List[Representation],
         pair_number_list="all",
         metric="cosine",
-        # shuffle=False,
     ) -> None:
         """
         Args:
@@ -757,8 +724,6 @@ class AlignRepresentations:
         self.pairwise_list = self._get_pairwise_list()
 
         self.RSA_corr = dict()
-
-        # self.shuffle = shuffle
 
         if pair_number_list == "all":
             pair_number_list = range(len(self.pairwise_list))
@@ -1017,13 +982,8 @@ class AlignRepresentations:
             plt.savefig(os.path.join(fig_dir, fig_name))
             plt.show()
 
-    def _get_dataframe(self, eval_type="ot_plan", concat=True):#shuffle=False
+    def _get_dataframe(self, eval_type="ot_plan", concat=True):
         df = self.top_k_accuracy if eval_type == "ot_plan" else self.k_nearest_matching_rate
-
-        # if not shuffle:
-        #     cols = [col for col in df.columns if "shuffle" not in col and "top_n" not in col]
-        # else:
-        #     cols = [col for col in df.columns if "shuffle" in col]
 
         cols = [col for col in df.columns if "top_n" not in col]
         df = df[cols]
@@ -1044,13 +1004,13 @@ class AlignRepresentations:
         plt.figure(figsize=(5, 3))
 
         if scatter:
-            df = self._get_dataframe(eval_type, concat=True) #shuffle=shuffle,
+            df = self._get_dataframe(eval_type, concat=True) 
             sns.set_style("darkgrid")
             sns.set_palette("pastel")
             sns.swarmplot(data=pd.DataFrame(df), x="top_n", y="matching rate", size=5, dodge=True)
 
         else:
-            df = self._get_dataframe(eval_type, concat=False) #shuffle=shuffle,
+            df = self._get_dataframe(eval_type, concat=False)
             for group in df.columns:
                 plt.plot(df.index, df[group], c="blue")
 
