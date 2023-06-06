@@ -995,8 +995,7 @@ class AlignRepresentations:
 
     def plot_accuracy(
         self, 
-        eval_type="ot_plan", 
-        # shuffle=False, 
+        eval_type="ot_plan",
         fig_dir=None, 
         fig_name="Accuracy_ot_plan.png", 
         scatter=True
