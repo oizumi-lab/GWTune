@@ -170,27 +170,19 @@ class RunOptuna:
         return study
 
     def _run_study(self, objective, device="cpu", seed=42, forced_run=True):
-        """
+        """_summary_
 
-        2023.4.11 佐々木
-        multi-threadによる計算よりもmultiprocessingの方が、CUDAでの計算が早いことがわかった。
+        Args:
+            objective (_type_): _description_
+            device (str, optional): _description_. Defaults to "cpu".
+            seed (int, optional): _description_. Defaults to 42.
+            forced_run (bool, optional): _description_. Defaults to True.
 
-        しかし、すでに、以下のバグが発生していることがわかっている。
+        Raises:
+            ValueError: _description_
 
-        ・初期値がrandomのとき、GridSamplerを使うと同じepsの値が異なるworkerで計算されてしまう(しかし、初期値の乱数は異なる)。
-          → これは2023.4.10に作成した "if sampler_name == grid" で起こっているバグ。おそらくoptunaの仕様かもしれない。
-
-        ・初期値がrandomのとき、multiprocessingを使うと、各workerの1回目のとき、tqdmが表示されない。2回目以降は表示される。
-          おそらくjupyter側のバグかと思われる。
-
-        ・multiprocessingで、GridSamplerを使うと、一つのepsの値だけ、重複して計算されてしまう。
-
-        2023.4.12 佐々木
-        ・grid searchの問題はoptunaの仕様らしい
-        ・tqdmのバグは、各processごとにprintを噛ませて回避できた。
-
-        2024.4.18 佐々木
-        parallelでの計算は全てコメントアウトにした。
+        Returns:
+            _type_: _description_
         """
 
         if self.delete_study:
