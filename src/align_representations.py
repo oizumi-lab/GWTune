@@ -87,7 +87,11 @@ class VisualizationConfig():
         color_labels = None, 
         color_hue = None, 
         markers_list = None, 
-        marker_size = 30
+        marker_size = 30,
+        draw_category_line = True,
+        category_line_color = 'C2',
+        category_line_alpha = 0.2,
+        category_line_style = 'dashed',
     ) -> None:
         
         self.visualization_params = {
@@ -108,7 +112,11 @@ class VisualizationConfig():
             'color_labels': color_labels,
             'color_hue' : color_hue,
             'markers_list' : markers_list,
-            'marker_size' : marker_size
+            'marker_size' : marker_size,
+            'draw_category_line':draw_category_line,
+            'category_line_color' : category_line_color,
+            'category_line_alpha' : category_line_alpha,
+            'category_line_style' : category_line_style,
         }
 
     def __call__(self):
@@ -168,6 +176,8 @@ class Representation:
         
         if self.category_idx_list is not None:
             self.sorted_sim_mat = self.func_for_sort_sim_mat(self.sim_mat, category_idx_list=self.category_idx_list)
+        else:
+            self.sorted_sim_mat = None
 
     def _get_sim_mat(self):
         if self.metric == "dot":
@@ -215,15 +225,16 @@ class Representation:
             visualize_functions.show_heatmap(
                 self.sim_mat, 
                 title = self.name, 
-                file_name = fig_path, 
+                save_file_name = fig_path, 
                 **visualization_config()
             )
         
         elif sim_mat_format == "sorted" or sim_mat_format == "both":
+            assert self.category_idx_list is not None, "No label info to sort the 'sim_mat'."
             visualize_functions.show_heatmap(
                 self.sorted_sim_mat, 
                 title = self.name + "_sorted", 
-                file_name = fig_path, 
+                save_file_name = fig_path, 
                 ticks = ticks, 
                 category_name_list = self.category_name_list, 
                 num_category_list = self.num_category_list, 
@@ -552,7 +563,7 @@ class PairwiseAnalysis():
     ):
         
         if OT_format == "sorted" or OT_format == "both":
-            assert self.source.category_idx_list is not None, "No label info to sort the 'sim_mat'."
+            assert self.source.sorted_sim_mat is not None, "No label info to sort the 'sim_mat'."
             OT_sorted = self.source.func_for_sort_sim_mat(self.OT, category_idx_list=self.source.category_idx_list)
 
         if return_figure:
@@ -565,7 +576,7 @@ class PairwiseAnalysis():
                 visualize_functions.show_heatmap(
                     self.OT, 
                     title = title, 
-                    file_name = fig_path, 
+                    save_file_name = fig_path, 
                     **visualization_config()
                 )
 
@@ -573,7 +584,7 @@ class PairwiseAnalysis():
                 visualize_functions.show_heatmap(
                     OT_sorted,
                     title = title,
-                    file_name = fig_path,
+                    save_file_name = fig_path,
                     ticks = ticks,
                     category_name_list = self.source.category_name_list,
                     num_category_list = self.source.num_category_list,
@@ -598,7 +609,6 @@ class PairwiseAnalysis():
                 raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
 
     def calc_category_level_accuracy(self, category_mat:pd.DataFrame):
-   
         category_mat = category_mat.values
         count = 0
 
@@ -776,7 +786,8 @@ class AlignRepresentations:
     
     def gw_alignment(
         self, 
-        results_dir, 
+        results_dir,
+        compute_again = False,
         return_data = False,
         return_figure = True,
         OT_format = "default", 
@@ -801,6 +812,7 @@ class AlignRepresentations:
             pairwise = self.pairwise_list[pair_number]
             OT = pairwise.run_gw(
                 results_dir = results_dir,
+                compute_again = compute_again,
                 return_data = return_data,
                 return_figure = return_figure,
                 OT_format = OT_format,
@@ -836,8 +848,9 @@ class AlignRepresentations:
         pivot,
         n_iter,
         results_dir,
-        load_OT=False,
-        returned="figure",
+        compute_again=False,
+        return_data=False,
+        return_figure=True,
         OT_format="default",
         visualization_config:VisualizationConfig=VisualizationConfig(),
         show_log=False,
@@ -858,8 +871,9 @@ class AlignRepresentations:
 
             pairwise.run_gw(
                 results_dir=results_dir,
-                load_OT=load_OT,
-                returned=returned,
+                compute_again=compute_again,
+                return_data=return_data,
+                return_figure=return_figure,
                 OT_format=OT_format,
                 visualization_config=visualization_config,
                 show_log=show_log,
@@ -915,9 +929,10 @@ class AlignRepresentations:
         ### visualize
         OT_list = []
         for pairwise in self.pairwise_list:
-            OT = pairwise.show_OT(
+            OT = pairwise._show_OT(
                 title = f"$\Gamma$ ({pairwise.pair_name})",
-                returned = returned,
+                return_data=return_data,
+                return_figure=return_figure,
                 OT_format = OT_format,
                 visualization_config = visualization_config,
                 fig_dir = fig_dir,
@@ -925,7 +940,7 @@ class AlignRepresentations:
             )
             OT_list.append(OT)
 
-        if returned == "row_data":
+        if return_data:
             return OT_list
 
     def _get_OT_all_pair(self, pairwise_barycenters):

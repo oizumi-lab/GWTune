@@ -6,6 +6,7 @@ import colorsys
 from sklearn.decomposition import PCA 
 import seaborn as sns
 from typing import List
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 def get_color_labels(n, hue = None, show_labels = True):
     """Create color labels for n objects
@@ -84,9 +85,9 @@ def get_color_labels_for_category(n_category_list, min_saturation, show_labels =
     return color_labels, main_colors
         
 
-def show_heatmap(matrix, title, file_name, ticks = None, category_name_list = None, num_category_list = None, object_labels = None, **kwargs):
+def show_heatmap(matrix, title, save_file_name, draw_category_line = True, ticks = None, category_name_list = None, num_category_list = None, object_labels = None, **kwargs):
     figsize = kwargs.get('figsize', (20, 20))
-    cbar_size = kwargs.get("cbar_size", .80)
+    cbar_size = kwargs.get("cbar_size", 0.8)
     cbar_ticks_size = kwargs.get("cbar_ticks_size", 20)
     ticks_size = kwargs.get('ticks_size', 20)
     xticks_rotation = kwargs.get('xticks_rotation', 90)
@@ -96,20 +97,35 @@ def show_heatmap(matrix, title, file_name, ticks = None, category_name_list = No
     xlabel_size = kwargs.get('xlabel_size', 40)
     ylabel = kwargs.get('ylabel', None)
     ylabel_size = kwargs.get('ylabel_size', 40)
+    
+    cmap = kwargs.get('cmap', 'cividis')
+    category_line_alpha = kwargs.get('category_line_alpha', 0.2)
+    category_line_style = kwargs.get('category_line_style', 'dashed')
+    category_line_color = kwargs.get('category_line_color', 'C2')
 
-    plt.figure(figsize = figsize)
-    ax = sns.heatmap(matrix, square=True, cbar_kws = {"shrink": cbar_size})
-    cbar = ax.collections[0].colorbar
-    cbar.ax.tick_params(labelsize = cbar_ticks_size)
+    fig, ax = plt.subplots(figsize = figsize)
+    
+    if title is not None:
+        ax.set_title(title, size = title_size)
+        
+    aximg = ax.imshow(matrix, cmap=cmap, aspect='equal')
+    
     if category_name_list is not None:
         assert num_category_list is not None
         if ticks == "objects":
             plt.xticks(np.arange(sum(num_category_list)) + 0.5, labels = object_labels, rotation = xticks_rotation, size = ticks_size)
             plt.yticks(np.arange(sum(num_category_list)) + 0.5, labels = object_labels, rotation = yticks_rotation, size = ticks_size)
+        
         elif ticks == "category":
             label_pos = [sum(num_category_list[:i + 1]) for i in range(len(category_name_list))]
             plt.xticks(label_pos, labels = category_name_list, rotation = xticks_rotation, size = ticks_size, fontweight = "bold")
             plt.yticks(label_pos, labels = category_name_list, rotation = yticks_rotation, size = ticks_size, fontweight = "bold")
+            
+            if draw_category_line:
+                for pos in label_pos:
+                    plt.axhline(pos, alpha = category_line_alpha, linestyle = category_line_style, color = category_line_color)
+                    plt.axvline(pos, alpha = category_line_alpha, linestyle = category_line_style, color = category_line_color)
+        
         else:
             plt.xticks([])
             plt.yticks([])
@@ -120,14 +136,20 @@ def show_heatmap(matrix, title, file_name, ticks = None, category_name_list = No
         else:
             plt.xticks([])
             plt.yticks([])
+    
+    
+    divider = make_axes_locatable(ax) 
+    cax = divider.append_axes("right", size="5%", pad=0.1)
+
+    fig.colorbar(aximg, cax=cax)
+  
     plt.xlabel(xlabel, size = xlabel_size)
     plt.ylabel(ylabel, size = ylabel_size)
-    if title is not None:
-        plt.title(title, size = title_size)
-    if file_name is not None:
-        plt.savefig(file_name)
+    
+    
+    if save_file_name is not None:
+        plt.savefig(save_file_name)
     plt.show()
-
 
 def plot_lower_triangular_histogram(matrix, title):
     lower_triangular = np.tril(matrix)
