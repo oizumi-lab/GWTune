@@ -149,7 +149,11 @@ def show_heatmap(matrix, title, save_file_name, draw_category_line = True, ticks
     
     if save_file_name is not None:
         plt.savefig(save_file_name)
-    plt.show()
+    else:
+        plt.show()
+    
+    plt.close()
+
 
 def plot_lower_triangular_histogram(matrix, title):
     lower_triangular = np.tril(matrix)

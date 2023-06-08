@@ -21,6 +21,8 @@ import sys
 import os
 from typing import List
 import warnings
+import multiprocessing as mp
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # %%
 from .utils import visualize_functions, init_matrix, gw_optimizer
@@ -41,6 +43,7 @@ class OptimizationConfig:
         n_iter=1,
         max_iter=200,
         sampler_name="tpe",
+        sampler_seed=42,
         eps_list=[1, 10],
         eps_log=True,
         pruner_name="hyperband",
@@ -51,7 +54,25 @@ class OptimizationConfig:
             "reduction_factor": 3
         },
     ) -> None:
+        """_summary_
 
+        Args:
+            data_name (str, optional): _description_. Defaults to "THINGS".
+            delete_study (bool, optional): _description_. Defaults to False.
+            device (str, optional): _description_. Defaults to "cpu".
+            to_types (str, optional): _description_. Defaults to "numpy".
+            n_jobs (int, optional): _description_. Defaults to 1.
+            init_plans_list (list, optional): _description_. Defaults to ["random"].
+            num_trial (int, optional): _description_. Defaults to 4.
+            n_iter (int, optional): _description_. Defaults to 1.
+            max_iter (int, optional): _description_. Defaults to 200.
+            sampler_name (str, optional): _description_. Defaults to "tpe".
+            sampler_seed (int, optional): _description_. Defaults to 42.
+            eps_list (list, optional): _description_. Defaults to [1, 10].
+            eps_log (bool, optional): _description_. Defaults to True.
+            pruner_name (str, optional): _description_. Defaults to "hyperband".
+            pruner_params (dict, optional): _description_. Defaults to { "n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3 }.
+        """
         self.data_name = data_name
         self.delete_study = delete_study
         self.device = device
@@ -62,6 +83,7 @@ class OptimizationConfig:
         self.n_iter = n_iter
         self.max_iter = max_iter
         self.sampler_name = sampler_name
+        self.sampler_seed = sampler_seed
         self.eps_list = eps_list
         self.eps_log = eps_log
         self.pruner_name = pruner_name
@@ -354,6 +376,7 @@ class PairwiseAnalysis():
         plt.legend(loc="upper left")
         plt.tight_layout()
         plt.show()
+        plt.close()
 
     def RSA(self, metric="spearman", method='normal'):
         if method == 'normal':
@@ -451,6 +474,7 @@ class PairwiseAnalysis():
         save_path = os.path.join(results_dir, filename)
 
         storage = "sqlite:///" + save_path + "/" + filename + ".db"
+        # storage = 'mysql+pymysql://root:olabGPU61@localhost/GridTest'
         
         if not os.path.exists(save_path):            
             if compute_again != False:
@@ -473,11 +497,33 @@ class PairwiseAnalysis():
         
         return OT, df_trial
           
-    def _run_optimization(self, filename, save_path, storage, compute_again):
+    def _run_optimization(
+        self, 
+        filename, 
+        save_path, 
+        storage, 
+        compute_again, 
+        n_jobs_for_pairwise_analysis = 1
+    ):
+        """_summary_
+
+        Args:
+            filename (_type_): _description_
+            save_path (_type_): _description_
+            storage (_type_): _description_
+            compute_again (_type_): _description_
+            
+            n_jobs_for_pairwise_analysis (int, optional): Defaults to 1. 
+                When calculating the alignment for a single pair, the optuna specification does not allow for parallel computation to speed up the process. 
+                The implementation itself is possible, however. 
+
+        Returns:
+            _type_: _description_
+        """
         # generate instance optimize gw_alignment
         opt = gw_optimizer.load_optimizer(
             save_path,
-            n_jobs=self.config.n_jobs,
+            n_jobs=n_jobs_for_pairwise_analysis,
             num_trial=self.config.num_trial,
             to_types=self.config.to_types,
             method="optuna",
@@ -519,6 +565,7 @@ class PairwiseAnalysis():
             study = opt.run_study(
                 gw,
                 self.config.device,
+                seed=self.config.sampler_seed,
                 init_plans_list=init_plans,
                 eps_list=self.config.eps_list,
                 eps_log=self.config.eps_log,
@@ -784,7 +831,7 @@ class AlignRepresentations:
             if show_distribution:
                 representation.show_sim_mat_distribution()
     
-    def gw_alignment(
+    def _single_computation(
         self, 
         results_dir,
         compute_again = False,
@@ -794,20 +841,10 @@ class AlignRepresentations:
         visualization_config : VisualizationConfig = VisualizationConfig(),
         show_log = False,
         fig_dir = None,
-        ticks = None
+        ticks = None,
     ):
+        
         OT_list = []
-        """
-        Args:
-            results_dir (_type_): _description_
-            load_OT (bool, optional): _description_. Defaults to False.
-            returned (str, optional): _description_. Defaults to "figure".
-            OT_format (str, optional): _description_. Defaults to "default".
-            visualization_config (VisualizationConfig, optional): _description_. Defaults to VisualizationConfig().
-            show_log (bool, optional): _description_. Defaults to False.
-            fig_dir (_type_, optional): _description_. Defaults to None.
-            ticks (_type_, optional): _description_. Defaults to None.
-        """
         for pair_number in self.pair_number_list:
             pairwise = self.pairwise_list[pair_number]
             OT = pairwise.run_gw(
@@ -821,8 +858,97 @@ class AlignRepresentations:
                 fig_dir = fig_dir, 
                 ticks = ticks
             )
+            
             OT_list.append(OT)
+        
+        return OT_list
+        
+        
+    def gw_alignment(
+        self, 
+        results_dir,
+        compute_again = False,
+        return_data = False,
+        return_figure = True,
+        OT_format = "default", 
+        visualization_config : VisualizationConfig = VisualizationConfig(),
+        show_log = False,
+        fig_dir = None,
+        ticks = None,
+        use_parallel = True,
+    ):
+        """_summary_
 
+        Args:
+            results_dir (_type_): _description_
+            compute_again (bool, optional): _description_. Defaults to False.
+            return_data (bool, optional): _description_. Defaults to False.
+            return_figure (bool, optional): _description_. Defaults to True.
+            OT_format (str, optional): _description_. Defaults to "default".
+            visualization_config (VisualizationConfig, optional): _description_. Defaults to VisualizationConfig().
+            show_log (bool, optional): _description_. Defaults to False.
+            fig_dir (_type_, optional): _description_. Defaults to None.
+            ticks (_type_, optional): _description_. Defaults to None.
+            use_parallel (bool, optional): _description_. Defaults to False.
+
+        Returns:
+            _type_: _description_
+        """
+        
+        if use_parallel:
+            OT_list = []
+            processes = []
+            
+            with ThreadPoolExecutor(self.config.n_jobs) as pool:
+                for pair_number in self.pair_number_list:
+               
+                    pairwise = self.pairwise_list[pair_number]
+                
+                    future = pool.submit(
+                        pairwise.run_gw,
+                        results_dir = results_dir,
+                        compute_again = compute_again,
+                        return_data = return_data,
+                        return_figure = False,
+                        OT_format = OT_format,
+                        visualization_config = visualization_config,
+                        show_log = show_log,
+                        fig_dir = fig_dir, 
+                        ticks = ticks
+                    )
+                    
+                    processes.append(future)
+                    
+                for future in as_completed(processes):
+                    OT = future.result()
+                    OT_list.append(OT)
+                
+            if return_figure:
+                self._single_computation(
+                    results_dir = results_dir,
+                    compute_again = False,
+                    return_data = False,
+                    return_figure = True,
+                    OT_format = OT_format,
+                    visualization_config = visualization_config,
+                    show_log = show_log,
+                    fig_dir = fig_dir, 
+                    ticks = ticks
+                )
+                
+        if not use_parallel:
+            OT_list = self._single_computation(
+                results_dir = results_dir,
+                compute_again = compute_again,
+                return_data = return_data,
+                return_figure = return_figure,
+                OT_format = OT_format,
+                visualization_config = visualization_config,
+                show_log = show_log,
+                fig_dir = fig_dir, 
+                ticks = ticks
+            )
+        
         if return_data:
             return OT_list
 
