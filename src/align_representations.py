@@ -457,11 +457,14 @@ class PairwiseAnalysis():
         Returns:
             OT : Optimal Transportation matrix
         """      
-        self.OT, df_trial = self._gw_alignment(
+        self.OT, df_trial, save_path = self._gw_alignment(
             results_dir, 
             compute_again = compute_again,
             target_device = target_device
         )
+        
+        if fig_dir is None:
+            fig_dir = save_path
         
         OT = self._show_OT(
             title = f"$\Gamma$ ({self.pair_name})", 
@@ -521,7 +524,7 @@ class PairwiseAnalysis():
             
             OT = OT.to('cpu').numpy()
         
-        return OT, df_trial
+        return OT, df_trial, save_path
           
     def _run_optimization(
         self, 
@@ -645,8 +648,9 @@ class PairwiseAnalysis():
             OT_sorted = self.source.func_for_sort_sim_mat(self.OT, category_idx_list=self.source.category_idx_list)
 
         if return_figure:
+            save_file = self.config.data_name + " " + self.pair_name
             if fig_dir is not None:
-                fig_path = os.path.join(fig_dir, f"{title}.png")
+                fig_path = os.path.join(fig_dir, f"{save_file}.png")
             else:
                 fig_path = None
 
