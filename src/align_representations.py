@@ -280,7 +280,7 @@ class Representation:
         lower_triangular = lower_triangular.flatten()
         
         plt.figure()
-        plt.hist(lower_triangular, color=cmap)
+        plt.hist(lower_triangular, bins = 100, color=cmap)
         plt.title(f"Distribution of RDM ({self.name})", fontsize = title_size)
         plt.xlabel('RDM value')
         plt.ylabel('Count')
@@ -351,7 +351,7 @@ class PairwiseAnalysis():
         
         self.RDM_source = self.source.sim_mat
         self.RDM_target = self.target.sim_mat
-        self.pair_name = f"{target.name} vs {source.name}"
+        self.pair_name = f"{source.name} vs {target.name}"
         
         assert self.RDM_source.shape == self.RDM_target.shape, "the shape of sim_mat is not the same."
         
@@ -819,11 +819,12 @@ class AlignRepresentations:
         self.pair_number_list = pair_number_list
 
     def _get_pairwise_list(self) -> List[PairwiseAnalysis]:
-        pairs = list(itertools.combinations(self.representations_list, 2))
+        pairs = itertools.combinations(self.representations_list, 2)
 
         pairwise_list = list()
         for i, pair in enumerate(pairs):
-            pairwise = PairwiseAnalysis(config=self.config, source=pair[1], target=pair[0])
+            s, t = pair
+            pairwise = PairwiseAnalysis(config=self.config, source=s, target=t)
             pairwise_list.append(pairwise)
             print(f"Pair number {i} : {pairwise.pair_name}")
 
@@ -894,8 +895,7 @@ class AlignRepresentations:
             OT_list.append(OT)
         
         return OT_list
-        
-        
+               
     def gw_alignment(
         self, 
         results_dir,

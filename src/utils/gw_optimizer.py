@@ -190,6 +190,7 @@ class RunOptuna:
         objective = functools.partial(objective, **kwargs)
 
         # If there is no db file, multi_run will not work properly if you don't let it load here.
+        # PyMySQL implementation will be here if necessary.
         if  "sqlite" in self.storage and not os.path.exists(self.save_path + "/" + self.filename + ".db"):
             self.create_study()
         
@@ -203,7 +204,7 @@ class RunOptuna:
             warnings.filterwarnings("always")  
             warnings.warn(
                 "UserWarning : The parallel computation is done by the functions implemented in Optuna.\n \
-                This doesn't always provide a benefit for you to speed up or to get a better results.", UserWarning)
+                This doesn't always provide a benefit to speed up or to get a better results.", UserWarning)
         
         study.optimize(objective_device, self.num_trial, n_jobs=self.n_jobs)
         
