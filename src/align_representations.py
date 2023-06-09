@@ -267,12 +267,26 @@ class Representation:
         else:
             raise ValueError("sim_mat_format must be either 'default', 'sorted', or 'both'.")
 
-    def show_sim_mat_distribution(self):
+    def show_sim_mat_distribution(self,  **kwargs):
+        # figsize = kwargs.get('figsize', (4, 3))
+        xticks_rotation = kwargs.get('xticks_rotation', 90)
+        yticks_rotation = kwargs.get('yticks_rotation', 0)
+        title_size = kwargs.get('title_size', 60)
+        xlabel_size = kwargs.get('xlabel_size', 40)
+        ylabel_size = kwargs.get('ylabel_size', 40)
+        cmap = kwargs.get('cmap', 'C0')
+        
         lower_triangular = np.tril(self.sim_mat)
         lower_triangular = lower_triangular.flatten()
-        plt.hist(lower_triangular)
-        plt.title(f"Distribution of RDM ({self.name})")
+        
+        plt.figure()
+        plt.hist(lower_triangular, color=cmap)
+        plt.title(f"Distribution of RDM ({self.name})", fontsize = title_size)
+        plt.xlabel('RDM value')
+        plt.ylabel('Count')
+        plt.grid(True)
         plt.show()
+        plt.close()
         
     def show_embedding(
         self, 
@@ -423,7 +437,8 @@ class PairwiseAnalysis():
         visualization_config : VisualizationConfig = VisualizationConfig(), 
         show_log = False,
         fig_dir = None, 
-        ticks = None
+        ticks = None,
+        target_device = None,
     ):
         """
         Main Computation
@@ -442,7 +457,11 @@ class PairwiseAnalysis():
         Returns:
             OT : Optimal Transportation matrix
         """      
-        self.OT, df_trial = self._gw_alignment(results_dir, compute_again = compute_again)
+        self.OT, df_trial = self._gw_alignment(
+            results_dir, 
+            compute_again = compute_again,
+            target_device = target_device
+        )
         
         OT = self._show_OT(
             title = f"$\Gamma$ ({self.pair_name})", 
@@ -459,12 +478,13 @@ class PairwiseAnalysis():
 
         return OT
     
-    def _gw_alignment(self, results_dir, compute_again):
+    def _gw_alignment(self, results_dir, compute_again, target_device = None):
         """_summary_
 
         Args:
             results_dir (_type_): _description_
             compute_again (_type_): _description_
+            target_device (_type_, optional): _description_. Defaults to None.
 
         Returns:
             _type_: _description_
@@ -482,7 +502,13 @@ class PairwiseAnalysis():
                 
             compute_again = True            
     
-        study = self._run_optimization(filename, save_path, storage, compute_again)
+        study = self._run_optimization(
+            filename, 
+            save_path, 
+            storage, 
+            compute_again, 
+            target_device
+        )
         
         best_trial = study.best_trial
         df_trial = study.trials_dataframe()
@@ -502,7 +528,8 @@ class PairwiseAnalysis():
         filename, 
         save_path, 
         storage, 
-        compute_again, 
+        compute_again,
+        target_device,
         n_jobs_for_pairwise_analysis = 1
     ):
         """_summary_
@@ -512,6 +539,7 @@ class PairwiseAnalysis():
             save_path (_type_): _description_
             storage (_type_): _description_
             compute_again (_type_): _description_
+            target_device (_type_): _description_
             
             n_jobs_for_pairwise_analysis (int, optional): Defaults to 1. 
                 When calculating the alignment for a single pair, the optuna specification does not allow for parallel computation to speed up the process. 
@@ -561,10 +589,13 @@ class PairwiseAnalysis():
             eps_space = opt.define_eps_space(self.config.eps_list, self.config.eps_log, self.config.num_trial)
             search_space = {"eps": eps_space, "initialize": init_plans}
 
+            if target_device == None:
+                target_device = self.config.device
+
             # 2. run optimzation
             study = opt.run_study(
                 gw,
-                self.config.device,
+                target_device,
                 seed=self.config.sampler_seed,
                 init_plans_list=init_plans,
                 eps_list=self.config.eps_list,
@@ -815,10 +846,11 @@ class AlignRepresentations:
         """_summary_
 
         Args:
-            returned (str, optional): "figure", "row_data" or "both" . Defaults to "figure".
-            sim_mat_format (str, optional): "default", "sorted" or "both". Defaults to "default".
-            visualization_config (VisualizationConfig, optional): The instance of VisualizationConfig. Defaults to None.
+            sim_mat_format (str, optional): _description_. Defaults to "default".
+            visualization_config (VisualizationConfig, optional): _description_. Defaults to VisualizationConfig().
             fig_dir (_type_, optional): _description_. Defaults to None.
+            show_distribution (bool, optional): _description_. Defaults to True.
+            ticks (_type_, optional): _description_. Defaults to None.
         """
         for representation in self.representations_list:
             representation.show_sim_mat(
@@ -829,7 +861,7 @@ class AlignRepresentations:
             )
             
             if show_distribution:
-                representation.show_sim_mat_distribution()
+                representation.show_sim_mat_distribution(**visualization_config())
     
     def _single_computation(
         self, 
@@ -876,6 +908,7 @@ class AlignRepresentations:
         fig_dir = None,
         ticks = None,
         use_parallel = True,
+        multi_gpu : bool | List[int] = False,
     ):
         """_summary_
 
@@ -889,7 +922,8 @@ class AlignRepresentations:
             show_log (bool, optional): _description_. Defaults to False.
             fig_dir (_type_, optional): _description_. Defaults to None.
             ticks (_type_, optional): _description_. Defaults to None.
-            use_parallel (bool, optional): _description_. Defaults to False.
+            use_parallel (bool, optional): _description_. Defaults to True.
+            multi_gpu (bool | List, optional): _description_. Defaults to False.
 
         Returns:
             _type_: _description_
@@ -901,8 +935,19 @@ class AlignRepresentations:
             
             with ThreadPoolExecutor(self.config.n_jobs) as pool:
                 for pair_number in self.pair_number_list:
-               
+                    
+                    if multi_gpu:
+                        target_device = 'cuda:' + str(pair_number % torch.cuda.device_count())
+                    
+                    if isinstance(multi_gpu, list):
+                        gpu_idx = pair_number % len(multi_gpu)
+                        target_device = 'cuda:' + str(multi_gpu[gpu_idx])
+                    
                     pairwise = self.pairwise_list[pair_number]
+                    
+                    if self.config.to_types == 'numpy':
+                        assert multi_gpu == False, "numpy doesn't use GPU. Please 'multi_GPU = False'."
+                        target_device = self.config.device
                 
                     future = pool.submit(
                         pairwise.run_gw,
@@ -914,7 +959,8 @@ class AlignRepresentations:
                         visualization_config = visualization_config,
                         show_log = show_log,
                         fig_dir = fig_dir, 
-                        ticks = ticks
+                        ticks = ticks,
+                        target_device = target_device,
                     )
                     
                     processes.append(future)
