@@ -810,9 +810,9 @@ class AlignRepresentations:
 
         self.metric = metric
         self.representations_list = representations_list
-        self.pairwise_list = self._get_pairwise_list()
-        
         self.histogram_matching = histogram_matching
+        
+        self.pairwise_list = self._get_pairwise_list()
         self.RSA_corr = dict()
 
         if pair_number_list == "all":
