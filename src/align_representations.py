@@ -280,7 +280,7 @@ class Representation:
         lower_triangular = lower_triangular.flatten()
         
         plt.figure()
-        plt.hist(lower_triangular, color=cmap)
+        plt.hist(lower_triangular, bins = 100, color=cmap)
         plt.title(f"Distribution of RDM ({self.name})", fontsize = title_size)
         plt.xlabel('RDM value')
         plt.ylabel('Count')
@@ -351,7 +351,7 @@ class PairwiseAnalysis():
         
         self.RDM_source = self.source.sim_mat
         self.RDM_target = self.target.sim_mat
-        self.pair_name = f"{target.name} vs {source.name}"
+        self.pair_name = f"{source.name} vs {target.name}"
         
         assert self.RDM_source.shape == self.RDM_target.shape, "the shape of sim_mat is not the same."
         
@@ -457,11 +457,14 @@ class PairwiseAnalysis():
         Returns:
             OT : Optimal Transportation matrix
         """      
-        self.OT, df_trial = self._gw_alignment(
+        self.OT, df_trial, save_path = self._gw_alignment(
             results_dir, 
             compute_again = compute_again,
             target_device = target_device
         )
+        
+        if fig_dir is None:
+            fig_dir = save_path
         
         OT = self._show_OT(
             title = f"$\Gamma$ ({self.pair_name})", 
@@ -521,7 +524,7 @@ class PairwiseAnalysis():
             
             OT = OT.to('cpu').numpy()
         
-        return OT, df_trial
+        return OT, df_trial, save_path
           
     def _run_optimization(
         self, 
@@ -645,8 +648,9 @@ class PairwiseAnalysis():
             OT_sorted = self.source.func_for_sort_sim_mat(self.OT, category_idx_list=self.source.category_idx_list)
 
         if return_figure:
+            save_file = self.config.data_name + " " + self.pair_name
             if fig_dir is not None:
-                fig_path = os.path.join(fig_dir, f"{title}.png")
+                fig_path = os.path.join(fig_dir, f"{save_file}.png")
             else:
                 fig_path = None
 
@@ -798,6 +802,7 @@ class AlignRepresentations:
         self,
         config: OptimizationConfig,
         representations_list: List[Representation],
+        histogram_matching = False,
         pair_number_list="all",
         metric="cosine",
     ) -> None:
@@ -809,8 +814,9 @@ class AlignRepresentations:
 
         self.metric = metric
         self.representations_list = representations_list
+        self.histogram_matching = histogram_matching
+        
         self.pairwise_list = self._get_pairwise_list()
-
         self.RSA_corr = dict()
 
         if pair_number_list == "all":
@@ -819,14 +825,22 @@ class AlignRepresentations:
         self.pair_number_list = pair_number_list
 
     def _get_pairwise_list(self) -> List[PairwiseAnalysis]:
-        pairs = list(itertools.combinations(self.representations_list, 2))
+        pairs = itertools.combinations(self.representations_list, 2)
 
         pairwise_list = list()
         for i, pair in enumerate(pairs):
-            pairwise = PairwiseAnalysis(config=self.config, source=pair[1], target=pair[0])
-            pairwise_list.append(pairwise)
+            s, t = pair
+            pairwise = PairwiseAnalysis(config=self.config, source=s, target=t)
+            
             print(f"Pair number {i} : {pairwise.pair_name}")
-
+            
+            if self.histogram_matching:
+                pairwise.match_sim_mat_distribution()
+            
+            pairwise.show_both_sim_mats()
+            
+            pairwise_list.append(pairwise)
+           
         return pairwise_list
 
     def RSA_get_corr(self, metric="spearman", method='normal'):
@@ -894,8 +908,7 @@ class AlignRepresentations:
             OT_list.append(OT)
         
         return OT_list
-        
-        
+               
     def gw_alignment(
         self, 
         results_dir,
@@ -938,6 +951,8 @@ class AlignRepresentations:
                     
                     if multi_gpu:
                         target_device = 'cuda:' + str(pair_number % torch.cuda.device_count())
+                    else:
+                        target_device = self.config.device
                     
                     if isinstance(multi_gpu, list):
                         gpu_idx = pair_number % len(multi_gpu)

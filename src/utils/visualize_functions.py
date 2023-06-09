@@ -85,7 +85,17 @@ def get_color_labels_for_category(n_category_list, min_saturation, show_labels =
     return color_labels, main_colors
         
 
-def show_heatmap(matrix, title, save_file_name, draw_category_line = True, ticks = None, category_name_list = None, num_category_list = None, object_labels = None, **kwargs):
+def show_heatmap(
+    matrix, 
+    title, 
+    save_file_name, 
+    draw_category_line = True, 
+    ticks = None, 
+    category_name_list = None, 
+    num_category_list = None, 
+    object_labels = None, 
+    **kwargs
+):
     figsize = kwargs.get('figsize', (8, 6))
     cbar_size = kwargs.get("cbar_size", 0.8)
     cbar_ticks_size = kwargs.get("cbar_ticks_size", 20)
@@ -149,9 +159,8 @@ def show_heatmap(matrix, title, save_file_name, draw_category_line = True, ticks
     
     if save_file_name is not None:
         plt.savefig(save_file_name)
-    else:
-        plt.show()
-    
+   
+    plt.show()
     plt.close()
 
 
