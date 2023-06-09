@@ -907,7 +907,7 @@ class AlignRepresentations:
         show_log = False,
         fig_dir = None,
         ticks = None,
-        use_parallel = True,
+        use_parallel = False,
         multi_gpu : bool | List[int] = False,
     ):
         """_summary_
