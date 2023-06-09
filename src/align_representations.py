@@ -938,6 +938,8 @@ class AlignRepresentations:
                     
                     if multi_gpu:
                         target_device = 'cuda:' + str(pair_number % torch.cuda.device_count())
+                    else:
+                        target_device = self.config.device
                     
                     if isinstance(multi_gpu, list):
                         gpu_idx = pair_number % len(multi_gpu)
