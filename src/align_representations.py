@@ -828,14 +828,15 @@ class AlignRepresentations:
             s, t = pair
             pairwise = PairwiseAnalysis(config=self.config, source=s, target=t)
             
+            print(f"Pair number {i} : {pairwise.pair_name}")
+            
             if self.histogram_matching:
                 pairwise.match_sim_mat_distribution()
             
             pairwise.show_both_sim_mats()
             
             pairwise_list.append(pairwise)
-            print(f"Pair number {i} : {pairwise.pair_name}")
-
+           
         return pairwise_list
 
     def RSA_get_corr(self, metric="spearman", method='normal'):
