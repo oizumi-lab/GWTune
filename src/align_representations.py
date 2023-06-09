@@ -798,6 +798,7 @@ class AlignRepresentations:
         self,
         config: OptimizationConfig,
         representations_list: List[Representation],
+        histogram_matching = False,
         pair_number_list="all",
         metric="cosine",
     ) -> None:
@@ -810,7 +811,8 @@ class AlignRepresentations:
         self.metric = metric
         self.representations_list = representations_list
         self.pairwise_list = self._get_pairwise_list()
-
+        
+        self.histogram_matching = histogram_matching
         self.RSA_corr = dict()
 
         if pair_number_list == "all":
@@ -825,6 +827,12 @@ class AlignRepresentations:
         for i, pair in enumerate(pairs):
             s, t = pair
             pairwise = PairwiseAnalysis(config=self.config, source=s, target=t)
+            
+            if self.histogram_matching:
+                pairwise.match_sim_mat_distribution()
+            
+            pairwise.show_both_sim_mats()
+            
             pairwise_list.append(pairwise)
             print(f"Pair number {i} : {pairwise.pair_name}")
 
