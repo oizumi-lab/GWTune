@@ -23,9 +23,17 @@ from .utils.init_matrix import InitMatrix
 
 # %%
 class GW_Alignment:
-    def __init__(
-        self, pred_dist, target_dist, p, q, save_path, max_iter=1000, numItermax=1000, n_iter=100, to_types="torch"
-    ):
+    def __init__(self, 
+                 pred_dist, 
+                 target_dist, 
+                 p, 
+                 q, 
+                 save_path, 
+                 max_iter=1000, 
+                 numItermax=1000, 
+                 n_iter=100,
+                 to_types="torch"
+                 ):
         """
         2023/3/6 大泉先生
 
