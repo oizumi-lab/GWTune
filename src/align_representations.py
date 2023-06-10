@@ -21,8 +21,7 @@ import sys
 import os
 from typing import List
 import warnings
-import multiprocessing as mp
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 
 # %%
 from .utils import visualize_functions, init_matrix, gw_optimizer
@@ -430,7 +429,7 @@ class PairwiseAnalysis():
     def run_gw(
         self, 
         results_dir,
-        compute_again = False,
+        compute_OT = False,
         OT_format = "default",
         return_data = False,
         return_figure = True,
@@ -445,7 +444,7 @@ class PairwiseAnalysis():
 
         Args:
             results_dir,
-            compute_again = False,
+            compute_OT = False,
             OT_format = "default",
             return_data = False,
             return_figure = True,
@@ -459,7 +458,7 @@ class PairwiseAnalysis():
         """      
         self.OT, df_trial, save_path = self._gw_alignment(
             results_dir, 
-            compute_again = compute_again,
+            compute_OT = compute_OT,
             target_device = target_device
         )
         
@@ -481,12 +480,12 @@ class PairwiseAnalysis():
 
         return OT
     
-    def _gw_alignment(self, results_dir, compute_again, target_device = None):
+    def _gw_alignment(self, results_dir, compute_OT, target_device = None):
         """_summary_
 
         Args:
             results_dir (_type_): _description_
-            compute_again (_type_): _description_
+            compute_OT (_type_): _description_
             target_device (_type_, optional): _description_. Defaults to None.
 
         Returns:
@@ -500,16 +499,16 @@ class PairwiseAnalysis():
         # storage = 'mysql+pymysql://root:olabGPU61@localhost/GridTest'
         
         if not os.path.exists(save_path):            
-            if compute_again != False:
+            if compute_OT != False:
                 warnings.warn("This computing is running for the first time in the 'results_dir'.", UserWarning)
                 
-            compute_again = True            
+            compute_OT = True            
     
         study = self._run_optimization(
             filename, 
             save_path, 
             storage, 
-            compute_again, 
+            compute_OT, 
             target_device
         )
         
@@ -531,7 +530,7 @@ class PairwiseAnalysis():
         filename, 
         save_path, 
         storage, 
-        compute_again,
+        compute_OT,
         target_device,
         n_jobs_for_pairwise_analysis = 1
     ):
@@ -541,7 +540,7 @@ class PairwiseAnalysis():
             filename (_type_): _description_
             save_path (_type_): _description_
             storage (_type_): _description_
-            compute_again (_type_): _description_
+            compute_OT (_type_): _description_
             target_device (_type_): _description_
             
             n_jobs_for_pairwise_analysis (int, optional): Defaults to 1. 
@@ -567,7 +566,7 @@ class PairwiseAnalysis():
             delete_study=self.config.delete_study,
         )
         
-        if compute_again:
+        if compute_OT:
             # distribution in the source space, and target space
             p = ot.unif(len(self.RDM_source))
             q = ot.unif(len(self.RDM_target))
@@ -837,7 +836,7 @@ class AlignRepresentations:
             if self.histogram_matching:
                 pairwise.match_sim_mat_distribution()
             
-            pairwise.show_both_sim_mats()
+            # pairwise.show_both_sim_mats()
             
             pairwise_list.append(pairwise)
            
@@ -880,7 +879,7 @@ class AlignRepresentations:
     def _single_computation(
         self, 
         results_dir,
-        compute_again = False,
+        compute_OT = False,
         return_data = False,
         return_figure = True,
         OT_format = "default", 
@@ -895,7 +894,7 @@ class AlignRepresentations:
             pairwise = self.pairwise_list[pair_number]
             OT = pairwise.run_gw(
                 results_dir = results_dir,
-                compute_again = compute_again,
+                compute_OT = compute_OT,
                 return_data = return_data,
                 return_figure = return_figure,
                 OT_format = OT_format,
@@ -908,11 +907,11 @@ class AlignRepresentations:
             OT_list.append(OT)
         
         return OT_list
-               
+        
     def gw_alignment(
         self, 
         results_dir,
-        compute_again = False,
+        compute_OT = False,
         return_data = False,
         return_figure = True,
         OT_format = "default", 
@@ -921,13 +920,14 @@ class AlignRepresentations:
         fig_dir = None,
         ticks = None,
         use_parallel = False,
+        parallel_method = "multiprocessing",
         multi_gpu : bool | List[int] = False,
     ):
         """_summary_
 
         Args:
             results_dir (_type_): _description_
-            compute_again (bool, optional): _description_. Defaults to False.
+            compute_OT (bool, optional): _description_. Defaults to False.
             return_data (bool, optional): _description_. Defaults to False.
             return_figure (bool, optional): _description_. Defaults to True.
             OT_format (str, optional): _description_. Defaults to "default".
@@ -935,8 +935,9 @@ class AlignRepresentations:
             show_log (bool, optional): _description_. Defaults to False.
             fig_dir (_type_, optional): _description_. Defaults to None.
             ticks (_type_, optional): _description_. Defaults to None.
-            use_parallel (bool, optional): _description_. Defaults to True.
-            multi_gpu (bool | List, optional): _description_. Defaults to False.
+            use_parallel (bool, optional): _description_. Defaults to False.
+            parallel_method (str, optional): _description_. Defaults to "multiprocess".
+            multi_gpu (bool | List[int], optional): _description_. Defaults to False.
 
         Returns:
             _type_: _description_
@@ -946,7 +947,16 @@ class AlignRepresentations:
             OT_list = []
             processes = []
             
-            with ThreadPoolExecutor(self.config.n_jobs) as pool:
+            if parallel_method == "multiprocess":
+                pool = ProcessPoolExecutor(self.config.n_jobs)
+            
+            elif parallel_method == "multithread":
+                pool = ThreadPoolExecutor(self.config.n_jobs)
+            
+            else:
+                raise ValueError("please choose 'multiprocess' or 'multithread'. ")
+            
+            with pool:
                 for pair_number in self.pair_number_list:
                     
                     if multi_gpu:
@@ -967,9 +977,9 @@ class AlignRepresentations:
                     future = pool.submit(
                         pairwise.run_gw,
                         results_dir = results_dir,
-                        compute_again = compute_again,
+                        compute_OT = compute_OT,
                         return_data = return_data,
-                        return_figure = False,
+                        return_figure = True,
                         OT_format = OT_format,
                         visualization_config = visualization_config,
                         show_log = show_log,
@@ -987,7 +997,7 @@ class AlignRepresentations:
             if return_figure:
                 self._single_computation(
                     results_dir = results_dir,
-                    compute_again = False,
+                    compute_OT = False,
                     return_data = False,
                     return_figure = True,
                     OT_format = OT_format,
@@ -1000,7 +1010,7 @@ class AlignRepresentations:
         if not use_parallel:
             OT_list = self._single_computation(
                 results_dir = results_dir,
-                compute_again = compute_again,
+                compute_OT = compute_OT,
                 return_data = return_data,
                 return_figure = return_figure,
                 OT_format = OT_format,
@@ -1035,7 +1045,7 @@ class AlignRepresentations:
         pivot,
         n_iter,
         results_dir,
-        compute_again=False,
+        compute_OT=False,
         return_data=False,
         return_figure=True,
         OT_format="default",
@@ -1058,7 +1068,7 @@ class AlignRepresentations:
 
             pairwise.run_gw(
                 results_dir=results_dir,
-                compute_again=compute_again,
+                compute_OT=compute_OT,
                 return_data=return_data,
                 return_figure=return_figure,
                 OT_format=OT_format,
