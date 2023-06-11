@@ -52,6 +52,10 @@ class OptimizationConfig:
             "min_resource": 2,
             "reduction_factor": 3
         },
+        use_parallel = False,
+        parallel_method = "multithread",
+        multi_gpu : bool | List[int] = False,
+        
     ) -> None:
         """_summary_
 
@@ -87,6 +91,9 @@ class OptimizationConfig:
         self.eps_log = eps_log
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
+        self.use_parallel = use_parallel
+        self.parallel_method = parallel_method 
+        self.multi_gpu = multi_gpu
         
 class VisualizationConfig():
     def __init__(
@@ -919,9 +926,6 @@ class AlignRepresentations:
         show_log = False,
         fig_dir = None,
         ticks = None,
-        use_parallel = False,
-        parallel_method = "multiprocessing",
-        multi_gpu : bool | List[int] = False,
     ):
         """_summary_
 
@@ -943,14 +947,14 @@ class AlignRepresentations:
             _type_: _description_
         """
         
-        if use_parallel:
+        if self.config.use_parallel:
             OT_list = []
             processes = []
             
-            if parallel_method == "multiprocess":
+            if self.config.parallel_method == "multiprocess":
                 pool = ProcessPoolExecutor(self.config.n_jobs)
             
-            elif parallel_method == "multithread":
+            elif self.config.parallel_method == "multithread":
                 pool = ThreadPoolExecutor(self.config.n_jobs)
             
             else:
@@ -959,19 +963,19 @@ class AlignRepresentations:
             with pool:
                 for pair_number in self.pair_number_list:
                     
-                    if multi_gpu:
+                    if self.config.multi_gpu:
                         target_device = 'cuda:' + str(pair_number % torch.cuda.device_count())
                     else:
                         target_device = self.config.device
                     
-                    if isinstance(multi_gpu, list):
-                        gpu_idx = pair_number % len(multi_gpu)
-                        target_device = 'cuda:' + str(multi_gpu[gpu_idx])
+                    if isinstance(self.config.multi_gpu, list):
+                        gpu_idx = pair_number % len(self.config.multi_gpu)
+                        target_device = 'cuda:' + str(self.config.multi_gpu[gpu_idx])
                     
                     pairwise = self.pairwise_list[pair_number]
                     
                     if self.config.to_types == 'numpy':
-                        assert multi_gpu == False, "numpy doesn't use GPU. Please 'multi_GPU = False'."
+                        assert self.config.multi_gpu == False, "numpy doesn't use GPU. Please 'multi_GPU = False'."
                         target_device = self.config.device
                 
                     future = pool.submit(
@@ -979,7 +983,7 @@ class AlignRepresentations:
                         results_dir = results_dir,
                         compute_OT = compute_OT,
                         return_data = return_data,
-                        return_figure = True,
+                        return_figure = False,
                         OT_format = OT_format,
                         visualization_config = visualization_config,
                         show_log = show_log,
@@ -1007,7 +1011,7 @@ class AlignRepresentations:
                     ticks = ticks
                 )
                 
-        if not use_parallel:
+        if not self.config.use_parallel:
             OT_list = self._single_computation(
                 results_dir = results_dir,
                 compute_OT = compute_OT,
