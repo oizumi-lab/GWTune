@@ -95,8 +95,8 @@ config = OptimizationConfig(
     eps_log = True,
     num_trial = 4,
  
-    device = 'cuda',
-    to_types = 'torch',
+    device = 'cpu',
+    to_types = 'numpy',
     
     n_jobs = 1,
     parallel_method="multithread", # "multiprocess" or "multithread". Default is "multithread".
@@ -178,7 +178,7 @@ if data_select == "THINGS":
         return_figure = True,
         OT_format = sim_mat_format, 
         visualization_config = visualize_matrix,
-        show_log=True,
+        show_log=False,
         fig_dir=None,
          ticks = 'category', # you can use "objects" or "category" or "None"
     )
@@ -214,7 +214,8 @@ align_representation.calc_accuracy(top_k_list = [1, 5, 10], eval_type = "k_neare
 align_representation.plot_accuracy(eval_type = "k_nearest", scatter = True)
 
 # %%
-
+##  Show how the GWD was optimized
+align_representation.show_optimization_log(results_dir="../results")
 
 # %% [markdown]
 # ## category level analysis 
@@ -232,11 +233,21 @@ if data_select == "THINGS":
     category_mat = pd.read_csv("../data/category_mat_manual_preprocessed.csv", sep = ",", index_col = 0)   
     object_labels, category_idx_list, num_category_list, category_name_list = get_category_data(category_mat, category_name_list, show_numbers = True)  
     
+    visualization_embedding = VisualizationConfig(
+        figsize=(15, 15), 
+        xlabel="PC1",
+        ylabel="PC2", 
+        zlabel="PC3", 
+        marker_size=20,
+        legend_size=10
+        )
+    
     align_representation.visualize_embedding(
-        dim = 3,  
-        category_name_list = category_name_list, 
-        category_idx_list = category_idx_list, 
-        num_category_list = num_category_list,
+        dim=3,  
+        visualization_config=visualization_embedding,
+        category_name_list=category_name_list, 
+        category_idx_list=category_idx_list, 
+        num_category_list=num_category_list,
     )
 
 # %%
@@ -244,7 +255,17 @@ if data_select == 'color':
     file_path = "../data/color_dict.csv"
     data_color = pd.read_csv(file_path)
     color_labels = data_color.columns.values
-    visualization_config = VisualizationConfig(color_labels = color_labels, figsize = (15, 15), xlabel = "PC1", ylabel = "PC2", zlabel = "PC3", legend_size = 10)
-    align_representation.visualize_embedding(dim = 3, visualization_config = visualization_config)
-
-
+    
+    visualization_embedding = VisualizationConfig(
+        color_labels=color_labels, 
+        figsize=(15, 15), 
+        xlabel="PC1", 
+        ylabel="PC2",
+        zlabel="PC3", 
+        legend_size=10
+        )
+    
+    align_representation.visualize_embedding(
+        dim=3, 
+        visualization_config=visualization_embedding
+        )
