@@ -501,7 +501,7 @@ class PairwiseAnalysis():
         )
 
         if show_log:
-            self.get_optimization_log(df_trial, fig_dir=fig_dir)
+            self.get_optimization_log(df_trial=df_trial, fig_dir=fig_dir)
 
         return OT
 
@@ -652,12 +652,27 @@ class PairwiseAnalysis():
 
         return study
 
-    def get_optimization_log(self, df_trial, fig_dir):
+    def get_optimization_log(self, 
+            df_trial=None, 
+            results_dir=None,
+            filename=None,
+            target_device=None,
+            fig_dir=None,          
+        ):
+        
+        if df_trial is None:
+            _, df_trial, _ = self._gw_alignment(
+                results_dir,
+                compute_OT=False,
+                filename=filename,
+                target_device=target_device
+            )
         
         # figure plotting epsilon as x-axis and GWD as y-axis
         sns.scatterplot(data=df_trial, x="params_eps", y="value", s=50)
         plt.xlabel("$\epsilon$")
         plt.ylabel("GWD")
+        plt.title(f"$\epsilon$ - GWD ({self.pair_name})")
         if fig_dir is not None:
             fig_path = os.path.join(
                 fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png")
@@ -671,6 +686,7 @@ class PairwiseAnalysis():
                         y="user_attrs_best_acc", s=50)
         plt.xlabel("GWD")
         plt.ylabel("accuracy")
+        plt.title(f"GWD - accuracy ({self.pair_name})")
         if fig_dir is not None:
             fig_path = os.path.join(
                 fig_dir, f"Optim_log_acc_GWD_{self.pair_name}.png")
@@ -1083,9 +1099,21 @@ class AlignRepresentations:
         if return_data:
             return OT_list
 
+    def show_optimization_log(
+        self, 
+        results_dir,
+        filename=None,
+        fig_dir=None,
+    ):
+        for pairwise in self.pairwise_list:
+            pairwise.get_optimization_log(
+                results_dir=results_dir,
+                filename=filename,
+                fig_dir=fig_dir
+                )
+            
     def calc_barycenter(self, X_init=None):
-        embedding_list = [
-            representation.embedding for representation in self.representations_list]
+        embedding_list = [representation.embedding for representation in self.representations_list]
 
         if X_init is None:
             X_init = np.mean(embedding_list, axis=0)  # initial Dirac locations
