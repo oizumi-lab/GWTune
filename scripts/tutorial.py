@@ -23,7 +23,7 @@ from src.align_representations import Representation, AlignRepresentations, Opti
 # "data_select" in next code block can define which dataset are going to be used.
 
 # %%
-data_select = "THINGS"
+data_select = "color"
 
 # %%
 # Set Representations
@@ -90,13 +90,18 @@ if data_select == "THINGS":
 # ## Set the parameters for the optimazation of GWOT, and the parameters for visualizing matrices
 
 # %%
+# if you use mysql, you should specify the storage here
+# if you use sqlite, please just comment out this line
+storage = 'mysql+pymysql://root@localhost/oizumi'
+
 config = OptimizationConfig(
-    eps_list = [1, 10], # [1, 10] for THINGS data, [0.02, 0.2] for colors data
+    eps_list = [0.02, 0.2], # [1, 10] for THINGS data, [0.02, 0.2] for colors data
     eps_log = True,
     num_trial = 4,
  
     device = 'cpu',
     to_types = 'numpy',
+    storage = storage,
     
     n_jobs = 1,
     parallel_method="multithread", # "multiprocess" or "multithread". Default is "multithread".
@@ -154,6 +159,7 @@ if data_select == "color":
     visualize_matrix = VisualizationConfig(figsize=(8, 6), title_size = 15)
     sim_mat = align_representation.show_sim_mat(
         sim_mat_format = sim_mat_format, 
+        show_distribution=False,
         visualization_config = visualize_matrix,
     )
     
@@ -173,7 +179,7 @@ if data_select == "THINGS":
 
     ot_list = align_representation.gw_alignment(
         results_dir = "../results",
-        compute_OT = False,  # If the computation was done and no need for, turn "compute_OT" False, then OT plans calculated before is loaded.
+        compute_OT = True,  # If the computation was done and no need for, turn "compute_OT" False, then OT plans calculated before is loaded.
         return_data = False,
         return_figure = True,
         OT_format = sim_mat_format, 
