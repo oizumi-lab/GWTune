@@ -25,19 +25,23 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
 class OptimizationConfig:
     def __init__(
         self,
-        data_name="THINGS",
-        delete_study=False,
+        eps_list=[1, 10],
+        eps_log=True,
+        num_trial=4,
         device="cpu",
         to_types="numpy",
         n_jobs=1,
+        use_parallel=False,
+        parallel_method="multithread",
+        multi_gpu: Union[bool, List[int]] = False,
+        storage=None,
         init_plans_list=["random"],
-        num_trial=4,
         n_iter=1,
         max_iter=200,
+        data_name="THINGS",
+        delete_study=False,
         sampler_name="tpe",
         sampler_seed=42,
-        eps_list=[1, 10],
-        eps_log=True,
         pruner_name="hyperband",
         pruner_params={
             "n_startup_trials": 1,
@@ -45,51 +49,60 @@ class OptimizationConfig:
             "min_resource": 2,
             "reduction_factor": 3
         },
-        storage=None,
-        use_parallel=False,
-        parallel_method="multithread",
-        multi_gpu: Union[bool, List[int]] = False,
+
 
     ) -> None:
         """_summary_
 
         Args:
-            data_name (str, optional): _description_. Defaults to "THINGS".
-            delete_study (bool, optional): _description_. Defaults to False.
+            eps_list (list, optional): _description_. Defaults to [1, 10].
+            eps_log (bool, optional): _description_. Defaults to True.
+            num_trial (int, optional): _description_. Defaults to 4.
             device (str, optional): _description_. Defaults to "cpu".
             to_types (str, optional): _description_. Defaults to "numpy".
             n_jobs (int, optional): _description_. Defaults to 1.
+            use_parallel (bool, optional): _description_. Defaults to False.
+            parallel_method (str, optional): _description_. Defaults to "multithread".
+            multi_gpu (Union[bool, List[int]], optional): _description_. Defaults to False.
+            storage (_type_, optional): _description_. Defaults to None.
             init_plans_list (list, optional): _description_. Defaults to ["random"].
-            num_trial (int, optional): _description_. Defaults to 4.
             n_iter (int, optional): _description_. Defaults to 1.
             max_iter (int, optional): _description_. Defaults to 200.
+            data_name (str, optional): _description_. Defaults to "THINGS".
+            delete_study (bool, optional): _description_. Defaults to False.
             sampler_name (str, optional): _description_. Defaults to "tpe".
             sampler_seed (int, optional): _description_. Defaults to 42.
-            eps_list (list, optional): _description_. Defaults to [1, 10].
-            eps_log (bool, optional): _description_. Defaults to True.
             pruner_name (str, optional): _description_. Defaults to "hyperband".
             pruner_params (dict, optional): _description_. Defaults to { "n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3 }.
         """
-        self.data_name = data_name
-        self.delete_study = delete_study
-        self.device = device
-        self.to_types = to_types
-        self.n_jobs = n_jobs
-        self.init_plans_list = init_plans_list
-        self.num_trial = num_trial
-        self.n_iter = n_iter
-        self.max_iter = max_iter
-        self.sampler_name = sampler_name
-        self.sampler_seed = sampler_seed
         self.eps_list = eps_list
         self.eps_log = eps_log
-        self.pruner_name = pruner_name
-        self.pruner_params = pruner_params
-        self.storage = storage
+        self.num_trial = num_trial
+        
+        self.to_types = to_types
+        self.device = device
+        
+        self.n_jobs = n_jobs
         self.use_parallel = use_parallel
         self.parallel_method = parallel_method
         self.multi_gpu = multi_gpu
 
+        self.init_plans_list = init_plans_list
+        self.n_iter = n_iter
+        self.max_iter = max_iter
+        self.sampler_name = sampler_name
+        self.sampler_seed = sampler_seed
+        
+     
+        self.data_name = data_name
+        self.delete_study = delete_study
+        self.storage = storage
+        
+        self.pruner_name = pruner_name
+        self.pruner_params = pruner_params
+        
+        
+  
 
 class VisualizationConfig():
     def __init__(
