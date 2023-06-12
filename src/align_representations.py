@@ -1,32 +1,25 @@
-#%%
+# %%
+from .histogram_matching import SimpleHistogramMatching
+from .gw_alignment import GW_Alignment
+from .utils import visualize_functions, init_matrix, gw_optimizer
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
+import warnings
+from sklearn import manifold
+from scipy.stats import pearsonr, spearmanr
+from scipy.spatial import distance
+import torch
+import seaborn as sns
+import pandas as pd
+import ot
+import numpy as np
+import matplotlib.pyplot as plt
 import sys
 import itertools
 import os
 import sys
-from typing import List
+from typing import List, Union
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
-
-import matplotlib.pyplot as plt
-import numpy as np
-import ot
-import pandas as pd
-import seaborn as sns
-import torch
-from scipy.spatial import distance
-from scipy.stats import pearsonr, spearmanr
-from sklearn import manifold
-import ot
-import sys
-import os
-from typing import List
-import warnings
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
-
-# %%
-from .utils import visualize_functions, init_matrix, gw_optimizer
-from .gw_alignment import GW_Alignment
-from .histogram_matching import SimpleHistogramMatching
 
 # %%
 class OptimizationConfig:
@@ -47,15 +40,16 @@ class OptimizationConfig:
         eps_log=True,
         pruner_name="hyperband",
         pruner_params={
-            "n_startup_trials": 1, 
-            "n_warmup_steps": 2, 
+            "n_startup_trials": 1,
+            "n_warmup_steps": 2,
             "min_resource": 2,
             "reduction_factor": 3
         },
-        use_parallel = False,
-        parallel_method = "multithread",
-        multi_gpu : bool | List[int] = False,
-        
+        storage=None,
+        use_parallel=False,
+        parallel_method="multithread",
+        multi_gpu: Union[bool, List[int]] = False,
+
     ) -> None:
         """_summary_
 
@@ -91,37 +85,40 @@ class OptimizationConfig:
         self.eps_log = eps_log
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
+        self.storage = storage
         self.use_parallel = use_parallel
-        self.parallel_method = parallel_method 
+        self.parallel_method = parallel_method
         self.multi_gpu = multi_gpu
-        
+
+
 class VisualizationConfig():
     def __init__(
-        self, 
-        figsize = (8, 6),
-        cbar_size = 1.0,
-        cbar_ticks_size = 5,
-        ticks_size = 5,
-        xticks_rotation = 90,
-        yticks_rotation = 0,
-        title_size = 20,
-        legend_size = 5, 
-        xlabel = None,
-        xlabel_size = 15,
-        ylabel = None,
-        ylabel_size = 15,
-        zlabel = None,
-        zlabel_size = 15, 
-        color_labels = None, 
-        color_hue = None, 
-        markers_list = None, 
-        marker_size = 30,
-        draw_category_line = True,
-        category_line_color = 'C2',
-        category_line_alpha = 0.2,
-        category_line_style = 'dashed',
+        self,
+        figsize=(8, 6),
+        cbar_size=1.0,
+        cbar_ticks_size=5,
+        ticks_size=5,
+        xticks_rotation=90,
+        yticks_rotation=0,
+        title_size=20,
+        legend_size=5,
+        xlabel=None,
+        xlabel_size=15,
+        ylabel=None,
+        ylabel_size=15,
+        zlabel=None,
+        zlabel_size=15,
+        color_labels=None,
+        color_hue=None,
+        markers_list=None,
+        marker_size=30,
+        cmap = 'cividis',
+        draw_category_line=True,
+        category_line_color='C2',
+        category_line_alpha=0.2,
+        category_line_style='dashed',
     ) -> None:
-        
+
         self.visualization_params = {
             'figsize': figsize,
             'cbar_size': cbar_size,
@@ -130,21 +127,22 @@ class VisualizationConfig():
             'xticks_rotation': xticks_rotation,
             'yticks_rotation': yticks_rotation,
             'title_size': title_size,
-            'legend_size' : legend_size,
+            'legend_size': legend_size,
             'xlabel': xlabel,
             'xlabel_size': xlabel_size,
             'ylabel': ylabel,
             'ylabel_size': ylabel_size,
-            'zlabel' : zlabel,
-            'zlabel_size' : zlabel_size,
+            'zlabel': zlabel,
+            'zlabel_size': zlabel_size,
             'color_labels': color_labels,
-            'color_hue' : color_hue,
-            'markers_list' : markers_list,
-            'marker_size' : marker_size,
-            'draw_category_line':draw_category_line,
-            'category_line_color' : category_line_color,
-            'category_line_alpha' : category_line_alpha,
-            'category_line_style' : category_line_style,
+            'color_hue': color_hue,
+            'markers_list': markers_list,
+            'marker_size': marker_size,
+            'cmap':cmap,
+            'draw_category_line': draw_category_line,
+            'category_line_color': category_line_color,
+            'category_line_alpha': category_line_alpha,
+            'category_line_style': category_line_style,
         }
 
     def __call__(self):
@@ -154,21 +152,22 @@ class Representation:
     """
     A class object that has information of a representation, such as embeddings and similarity matrices
     """
+
     def __init__(
         self,
         name,
-        metric = "cosine",
-        sim_mat : np.ndarray = None,
-        embedding : np.ndarray = None,
-        get_embedding = True,
-        MDS_dim = 3,
-        object_labels = None,
-        category_name_list = None, 
-        num_category_list = None, 
-        category_idx_list = None,
-        func_for_sort_sim_mat = None,
+        metric="cosine",
+        sim_mat: np.ndarray = None,
+        embedding: np.ndarray = None,
+        get_embedding=True,
+        MDS_dim=3,
+        object_labels=None,
+        category_name_list=None,
+        num_category_list=None,
+        category_idx_list=None,
+        func_for_sort_sim_mat=None,
     ) -> None:
-        
+
         # meta data for the representation matrix (dis-similarity matrix).
         self.name = name
         self.metric = metric
@@ -178,32 +177,38 @@ class Representation:
         self.category_name_list = category_name_list
         self.category_idx_list = category_idx_list
         self.num_category_list = num_category_list
-        
+
         # define the function to sort the representation matrix by the label parameters above (Default is None). Users can define it by themselves.
         self.func_for_sort_sim_mat = func_for_sort_sim_mat
-        
+
         # computing the representation matrix (or embedding) from embedding (or representation matrix) if sim_mat is None.
-        assert (sim_mat is not None) or (embedding is not None), "sim_mat and embedding are None."
-        
+        assert (sim_mat is not None) or (
+            embedding is not None), "sim_mat and embedding are None."
+
         if sim_mat is None:
-            assert isinstance(embedding, np.ndarray), "'embedding' needs to be numpy.ndarray. "
+            assert isinstance(
+                embedding, np.ndarray), "'embedding' needs to be numpy.ndarray. "
             self.embedding = embedding
             self.sim_mat = self._get_sim_mat()
         else:
-            assert isinstance(sim_mat, np.ndarray), "'sim_mat' needs to be numpy.ndarray. "
+            assert isinstance(
+                sim_mat, np.ndarray), "'sim_mat' needs to be numpy.ndarray. "
             self.sim_mat = sim_mat
 
         if embedding is None:
-            assert isinstance(sim_mat, np.ndarray), "'sim_mat' needs to be numpy.ndarray. "
+            assert isinstance(
+                sim_mat, np.ndarray), "'sim_mat' needs to be numpy.ndarray. "
             self.sim_mat = sim_mat
             if get_embedding:
-                self.embedding = self._get_embedding(dim = MDS_dim)
+                self.embedding = self._get_embedding(dim=MDS_dim)
         else:
-            assert isinstance(embedding, np.ndarray), "'embedding' needs to be numpy.ndarray. "
+            assert isinstance(
+                embedding, np.ndarray), "'embedding' needs to be numpy.ndarray. "
             self.embedding = embedding
-        
+
         if self.category_idx_list is not None:
-            self.sorted_sim_mat = self.func_for_sort_sim_mat(self.sim_mat, category_idx_list=self.category_idx_list)
+            self.sorted_sim_mat = self.func_for_sort_sim_mat(
+                self.sim_mat, category_idx_list=self.category_idx_list)
         else:
             self.sorted_sim_mat = None
 
@@ -214,22 +219,23 @@ class Representation:
             metric = self.metric
 
         return distance.cdist(
-            self.embedding, 
-            self.embedding, 
+            self.embedding,
+            self.embedding,
             metric=metric
         )
-        
+
     def _get_embedding(self, dim):
-        MDS_embedding = manifold.MDS(n_components = dim, dissimilarity = "precomputed", random_state = 0)
+        MDS_embedding = manifold.MDS(
+            n_components=dim, dissimilarity="precomputed", random_state=0)
         embedding = MDS_embedding.fit_transform(self.sim_mat)
         return embedding
 
     def show_sim_mat(
-        self, 
-        sim_mat_format = "default", 
-        visualization_config : VisualizationConfig = VisualizationConfig(), 
-        fig_dir = None, 
-        ticks = None
+        self,
+        sim_mat_format="default",
+        visualization_config: VisualizationConfig = VisualizationConfig(),
+        fig_dir=None,
+        ticks=None
     ):
         """_summary_
 
@@ -242,36 +248,36 @@ class Representation:
         Raises:
             ValueError: _description_
         """
-        
+
         if fig_dir is not None:
             fig_path = os.path.join(fig_dir, f"RDM_{self.name}")
         else:
             fig_path = None
-            
 
         if sim_mat_format == "default" or sim_mat_format == "both":
             visualize_functions.show_heatmap(
-                self.sim_mat, 
-                title = self.name, 
-                save_file_name = fig_path, 
+                self.sim_mat,
+                title=self.name,
+                save_file_name=fig_path,
                 **visualization_config()
             )
-        
+
         elif sim_mat_format == "sorted" or sim_mat_format == "both":
             assert self.category_idx_list is not None, "No label info to sort the 'sim_mat'."
             visualize_functions.show_heatmap(
-                self.sorted_sim_mat, 
-                title = self.name + "_sorted", 
-                save_file_name = fig_path, 
-                ticks = ticks, 
-                category_name_list = self.category_name_list, 
-                num_category_list = self.num_category_list, 
-                object_labels = self.object_labels, 
+                self.sorted_sim_mat,
+                title=self.name + "_sorted",
+                save_file_name=fig_path,
+                ticks=ticks,
+                category_name_list=self.category_name_list,
+                num_category_list=self.num_category_list,
+                object_labels=self.object_labels,
                 **visualization_config()
             )
 
         else:
-            raise ValueError("sim_mat_format must be either 'default', 'sorted', or 'both'.")
+            raise ValueError(
+                "sim_mat_format must be either 'default', 'sorted', or 'both'.")
 
     def show_sim_mat_distribution(self,  **kwargs):
         # figsize = kwargs.get('figsize', (4, 3))
@@ -281,32 +287,32 @@ class Representation:
         xlabel_size = kwargs.get('xlabel_size', 40)
         ylabel_size = kwargs.get('ylabel_size', 40)
         cmap = kwargs.get('cmap', 'C0')
-        
+
         lower_triangular = np.tril(self.sim_mat)
         lower_triangular = lower_triangular.flatten()
-        
+
         plt.figure()
-        plt.hist(lower_triangular, bins = 100, color=cmap)
-        plt.title(f"Distribution of RDM ({self.name})", fontsize = title_size)
+        plt.hist(lower_triangular, bins=100, color=cmap)
+        plt.title(f"Distribution of RDM ({self.name})", fontsize=title_size)
         plt.xlabel('RDM value')
         plt.ylabel('Count')
         plt.grid(True)
         plt.show()
         plt.close()
-        
+
     def show_embedding(
-        self, 
-        dim = 3, 
-        visualization_config : VisualizationConfig = VisualizationConfig(),
-        category_name_list = None, 
-        num_category_list = None, 
-        category_idx_list = None, 
-        title = None, 
-        legend = True, 
-        fig_dir = None, 
-        fig_name = "Aligned_embedding.png"
+        self,
+        dim=3,
+        visualization_config: VisualizationConfig = VisualizationConfig(),
+        category_name_list=None,
+        num_category_list=None,
+        category_idx_list=None,
+        title=None,
+        legend=True,
+        fig_dir=None,
+        fig_name="Aligned_embedding.png"
     ):
-        
+
         if fig_dir is not None:
             fig_path = os.path.join(fig_dir, fig_name)
         else:
@@ -317,32 +323,33 @@ class Representation:
                 category_name_list = self.category_name_list
                 num_category_list = self.num_category_list
                 category_idx_list = self.category_idx_list
-            
+
         visualize_embedding = visualize_functions.VisualizeEmbedding(
-            embedding_list = [self.embedding],
-            dim = dim,
-            category_name_list = category_name_list,
-            num_category_list = num_category_list,
-            category_idx_list = category_idx_list
+            embedding_list=[self.embedding],
+            dim=dim,
+            category_name_list=category_name_list,
+            num_category_list=num_category_list,
+            category_idx_list=category_idx_list
         )
 
         visualize_embedding.plot_embedding(
-            name_list = [self.name], 
-            title = title, 
-            legend = legend, 
-            save_dir = fig_path, 
+            name_list=[self.name],
+            title=title,
+            legend=legend,
+            save_dir=fig_path,
             **visualization_config()
         )
-    
+
 class PairwiseAnalysis():
     """
     A class object that has methods conducting gw-alignment and corresponding results
     This object has information of a pair of Representations.
     """
+
     def __init__(
-        self, 
-        config: OptimizationConfig, 
-        source: Representation, 
+        self,
+        config: OptimizationConfig,
+        source: Representation,
         target: Representation
     ) -> None:
         """
@@ -354,17 +361,19 @@ class PairwiseAnalysis():
         self.source = source
         self.target = target
         self.config = config
-        
+
         self.RDM_source = self.source.sim_mat
         self.RDM_target = self.target.sim_mat
         self.pair_name = f"{source.name} vs {target.name}"
-        
+
         assert self.RDM_source.shape == self.RDM_target.shape, "the shape of sim_mat is not the same."
-        
-        assert np.array_equal(self.source.num_category_list, self.target.num_category_list), "the label information doesn't seem to be the same."
-        
-        assert np.array_equal(self.source.object_labels, self.target.object_labels), "the label information doesn't seem to be the same."
-        
+
+        assert np.array_equal(self.source.num_category_list,
+                              self.target.num_category_list), "the label information doesn't seem to be the same."
+
+        assert np.array_equal(self.source.object_labels,
+                              self.target.object_labels), "the label information doesn't seem to be the same."
+
     def show_both_sim_mats(self):
 
         a = self.RDM_source
@@ -389,9 +398,12 @@ class PairwiseAnalysis():
         b_hist, b_bin = np.histogram(b, bins=100)
 
         plt.figure()
-        plt.title("histogram, source : " + self.source.name + ", target : " + self.target.name)
-        plt.hist(a_bin[:-1], a_bin, weights=a_hist, label=self.source.name, alpha=0.5)
-        plt.hist(b_bin[:-1], b_bin, weights=b_hist, label=self.target.name, alpha=0.5)
+        plt.title("histogram, source : " + self.source.name +
+                  ", target : " + self.target.name)
+        plt.hist(a_bin[:-1], a_bin, weights=a_hist,
+                 label=self.source.name, alpha=0.5)
+        plt.hist(b_bin[:-1], b_bin, weights=b_hist,
+                 label=self.target.name, alpha=0.5)
         plt.grid(True)
         plt.legend(loc="upper left")
         plt.tight_layout()
@@ -400,19 +412,23 @@ class PairwiseAnalysis():
 
     def RSA(self, metric="spearman", method='normal'):
         if method == 'normal':
-            upper_tri_source = self.RDM_source[np.triu_indices(self.RDM_source.shape[0], k=1)]
-            upper_tri_target = self.RDM_target[np.triu_indices(self.RDM_target.shape[0], k=1)]
+            upper_tri_source = self.RDM_source[np.triu_indices(
+                self.RDM_source.shape[0], k=1)]
+            upper_tri_target = self.RDM_target[np.triu_indices(
+                self.RDM_target.shape[0], k=1)]
 
             if metric == "spearman":
                 corr, _ = spearmanr(upper_tri_source, upper_tri_target)
             elif metric == "pearson":
                 corr, _ = pearsonr(upper_tri_source, upper_tri_target)
-        
+
         elif method == 'all':
             if metric == "spearman":
-                corr, _ = spearmanr(self.RDM_source.flatten(), self.RDM_target.flatten())
+                corr, _ = spearmanr(self.RDM_source.flatten(),
+                                    self.RDM_target.flatten())
             elif metric == "pearson":
-                corr, _ = pearsonr(self.RDM_source.flatten(), self.RDM_target.flatten())
+                corr, _ = pearsonr(self.RDM_source.flatten(),
+                                   self.RDM_target.flatten())
 
         return corr
 
@@ -427,24 +443,25 @@ class PairwiseAnalysis():
         matching = SimpleHistogramMatching(self.RDM_source, self.RDM_target)
 
         new_target = matching.simple_histogram_matching()
-        
+
         if return_data:
             return new_target
         else:
             self.RDM_target = new_target
-    
+
     def run_gw(
-        self, 
+        self,
         results_dir,
-        compute_OT = False,
-        OT_format = "default",
-        return_data = False,
-        return_figure = True,
-        visualization_config : VisualizationConfig = VisualizationConfig(), 
-        show_log = False,
-        fig_dir = None, 
-        ticks = None,
-        target_device = None,
+        compute_OT=False,
+        OT_format="default",
+        return_data=False,
+        return_figure=True,
+        visualization_config: VisualizationConfig = VisualizationConfig(),
+        show_log=False,
+        fig_dir=None,
+        ticks=None,
+        filename=None,
+        target_device=None,
     ):
         """
         Main Computation
@@ -455,39 +472,46 @@ class PairwiseAnalysis():
             OT_format = "default",
             return_data = False,
             return_figure = True,
-            visualization_config : VisualizationConfig = VisualizationConfig(), 
+            visualization_config : VisualizationConfig = VisualizationConfig(),
             show_log = False,
-            fig_dir = None, 
+            fig_dir = None,
             ticks = None
-        
+
         Returns:
             OT : Optimal Transportation matrix
-        """      
+        """
         self.OT, df_trial, save_path = self._gw_alignment(
-            results_dir, 
-            compute_OT = compute_OT,
-            target_device = target_device
+            results_dir,
+            compute_OT=compute_OT,
+            filename=filename,
+            target_device=target_device
         )
-        
+
         if fig_dir is None:
             fig_dir = save_path
-        
+
         OT = self._show_OT(
-            title = f"$\Gamma$ ({self.pair_name})", 
-            return_data = return_data,
-            return_figure = return_figure,
-            OT_format = OT_format, 
-            visualization_config = visualization_config, 
-            fig_dir = fig_dir, 
-            ticks = ticks
+            title=f"$\Gamma$ ({self.pair_name})",
+            return_data=return_data,
+            return_figure=return_figure,
+            OT_format=OT_format,
+            visualization_config=visualization_config,
+            fig_dir=fig_dir,
+            ticks=ticks
         )
-        
+
         if show_log:
-            self._get_optimization_log(df_trial, fig_dir = fig_dir)
+            self.get_optimization_log(df_trial, fig_dir=fig_dir)
 
         return OT
-    
-    def _gw_alignment(self, results_dir, compute_OT, target_device = None):
+
+    def _gw_alignment(
+        self,
+        results_dir,
+        compute_OT,
+        filename=None,
+        target_device=None
+    ):
         """_summary_
 
         Args:
@@ -498,48 +522,57 @@ class PairwiseAnalysis():
         Returns:
             _type_: _description_
         """
-        filename = self.config.data_name + " " + self.pair_name
+        if filename is None:
+            filename = self.config.data_name + " " + self.pair_name
 
         save_path = os.path.join(results_dir, filename)
 
-        storage = "sqlite:///" + save_path + "/" + filename + ".db"
-        # storage = 'mysql+pymysql://root:olabGPU61@localhost/GridTest'
-        
-        if not os.path.exists(save_path):            
+        if self.config.storage is not None:
+            # 'mysql+pymysql://root:olabGPU61@localhost/GridTest'
+            storage = self.config.storage
+
+        else:
+            storage = "sqlite:///" + save_path + "/" + filename + ".db"
+            # storage = 'mysql+pymysql://root:olabGPU61@localhost/GridTest'
+
+        if not os.path.exists(save_path):
             if compute_OT != False:
-                warnings.warn("This computing is running for the first time in the 'results_dir'.", UserWarning)
-                
-            compute_OT = True            
-    
+                warnings.warn(
+                    "This computing is running for the first time in the 'results_dir'.", UserWarning)
+
+            compute_OT = True
+
         study = self._run_optimization(
-            filename, 
-            save_path, 
-            storage, 
-            compute_OT, 
+            filename,
+            save_path,
+            storage,
+            compute_OT,
             target_device
         )
-        
+
         best_trial = study.best_trial
         df_trial = study.trials_dataframe()
 
         if self.config.to_types == 'numpy':
-            OT = np.load(save_path + "/" + best_trial.params['initialize'] + f"/gw_{best_trial.number}.npy")
+            OT = np.load(
+                save_path + "/" + best_trial.params['initialize'] + f"/gw_{best_trial.number}.npy")
 
         elif self.config.to_types == "torch":
-            OT = torch.load(save_path +  "/" + best_trial.params['initialize'] + f"/gw_{best_trial.number}.pt")
-            
+            OT = torch.load(
+                save_path + "/" + best_trial.params['initialize'] + f"/gw_{best_trial.number}.pt")
+
             OT = OT.to('cpu').numpy()
-        
+
         return OT, df_trial, save_path
-          
+
     def _run_optimization(
-        self, 
-        filename, 
-        save_path, 
-        storage, 
+        self,
+        filename,
+        save_path,
+        storage,
         compute_OT,
         target_device,
-        n_jobs_for_pairwise_analysis = 1
+        n_jobs_for_pairwise_analysis=1
     ):
         """_summary_
 
@@ -549,10 +582,10 @@ class PairwiseAnalysis():
             storage (_type_): _description_
             compute_OT (_type_): _description_
             target_device (_type_): _description_
-            
-            n_jobs_for_pairwise_analysis (int, optional): Defaults to 1. 
-                When calculating the alignment for a single pair, the optuna specification does not allow for parallel computation to speed up the process. 
-                The implementation itself is possible, however. 
+
+            n_jobs_for_pairwise_analysis (int, optional): Defaults to 1.
+                When calculating the alignment for a single pair, the optuna specification does not allow for parallel computation to speed up the process.
+                The implementation itself is possible, however.
 
         Returns:
             _type_: _description_
@@ -572,7 +605,7 @@ class PairwiseAnalysis():
             storage=storage,
             delete_study=self.config.delete_study,
         )
-        
+
         if compute_OT:
             # distribution in the source space, and target space
             p = ot.unif(len(self.RDM_source))
@@ -589,13 +622,15 @@ class PairwiseAnalysis():
                 n_iter=self.config.n_iter,
                 to_types=self.config.to_types,
             )
-            
-            ### optimization
+
+            # optimization
             # 1. choose the initial matrix for GW alignment computation.
-            init_plans = init_matrix.InitMatrix().implemented_init_plans(self.config.init_plans_list)
+            init_plans = init_matrix.InitMatrix().implemented_init_plans(
+                self.config.init_plans_list)
 
             # used only in grid search sampler below the two lines
-            eps_space = opt.define_eps_space(self.config.eps_list, self.config.eps_log, self.config.num_trial)
+            eps_space = opt.define_eps_space(
+                self.config.eps_list, self.config.eps_log, self.config.num_trial)
             search_space = {"eps": eps_space, "initialize": init_plans}
 
             if target_device == None:
@@ -611,47 +646,56 @@ class PairwiseAnalysis():
                 eps_log=self.config.eps_log,
                 search_space=search_space,
             )
-                
+
         else:
             study = opt.load_study()
-        
+
         return study
-    
-    def _get_optimization_log(self, df_trial, fig_dir):
+
+    def get_optimization_log(self, df_trial, fig_dir):
+        
         # figure plotting epsilon as x-axis and GWD as y-axis
-        sns.scatterplot(data = df_trial, x = "params_eps", y = "value", s = 50)
+        sns.scatterplot(data=df_trial, x="params_eps", y="value", s=50)
         plt.xlabel("$\epsilon$")
         plt.ylabel("GWD")
         if fig_dir is not None:
-            fig_path = os.path.join(fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png")
+            fig_path = os.path.join(
+                fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png")
             plt.savefig(fig_path)
         plt.tight_layout()
         plt.show()
+        plt.close()
 
-        # 　figure plotting GWD as x-axis and accuracy as y-axis
-        sns.scatterplot(data = df_trial, x = "value", y = "user_attrs_best_acc", s = 50)
+        # figure plotting GWD as x-axis and accuracy as y-axis
+        sns.scatterplot(data=df_trial, x="value",
+                        y="user_attrs_best_acc", s=50)
         plt.xlabel("GWD")
         plt.ylabel("accuracy")
         if fig_dir is not None:
-            fig_path = os.path.join(fig_dir, f"Optim_log_acc_GWD_{self.pair_name}.png")
+            fig_path = os.path.join(
+                fig_dir, f"Optim_log_acc_GWD_{self.pair_name}.png")
             plt.savefig(fig_path)
         plt.tight_layout()
         plt.show()
-    
+        plt.close()
+
     def _show_OT(
-        self, 
-        title, 
-        OT_format = "default",
-        return_data = False,
-        return_figure = True,
-        visualization_config : VisualizationConfig = VisualizationConfig(),
-        fig_dir = None,
-        ticks = None
+        self,
+        title,
+        OT_format="default",
+        return_data=False,
+        return_figure=True,
+        visualization_config: VisualizationConfig = VisualizationConfig(),
+        fig_dir=None,
+        ticks=None
     ):
-        
+
         if OT_format == "sorted" or OT_format == "both":
             assert self.source.sorted_sim_mat is not None, "No label info to sort the 'sim_mat'."
-            OT_sorted = self.source.func_for_sort_sim_mat(self.OT, category_idx_list=self.source.category_idx_list)
+            OT_sorted = self.source.func_for_sort_sim_mat(
+                self.OT, 
+                category_idx_list=self.source.category_idx_list
+            )
 
         if return_figure:
             save_file = self.config.data_name + " " + self.pair_name
@@ -662,26 +706,27 @@ class PairwiseAnalysis():
 
             if OT_format == "default" or OT_format == "both":
                 visualize_functions.show_heatmap(
-                    self.OT, 
-                    title = title, 
-                    save_file_name = fig_path, 
+                    self.OT,
+                    title=title,
+                    save_file_name=fig_path,
                     **visualization_config()
                 )
 
             elif OT_format == "sorted" or OT_format == "both":
                 visualize_functions.show_heatmap(
                     OT_sorted,
-                    title = title,
-                    save_file_name = fig_path,
-                    ticks = ticks,
-                    category_name_list = self.source.category_name_list,
-                    num_category_list = self.source.num_category_list,
-                    object_labels = self.source.object_labels,
+                    title=title,
+                    save_file_name=fig_path,
+                    ticks=ticks,
+                    category_name_list=self.source.category_name_list,
+                    num_category_list=self.source.num_category_list,
+                    object_labels=self.source.object_labels,
                     **visualization_config()
                 )
 
             else:
-                raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
+                raise ValueError(
+                    "OT_format must be either 'default', 'sorted', or 'both'.")
 
         if return_data:
             if OT_format == "default":
@@ -694,9 +739,10 @@ class PairwiseAnalysis():
                 return self.OT, OT_sorted
 
             else:
-                raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
+                raise ValueError(
+                    "OT_format must be either 'default', 'sorted', or 'both'.")
 
-    def calc_category_level_accuracy(self, category_mat:pd.DataFrame):
+    def calc_category_level_accuracy(self, category_mat: pd.DataFrame):
         category_mat = category_mat.values
         count = 0
 
@@ -723,17 +769,21 @@ class PairwiseAnalysis():
         for k in top_k_list:
             if eval_type == "k_nearest":
                 if not barycenter:
-                    new_embedding_source = self.procrustes(self.target.embedding, self.source.embedding, OT)
+                    new_embedding_source = self.procrustes(
+                        self.target.embedding, self.source.embedding, OT)
                 else:
                     new_embedding_source = self.source.embedding
 
                 # Compute distances between each points
-                dist_mat = distance.cdist(self.target.embedding, new_embedding_source, metric)
+                dist_mat = distance.cdist(
+                    self.target.embedding, new_embedding_source, metric)
 
-                acc = self._calc_accuracy_with_topk_diagonal(dist_mat, k=k, order="minimum")
+                acc = self._calc_accuracy_with_topk_diagonal(
+                    dist_mat, k=k, order="minimum")
 
             elif eval_type == "ot_plan":
-                acc = self._calc_accuracy_with_topk_diagonal(OT, k=k, order="maximum")
+                acc = self._calc_accuracy_with_topk_diagonal(
+                    OT, k=k, order="maximum")
 
             acc_list.append(acc)
 
@@ -751,7 +801,8 @@ class PairwiseAnalysis():
         elif order == "minimum":
             topk_values = np.partition(matrix, k - 1)[:, :k]
         else:
-            raise ValueError("Invalid order parameter. Must be 'maximum' or 'minimum'.")
+            raise ValueError(
+                "Invalid order parameter. Must be 'maximum' or 'minimum'.")
 
         # Count the number of rows where the diagonal is in the top k values
         count = np.sum(np.isin(diagonal, topk_values))
@@ -777,7 +828,8 @@ class PairwiseAnalysis():
         """
         # assert self.source.shuffle == False, "you cannot use procrustes method if 'shuffle' is True."
 
-        U, S, Vt = np.linalg.svd(np.matmul(embedding_sourse.T, np.matmul(OT, embedding_target)))
+        U, S, Vt = np.linalg.svd(
+            np.matmul(embedding_sourse.T, np.matmul(OT, embedding_target)))
         Q = np.matmul(U, Vt)
         new_embedding_sourse = np.matmul(embedding_sourse, Q)
 
@@ -787,12 +839,12 @@ class PairwiseAnalysis():
         a = ot.unif(len(self.source.embedding))
         b = ot.unif(len(self.target.embedding))
 
-        M = distance.cdist(self.source.embedding, self.target.embedding, metric=metric)
+        M = distance.cdist(self.source.embedding,
+                           self.target.embedding, metric=metric)
 
         self.OT, log = ot.emd(a, b, M, log=True)
 
         return log["cost"]
-
 
     def get_new_source_embedding(self):
         return self.procrustes(self.target.embedding, self.source.embedding, self.OT)
@@ -808,8 +860,8 @@ class AlignRepresentations:
         self,
         config: OptimizationConfig,
         representations_list: List[Representation],
-        histogram_matching = False,
-        pair_number_list="all",
+        histogram_matching=False,
+        pair_number_list : Union[str, List[List[int]]] = "all",
         metric="cosine",
     ) -> None:
         """
@@ -821,47 +873,47 @@ class AlignRepresentations:
         self.metric = metric
         self.representations_list = representations_list
         self.histogram_matching = histogram_matching
-        
-        self.pairwise_list = self._get_pairwise_list()
+
+        self.pairwise_list = self._get_pairwise_list(pair_number_list)
         self.RSA_corr = dict()
 
+    def _get_pairwise_list(self, pair_number_list) -> List[PairwiseAnalysis]:
         if pair_number_list == "all":
-            pair_number_list = range(len(self.pairwise_list))
+            pairs = itertools.combinations(range(len(self.representations_list)), 2)
+        else:
+            pairs = pair_number_list
 
-        self.pair_number_list = pair_number_list
-
-    def _get_pairwise_list(self) -> List[PairwiseAnalysis]:
-        pairs = itertools.combinations(self.representations_list, 2)
-
-        pairwise_list = list()
+        pairwise_list = []
         for i, pair in enumerate(pairs):
-            s, t = pair
+            s = self.representations_list[pair[0]]
+            t = self.representations_list[pair[1]]
+
             pairwise = PairwiseAnalysis(config=self.config, source=s, target=t)
-            
+
             print(f"Pair number {i} : {pairwise.pair_name}")
-            
+
             if self.histogram_matching:
                 pairwise.match_sim_mat_distribution()
-            
+
             # pairwise.show_both_sim_mats()
-            
+
             pairwise_list.append(pairwise)
-           
+
         return pairwise_list
 
     def RSA_get_corr(self, metric="spearman", method='normal'):
         for pairwise in self.pairwise_list:
-            corr = pairwise.RSA(metric = metric, method = method)
+            corr = pairwise.RSA(metric=metric, method=method)
             self.RSA_corr[pairwise.pair_name] = corr
             print(f"Correlation {pairwise.pair_name} : {corr}")
-    
+
     def show_sim_mat(
-        self, 
-        sim_mat_format = "default", 
-        visualization_config : VisualizationConfig = VisualizationConfig(), 
-        fig_dir = None, 
-        show_distribution = True, 
-        ticks = None
+        self,
+        sim_mat_format="default",
+        visualization_config: VisualizationConfig = VisualizationConfig(),
+        fig_dir=None,
+        show_distribution=True,
+        ticks=None
     ):
         """_summary_
 
@@ -874,58 +926,58 @@ class AlignRepresentations:
         """
         for representation in self.representations_list:
             representation.show_sim_mat(
-                sim_mat_format = sim_mat_format,
-                visualization_config = visualization_config,
-                fig_dir = fig_dir,
-                ticks = ticks
+                sim_mat_format=sim_mat_format,
+                visualization_config=visualization_config,
+                fig_dir=fig_dir,
+                ticks=ticks
             )
-            
+
             if show_distribution:
-                representation.show_sim_mat_distribution(**visualization_config())
-    
+                representation.show_sim_mat_distribution(
+                    **visualization_config())
+
     def _single_computation(
-        self, 
+        self,
         results_dir,
-        compute_OT = False,
-        return_data = False,
-        return_figure = True,
-        OT_format = "default", 
-        visualization_config : VisualizationConfig = VisualizationConfig(),
-        show_log = False,
-        fig_dir = None,
-        ticks = None,
+        compute_OT=False,
+        return_data=False,
+        return_figure=True,
+        OT_format="default",
+        visualization_config: VisualizationConfig = VisualizationConfig(),
+        show_log=False,
+        fig_dir=None,
+        ticks=None,
     ):
-        
+
         OT_list = []
-        for pair_number in self.pair_number_list:
-            pairwise = self.pairwise_list[pair_number]
+        for pairwise in self.pairwise_list:
             OT = pairwise.run_gw(
-                results_dir = results_dir,
-                compute_OT = compute_OT,
-                return_data = return_data,
-                return_figure = return_figure,
-                OT_format = OT_format,
-                visualization_config = visualization_config,
-                show_log = show_log,
-                fig_dir = fig_dir, 
-                ticks = ticks
+                results_dir=results_dir,
+                compute_OT=compute_OT,
+                return_data=return_data,
+                return_figure=return_figure,
+                OT_format=OT_format,
+                visualization_config=visualization_config,
+                show_log=show_log,
+                fig_dir=fig_dir,
+                ticks=ticks
             )
-            
+
             OT_list.append(OT)
-        
+
         return OT_list
-        
+
     def gw_alignment(
-        self, 
+        self,
         results_dir,
-        compute_OT = False,
-        return_data = False,
-        return_figure = True,
-        OT_format = "default", 
-        visualization_config : VisualizationConfig = VisualizationConfig(),
-        show_log = False,
-        fig_dir = None,
-        ticks = None,
+        compute_OT=False,
+        return_data=False,
+        return_figure=True,
+        OT_format="default",
+        visualization_config: VisualizationConfig = VisualizationConfig(),
+        show_log=False,
+        fig_dir=None,
+        ticks=None,
     ):
         """_summary_
 
@@ -939,108 +991,115 @@ class AlignRepresentations:
             show_log (bool, optional): _description_. Defaults to False.
             fig_dir (_type_, optional): _description_. Defaults to None.
             ticks (_type_, optional): _description_. Defaults to None.
-            use_parallel (bool, optional): _description_. Defaults to False.
-            parallel_method (str, optional): _description_. Defaults to "multiprocess".
-            multi_gpu (bool | List[int], optional): _description_. Defaults to False.
+
+        Raises:
+            ValueError: _description_
 
         Returns:
             _type_: _description_
         """
-        
-        if self.config.use_parallel:
+
+        if self.config.n_jobs > 1:
             OT_list = []
             processes = []
-            
+
             if self.config.parallel_method == "multiprocess":
                 pool = ProcessPoolExecutor(self.config.n_jobs)
-            
+
             elif self.config.parallel_method == "multithread":
                 pool = ThreadPoolExecutor(self.config.n_jobs)
-            
+
             else:
-                raise ValueError("please choose 'multiprocess' or 'multithread'. ")
-            
+                raise ValueError(
+                    "please choose 'multiprocess' or 'multithread'. ")
+
             with pool:
-                for pair_number in self.pair_number_list:
-                    
+                for pair_number in range(len(self.pairwise_list)):
+
                     if self.config.multi_gpu:
-                        target_device = 'cuda:' + str(pair_number % torch.cuda.device_count())
+                        target_device = 'cuda:' + \
+                            str(pair_number % torch.cuda.device_count())
                     else:
                         target_device = self.config.device
-                    
+
                     if isinstance(self.config.multi_gpu, list):
                         gpu_idx = pair_number % len(self.config.multi_gpu)
-                        target_device = 'cuda:' + str(self.config.multi_gpu[gpu_idx])
-                    
+                        target_device = 'cuda:' + \
+                            str(self.config.multi_gpu[gpu_idx])
+
                     pairwise = self.pairwise_list[pair_number]
-                    
+
                     if self.config.to_types == 'numpy':
-                        assert self.config.multi_gpu == False, "numpy doesn't use GPU. Please 'multi_GPU = False'."
+                        if self.config.multi_gpu != False:
+                            warnings.warn("numpy doesn't use GPU. Please 'multi_GPU = False'.", UserWarning)
                         target_device = self.config.device
-                
+
                     future = pool.submit(
                         pairwise.run_gw,
-                        results_dir = results_dir,
-                        compute_OT = compute_OT,
-                        return_data = return_data,
-                        return_figure = False,
-                        OT_format = OT_format,
-                        visualization_config = visualization_config,
-                        show_log = show_log,
-                        fig_dir = fig_dir, 
-                        ticks = ticks,
-                        target_device = target_device,
+                        results_dir=results_dir,
+                        compute_OT=compute_OT,
+                        return_data=return_data,
+                        return_figure=False,
+                        OT_format=OT_format,
+                        visualization_config=visualization_config,
+                        show_log=show_log,
+                        fig_dir=fig_dir,
+                        ticks=ticks,
+                        target_device=target_device,
                     )
-                    
+
                     processes.append(future)
-                    
+
                 for future in as_completed(processes):
                     OT = future.result()
                     OT_list.append(OT)
-                
+
             if return_figure:
                 self._single_computation(
-                    results_dir = results_dir,
-                    compute_OT = False,
-                    return_data = False,
-                    return_figure = True,
-                    OT_format = OT_format,
-                    visualization_config = visualization_config,
-                    show_log = show_log,
-                    fig_dir = fig_dir, 
-                    ticks = ticks
+                    results_dir=results_dir,
+                    compute_OT=False,
+                    return_data=False,
+                    return_figure=True,
+                    OT_format=OT_format,
+                    visualization_config=visualization_config,
+                    show_log=show_log,
+                    fig_dir=fig_dir,
+                    ticks=ticks
                 )
-                
-        if not self.config.use_parallel:
+
+        if self.config.n_jobs == 1:
             OT_list = self._single_computation(
-                results_dir = results_dir,
-                compute_OT = compute_OT,
-                return_data = return_data,
-                return_figure = return_figure,
-                OT_format = OT_format,
-                visualization_config = visualization_config,
-                show_log = show_log,
-                fig_dir = fig_dir, 
-                ticks = ticks
+                results_dir=results_dir,
+                compute_OT=compute_OT,
+                return_data=return_data,
+                return_figure=return_figure,
+                OT_format=OT_format,
+                visualization_config=visualization_config,
+                show_log=show_log,
+                fig_dir=fig_dir,
+                ticks=ticks
             )
-        
+
         if return_data:
             return OT_list
 
     def calc_barycenter(self, X_init=None):
-        embedding_list = [representation.embedding for representation in self.representations_list]
+        embedding_list = [
+            representation.embedding for representation in self.representations_list]
 
         if X_init is None:
-            X_init = np.mean(embedding_list, axis=0) # initial Dirac locations
+            X_init = np.mean(embedding_list, axis=0)  # initial Dirac locations
 
-        b = ot.unif(len(X_init)) # weights of the barycenter
+        b = ot.unif(len(X_init))  # weights of the barycenter
 
-        weights_list = []# measures weights
+        weights_list = []  # measures weights
         for representation in self.representations_list:
             weights = ot.unif(len(representation.embedding))
             weights_list.append(weights)
 
-        X = ot.lp.free_support_barycenter(embedding_list, weights_list, X_init, b) # # new location of the barycenter
+        # new location of the barycenter
+        X = ot.lp.free_support_barycenter(
+            embedding_list, weights_list, X_init, b)
 
         return X
 
@@ -1053,7 +1112,7 @@ class AlignRepresentations:
         return_data=False,
         return_figure=True,
         OT_format="default",
-        visualization_config:VisualizationConfig=VisualizationConfig(),
+        visualization_config: VisualizationConfig = VisualizationConfig(),
         show_log=False,
         fig_dir=None,
         ticks=None
@@ -1061,14 +1120,16 @@ class AlignRepresentations:
 
         assert self.pair_number_list == range(len(self.pairwise_list))
 
-        ### Select the pivot
+        # Select the pivot
         pivot_representation = self.representations_list[pivot]
-        others_representaions = self.representations_list[:pivot] + self.representations_list[pivot + 1:]
+        others_representaions = self.representations_list[:pivot] + \
+            self.representations_list[pivot + 1:]
 
-        ### GW alignment to the pivot
+        # GW alignment to the pivot
         # ここの部分はあとでself.gw_alignmentの中に組み込む
         for representation in others_representaions:
-            pairwise = PairwiseAnalysis(config=self.config, source=representation, target=pivot_representation)
+            pairwise = PairwiseAnalysis(
+                config=self.config, source=representation, target=pivot_representation)
 
             pairwise.run_gw(
                 results_dir=results_dir,
@@ -1084,7 +1145,7 @@ class AlignRepresentations:
 
             pairwise.source.embedding = pairwise.get_new_source_embedding()
 
-        ### Set up barycenter
+        # Set up barycenter
         init_embedding = self.calc_barycenter()
         self.barycenter = Representation(
             name="barycenter",
@@ -1093,17 +1154,19 @@ class AlignRepresentations:
             category_name_list=self.representations_list[0].category_name_list
         )
 
-        ### Set pairwises whose target is the barycenter
+        # Set pairwises whose target is the barycenter
         pairwise_barycenters = []
         for representation in self.representations_list:
-            pairwise = PairwiseAnalysis(config=self.config, source=representation, target=self.barycenter)
+            pairwise = PairwiseAnalysis(
+                config=self.config, source=representation, target=self.barycenter)
             pairwise_barycenters.append(pairwise)
 
-        ### Barycenter alignment
+        # Barycenter alignment
         loss_list = []
         embedding_barycenter = init_embedding
         for i in range(n_iter):
-            embedding_barycenter = self.calc_barycenter(X_init=embedding_barycenter)
+            embedding_barycenter = self.calc_barycenter(
+                X_init=embedding_barycenter)
 
             loss = 0
             for pairwise in pairwise_barycenters:
@@ -1124,20 +1187,20 @@ class AlignRepresentations:
         plt.xlabel("iteration")
         plt.ylabel("Mean Wasserstein distance")
 
-        ### replace OT of each pairwise by the product of OTs to the barycenter
+        # replace OT of each pairwise by the product of OTs to the barycenter
         self._get_OT_all_pair(pairwise_barycenters)
 
-        ### visualize
+        # visualize
         OT_list = []
         for pairwise in self.pairwise_list:
             OT = pairwise._show_OT(
-                title = f"$\Gamma$ ({pairwise.pair_name})",
+                title=f"$\Gamma$ ({pairwise.pair_name})",
                 return_data=return_data,
                 return_figure=return_figure,
-                OT_format = OT_format,
-                visualization_config = visualization_config,
-                fig_dir = fig_dir,
-                ticks = ticks
+                OT_format=OT_format,
+                visualization_config=visualization_config,
+                fig_dir=fig_dir,
+                ticks=ticks
             )
             OT_list.append(OT)
 
@@ -1150,16 +1213,16 @@ class AlignRepresentations:
 
         for i, (pairwise_1, pairwise_2) in enumerate(pairs):
             OT = np.matmul(pairwise_2.OT, pairwise_1.OT.T)
-            OT *= len(OT) # normalize
+            OT *= len(OT)  # normalize
             self.pairwise_list[i].OT = OT
 
     def calc_accuracy(self, top_k_list, eval_type="ot_plan", barycenter=False):
         accuracy = pd.DataFrame()
         accuracy["top_n"] = top_k_list
 
-        for pair_number in self.pair_number_list:
-            pairwise = self.pairwise_list[pair_number]
-            df = pairwise.eval_accuracy(top_k_list, eval_type=eval_type, metric=self.metric, barycenter=barycenter)
+        for pairwise in self.pairwise_list:
+            df = pairwise.eval_accuracy(
+                top_k_list, eval_type=eval_type, metric=self.metric, barycenter=barycenter)
 
             accuracy = pd.merge(accuracy, df, on="top_n")
 
@@ -1176,18 +1239,17 @@ class AlignRepresentations:
         print("Mean : \n", accuracy.iloc[:, 1:].mean(axis="columns"))
 
     def calc_category_level_accuracy(
-        self, 
-        barycenter=False,
-        make_hist=False, 
-        fig_dir=None, 
-        fig_name="Category_level_accuracy.png", 
+        self,
+        make_hist=False,
+        fig_dir=None,
+        fig_name="Category_level_accuracy.png",
         category_mat=None
     ):
-        
+
         acc_list = []
-        for pairnumber in self.pair_number_list:
-            pairwise = self.pairwise_list[pairnumber]
-            acc = pairwise.calc_category_level_accuracy(category_mat=category_mat)
+        for pairwise in self.pairwise_list:
+            acc = pairwise.calc_category_level_accuracy(
+                category_mat=category_mat)
             print(f"{pairwise.pair_name} :  {acc}")
             acc_list.append(acc)
 
@@ -1203,26 +1265,27 @@ class AlignRepresentations:
 
         cols = [col for col in df.columns if "top_n" not in col]
         df = df[cols]
-        
+
         if concat:
             df = pd.concat([df[i] for i in df.columns], axis=0)
             df = df.rename("matching rate")
         return df
 
     def plot_accuracy(
-        self, 
+        self,
         eval_type="ot_plan",
-        fig_dir=None, 
-        fig_name="Accuracy_ot_plan.png", 
+        fig_dir=None,
+        fig_name="Accuracy_ot_plan.png",
         scatter=True
     ):
         plt.figure(figsize=(5, 3))
 
         if scatter:
-            df = self._get_dataframe(eval_type, concat=True) 
+            df = self._get_dataframe(eval_type, concat=True)
             sns.set_style("darkgrid")
             sns.set_palette("pastel")
-            sns.swarmplot(data=pd.DataFrame(df), x="top_n", y="matching rate", size=5, dodge=True)
+            sns.swarmplot(data=pd.DataFrame(df), x="top_n",
+                          y="matching rate", size=5, dodge=True)
 
         else:
             df = self._get_dataframe(eval_type, concat=False)
@@ -1245,16 +1308,16 @@ class AlignRepresentations:
     def visualize_embedding(
         self,
         dim,
-        pivot = 0,
-        returned = "figure",
-        visualization_config : VisualizationConfig = VisualizationConfig(),
-        category_name_list = None,
-        num_category_list = None,
-        category_idx_list = None,
-        title = None,
-        legend = True,
-        fig_dir = None,
-        fig_name = "Aligned_embedding.png"
+        pivot=0,
+        returned="figure",
+        visualization_config: VisualizationConfig = VisualizationConfig(),
+        category_name_list=None,
+        num_category_list=None,
+        category_idx_list=None,
+        title=None,
+        legend=True,
+        fig_dir=None,
+        fig_name="Aligned_embedding.png"
     ):
         """_summary_
 
@@ -1287,7 +1350,7 @@ class AlignRepresentations:
                 pair.source.embedding = pair.get_new_source_embedding()
 
         else:
-            assert(self.barycenter is not None)
+            assert (self.barycenter is not None)
 
         name_list = []
         embedding_list = []
@@ -1303,14 +1366,15 @@ class AlignRepresentations:
                     category_idx_list = self.representations_list[0].category_idx_list
 
             visualize_embedding = visualize_functions.VisualizeEmbedding(
-                embedding_list = embedding_list,
-                dim = dim,
-                category_name_list = category_name_list,
-                num_category_list = num_category_list,
-                category_idx_list = category_idx_list
+                embedding_list=embedding_list,
+                dim=dim,
+                category_name_list=category_name_list,
+                num_category_list=num_category_list,
+                category_idx_list=category_idx_list
             )
 
-            visualize_embedding.plot_embedding(name_list = name_list, title = title, legend = legend, save_dir = fig_path, **visualization_config())
+            visualize_embedding.plot_embedding(
+                name_list=name_list, title=title, legend=legend, save_dir=fig_path, **visualization_config())
 
         elif returned == "row_data":
             return embedding_list
