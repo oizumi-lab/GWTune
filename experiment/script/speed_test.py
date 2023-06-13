@@ -1,6 +1,6 @@
 # %%
 import os, sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
 
 os.chdir(os.path.dirname(__file__))
 
@@ -34,19 +34,19 @@ class SpeedTest():
             _type_: _description_
         """
         if self.data_select == 'DNN':
-            path1 = '../data/model1.pt'
-            path2 = '../data/model2.pt'
+            path1 = '../../data/model1.pt'
+            path2 = '../../data/model2.pt'
             C1 = torch.load(path1)
             C2 = torch.load(path2)
         elif self.data_select == 'color':
-            data_path = '../data/num_groups_5_seed_0_fill_val_3.5.pickle'
+            data_path = '../../data/num_groups_5_seed_0_fill_val_3.5.pickle'
             with open(data_path, "rb") as f:
                 data = pkl.load(f)
             sim_mat_list = data["group_ave_mat"]
             C1 = sim_mat_list[0]
             C2 = sim_mat_list[1]
         elif self.data_select == 'face':
-            data_path = '../data/faces_GROUP_interp.mat'
+            data_path = '../../data/faces_GROUP_interp.mat'
             mat_dic = scipy.io.loadmat(data_path)
             C1 = mat_dic["group_mean_ATTENDED"]
             C2 = mat_dic["group_mean_UNATTENDED"]
@@ -78,7 +78,7 @@ class SpeedTest():
             Tprev = T
             # compute the gradient
             tens = ot.gromov.gwggrad(constC, hC1, hC2, T)
-            T = ot.bregman.sinkhorn(p, q, tens, epsilon, method = 'sinkhorn')
+            T = ot.bregman.sinkhorn(p, q, tens, epsilon, method = 'sinkhorn_log')
 
             if cpt % 10 == 0:
                 err = nx.norm(T - Tprev)
@@ -155,6 +155,7 @@ class SpeedTest():
         elif self.data_select == 'DNN':
             epsilon = 6e-4
         
+        print("data_select:", self.data_select)
         numpy_cpu_log, numpy_cpu_end = self.time_test(epsilon, device='cpu', to_types='numpy')
         torch_cpu_log, torch_cpu_end = self.time_test(epsilon, device='cpu', to_types='torch')
         torch_gpu_log, torch_gpu_end = self.time_test(epsilon, device='cuda', to_types='torch')
@@ -172,7 +173,7 @@ class SpeedTest():
 
 # %%
 if __name__ == '__main__':
-    data_select = 'color'
+    data_select = 'face'
     tgw = SpeedTest(data_select)
     tgw.comparison()
 
