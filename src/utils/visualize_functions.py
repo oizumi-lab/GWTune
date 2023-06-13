@@ -97,7 +97,6 @@ def show_heatmap(
     **kwargs
 ):
     figsize = kwargs.get('figsize', (8, 6))
-    cbar_size = kwargs.get("cbar_size", 0.8)
     cbar_ticks_size = kwargs.get("cbar_ticks_size", 20)
     ticks_size = kwargs.get('ticks_size', 20)
     xticks_rotation = kwargs.get('xticks_rotation', 90)
@@ -151,7 +150,9 @@ def show_heatmap(
     divider = make_axes_locatable(ax) 
     cax = divider.append_axes("right", size="5%", pad=0.1)
 
-    fig.colorbar(aximg, cax=cax)
+    cbar = fig.colorbar(aximg, cax=cax)
+    
+    cbar.ax.tick_params(axis='y', labelsize = cbar_ticks_size)
   
     plt.xlabel(xlabel, size = xlabel_size)
     plt.ylabel(ylabel, size = ylabel_size)
