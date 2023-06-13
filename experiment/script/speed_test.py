@@ -155,6 +155,7 @@ class SpeedTest():
         elif self.data_select == 'DNN':
             epsilon = 6e-4
         
+        print("data_select:", self.data_select)
         numpy_cpu_log, numpy_cpu_end = self.time_test(epsilon, device='cpu', to_types='numpy')
         torch_cpu_log, torch_cpu_end = self.time_test(epsilon, device='cpu', to_types='torch')
         torch_gpu_log, torch_gpu_end = self.time_test(epsilon, device='cuda', to_types='torch')
@@ -172,7 +173,7 @@ class SpeedTest():
 
 # %%
 if __name__ == '__main__':
-    data_select = 'DNN'
+    data_select = 'face'
     tgw = SpeedTest(data_select)
     tgw.comparison()
 

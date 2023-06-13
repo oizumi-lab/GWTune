@@ -145,7 +145,7 @@ class Backend():
         #         return jax.device_put(args, cpus[0])
 
         elif isinstance(args, torch.Tensor):
-            return args.to(device).double()
+            return args.to(device).float()#.double()
 
         else:
             raise ValueError("Unknown type of non implemented here.")
