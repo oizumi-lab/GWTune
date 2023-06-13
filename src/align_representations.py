@@ -28,6 +28,7 @@ class OptimizationConfig:
         eps_list=[1, 10],
         eps_log=True,
         num_trial=4,
+        sinkhorn_method='sinkhorn',
         device="cpu",
         to_types="numpy",
         n_jobs=1,
@@ -78,6 +79,7 @@ class OptimizationConfig:
         self.eps_list = eps_list
         self.eps_log = eps_log
         self.num_trial = num_trial
+        self.sinkhorn_method = sinkhorn_method
         
         self.to_types = to_types
         self.device = device
@@ -634,6 +636,7 @@ class PairwiseAnalysis():
                 max_iter=self.config.max_iter,
                 n_iter=self.config.n_iter,
                 to_types=self.config.to_types,
+                sinkhorn_method=self.config.sinkhorn_method,
             )
 
             # optimization
