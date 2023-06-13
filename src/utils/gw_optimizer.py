@@ -198,7 +198,13 @@ class RunOptuna:
             self._confirm_delete()
         
         objective_device = functools.partial(objective, device=device)
-        study = self.load_study(seed=seed)
+        
+        try:
+            study = self.load_study(seed=seed)
+        except KeyError:
+            print("Study not found, creating a new one.")
+            self.create_study()
+            study = self.load_study(seed=seed)
         
         if self.n_jobs > 1:
             warnings.filterwarnings("always")  

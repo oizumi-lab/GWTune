@@ -33,7 +33,8 @@ class GW_Alignment:
         max_iter=1000, 
         numItermax=1000, 
         n_iter=100,
-        to_types="torch"
+        to_types="torch",
+        sinkhorn_method="sinkhorn",
     ):
         """
         2023/3/6 大泉先生
@@ -47,6 +48,7 @@ class GW_Alignment:
         初期値ランダムで複数: 乱数
         """
         self.to_types = to_types
+        self.sinkhorn_method = sinkhorn_method
         self.size = len(p)
 
         self.save_path = save_path
@@ -101,7 +103,11 @@ class GW_Alignment:
         2.  Compute GW alignment with hyperparameters defined above.
         """
         gw, logv, gw_loss, init_mat, trial = self.main_compute.compute_GW_with_init_plans(
-            trial, eps, init_mat_plan, device
+            trial, 
+            eps, 
+            init_mat_plan, 
+            device, 
+            sinkhorn_method = self.sinkhorn_method
         )
 
         """
@@ -208,7 +214,8 @@ class MainGromovWasserstainComputation:
         max_iter=1000, 
         numItermax=1000, 
         tol=1e-9, 
-        trial=None, 
+        trial=None,
+        sinkhorn_method="sinkhorn",
         log=True, 
         verbose=False
     ):
@@ -241,7 +248,7 @@ class MainGromovWasserstainComputation:
             Tprev = T
             # compute the gradient
             tens = ot.gromov.gwggrad(constC, hC1, hC2, T)
-            T = ot.bregman.sinkhorn(p, q, tens, epsilon, method="sinkhorn", numItermax=numItermax)
+            T = ot.bregman.sinkhorn(p, q, tens, epsilon, method=sinkhorn_method, numItermax=numItermax)
 
             if cpt % 10 == 0:
                 # err_prev = copy.copy(err)　#ここは使われていないようなので、一旦コメントアウトしました (2023.3.16 佐々木)
@@ -261,7 +268,17 @@ class MainGromovWasserstainComputation:
         else:
             return T
 
-    def gw_alignment_computation(self, init_mat_plan, eps, max_iter, numItermax, device, trial=None, seed=42):
+    def gw_alignment_computation(
+        self, 
+        init_mat_plan, 
+        eps, 
+        max_iter, 
+        numItermax, 
+        device, 
+        trial=None, 
+        seed=42,
+        sinkhorn_method="sinkhorn",
+    ):
         """
         2023.3.17 佐々木
         gw_alignmentの計算を行う。ここのメソッドは変更しない方がいいと思う。
@@ -269,7 +286,17 @@ class MainGromovWasserstainComputation:
         """
 
         init_mat = self.init_mat_builder.make_initial_T(init_mat_plan, seed)
-        gw, logv = self.entropic_gw(device, eps, init_mat, max_iter=max_iter, numItermax=numItermax, trial=trial)
+        
+        gw, logv = self.entropic_gw(
+            device, 
+            eps, 
+            init_mat, 
+            max_iter=max_iter, 
+            numItermax=numItermax,
+            trial=trial, 
+            sinkhorn_method=sinkhorn_method,
+        )
+        
         gw_loss = logv["gw_dist"]
 
         if self.back_end.check_zeros(gw):
@@ -326,7 +353,14 @@ class MainGromovWasserstainComputation:
                 f"Trial was pruned at iteration {num_iter} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}"
             )
 
-    def compute_GW_with_init_plans(self, trial, eps, init_mat_plan, device):
+    def compute_GW_with_init_plans(
+        self, 
+        trial,
+        eps, 
+        init_mat_plan, 
+        device, 
+        sinkhorn_method = "sinkhorn"
+    ):
         """
         2023.3.17 佐々木
         uniform, diagでも、prunerを使うこともできるが、いまのところはコメントアウトしている。
@@ -343,7 +377,12 @@ class MainGromovWasserstainComputation:
 
         if init_mat_plan in ["uniform", "diag"]:
             gw, logv, gw_loss, acc, init_mat = self.gw_alignment_computation(
-                init_mat_plan, eps, self.max_iter, self.numItermax, device
+                init_mat_plan, 
+                eps, 
+                self.max_iter, 
+                self.numItermax, 
+                device, 
+                sinkhorn_method=sinkhorn_method,
             )
             trial = self._save_results(gw_loss, acc, trial, init_mat_plan)
             self._check_pruner_should_work(gw_loss, trial, init_mat_plan, eps)
@@ -357,7 +396,13 @@ class MainGromovWasserstainComputation:
 
             for i, seed in enumerate(pbar):
                 c_gw, c_logv, c_gw_loss, c_acc, c_init_mat = self.gw_alignment_computation(
-                    init_mat_plan, eps, self.max_iter, self.numItermax, device, seed=seed
+                    init_mat_plan, 
+                    eps, 
+                    self.max_iter, 
+                    self.numItermax, 
+                    device, 
+                    seed=seed, 
+                    sinkhorn_method=sinkhorn_method,
                 )
 
                 if c_gw_loss < best_gw_loss:
