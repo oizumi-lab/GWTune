@@ -14,9 +14,8 @@ import torch
 from tqdm.auto import tqdm
 
 # warnings.simplefilter("ignore")
-
-from .utils.backend import Backend
-from .utils.init_matrix import InitMatrix
+from utils.backend import Backend
+from utils.init_matrix import InitMatrix
 
 # nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
 
@@ -24,16 +23,7 @@ from .utils.init_matrix import InitMatrix
 # %%
 class GW_Alignment:
     def __init__(
-        self, 
-        pred_dist, 
-        target_dist, 
-        p, 
-        q, 
-        save_path, 
-        max_iter=1000, 
-        numItermax=1000, 
-        n_iter=100,
-        to_types="torch"
+        self, pred_dist, target_dist, p, q, save_path, max_iter=1000, numItermax=1000, n_iter=100, to_types="torch"
     ):
         """
         2023/3/6 大泉先生
@@ -169,18 +159,8 @@ class GW_Alignment:
 
 
 class MainGromovWasserstainComputation:
-    def __init__(
-        self, 
-        pred_dist, 
-        target_dist, 
-        p, 
-        q, 
-        to_types, 
-        max_iter=1000, 
-        numItermax=1000, 
-        n_iter=100
-    ) -> None:
-        
+    def __init__(self, pred_dist, target_dist, p, q, to_types, max_iter=1000, numItermax=1000, n_iter=100) -> None:
+
         self.to_types = to_types
 
         self.pred_dist, self.target_dist, self.p, self.q = pred_dist, target_dist, p, q
@@ -201,16 +181,7 @@ class MainGromovWasserstainComputation:
         self.back_end = Backend("cpu", self.to_types)  # 並列計算をしない場合は、こちらにおいた方がはやい。(2023.4.19 佐々木)
 
     def entropic_gw(
-        self, 
-        device, 
-        epsilon,
-        T, 
-        max_iter=1000, 
-        numItermax=1000, 
-        tol=1e-9, 
-        trial=None, 
-        log=True, 
-        verbose=False
+        self, device, epsilon, T, max_iter=1000, numItermax=1000, tol=1e-9, trial=None, log=True, verbose=False
     ):
         """
         2023.3.16 佐々木
@@ -368,15 +339,8 @@ class MainGromovWasserstainComputation:
                         c_acc,
                         c_init_mat,
                     )
-                    
-                    trial = self._save_results(
-                        best_gw_loss, 
-                        best_acc, 
-                        trial, 
-                        init_mat_plan, 
-                        num_iter=i, 
-                        seed=seed
-                    )
+
+                    trial = self._save_results(best_gw_loss, best_acc, trial, init_mat_plan, num_iter=i, seed=seed)
 
                 self._check_pruner_should_work(c_gw_loss, trial, init_mat_plan, eps, num_iter=i)
 
