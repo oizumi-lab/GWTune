@@ -549,7 +549,9 @@ class PairwiseAnalysis():
         if not os.path.exists(save_path):
             if compute_OT != False:
                 warnings.warn(
-                    "This computing is running for the first time in the 'results_dir'.", UserWarning)
+                    "This computing is running for the first time in the 'results_dir'.",
+                    UserWarning
+                )
 
             compute_OT = True
 
