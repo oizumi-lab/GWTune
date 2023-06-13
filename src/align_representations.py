@@ -108,7 +108,6 @@ class VisualizationConfig():
     def __init__(
         self,
         figsize=(8, 6),
-        cbar_size=1.0,
         cbar_ticks_size=5,
         ticks_size=5,
         xticks_rotation=90,
@@ -134,7 +133,6 @@ class VisualizationConfig():
 
         self.visualization_params = {
             'figsize': figsize,
-            'cbar_size': cbar_size,
             'cbar_ticks_size': cbar_ticks_size,
             'ticks_size': ticks_size,
             'xticks_rotation': xticks_rotation,
@@ -643,7 +641,10 @@ class PairwiseAnalysis():
 
             # used only in grid search sampler below the two lines
             eps_space = opt.define_eps_space(
-                self.config.eps_list, self.config.eps_log, self.config.num_trial)
+                self.config.eps_list, 
+                self.config.eps_log, 
+                self.config.num_trial
+            )
             search_space = {"eps": eps_space, "initialize": init_plans}
 
             if target_device == None:
