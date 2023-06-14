@@ -353,10 +353,10 @@ class PairwiseAnalysis:
         self.RDM_source = self.source.sim_mat
         self.RDM_target = self.target.sim_mat
         self.pair_name = f"{source.name}_vs_{target.name}"
-
-        self.storage = None
-        self.save_path = None
-        self.filename = None
+        
+        # self.storage = None
+        # self.save_path = None
+        # self.filename = None
 
         assert self.RDM_source.shape == self.RDM_target.shape, "the shape of sim_mat is not the same."
 
@@ -467,12 +467,13 @@ class PairwiseAnalysis:
         Returns:
             OT : Optimal Transportation matrix
         """
-        self.OT, df_trial, save_path = self._gw_alignment(
-            results_dir, compute_OT=compute_OT, filename=filename, delete_results=self.config.delete_results, target_device=target_device
-        )
+        
+        self._save_path_checker(results_dir, filename, compute_OT)
+        
+        self.OT, df_trial = self._gw_alignment(compute_OT, target_device=target_device)
 
         if fig_dir is None:
-            fig_dir = save_path
+            fig_dir = self.save_path
 
         OT = self._show_OT(
             title=f"$\Gamma$ ({self.pair_name})",
@@ -488,23 +489,13 @@ class PairwiseAnalysis:
             self.get_optimization_log(df_trial=df_trial, fig_dir=fig_dir)
 
         return OT
-
-    def _gw_alignment(self, results_dir, compute_OT, filename=None, delete_results=False, target_device=None):
-        """_summary_
-
-        Args:
-            results_dir (_type_): _description_
-            compute_OT (_type_): _description_
-            target_device (_type_, optional): _description_. Defaults to None.
-
-        Returns:
-            _type_: _description_
-        """
+    
+    def _save_path_checker(self, results_dir, filename, compute_OT):
         if filename is None:
             filename = self.config.data_name + "_" + self.pair_name
 
-        self.save_path = os.path.join(results_dir, filename)
         self.filename = filename
+        self.save_path = os.path.join(results_dir, filename)
 
         # Generate the URL for the database. Syntax differs for SQLite and others.
         if self.config.db_params["drivername"] == "sqlite":
@@ -513,11 +504,56 @@ class PairwiseAnalysis:
             self.storage = URL.create(database=filename, **self.config.db_params).render_as_string(hide_password=False)
 
         # Delete the previous results if the flag is True.
-        if delete_results:
-            self.delete_prev_results()
+        if self.config.delete_results:
+            if not compute_OT and os.path.exists(self.save_path) and self.config.n_jobs == 1:
+                self._confirm_delete()
+                
+    
+    def _confirm_delete(self) -> None:
+        while True:
+            confirmation = input(
+                f"The study, result folder, and database named '{self.filename}' existed in your environment will be deleted.\n \
+                 Do you want to execute it? (Y/n)"
+            )
+            if confirmation == "Y":
+               self.delete_prev_results()
+            elif confirmation == "n":
+                print(f"The study, result folder, and database named '{self.filename}' existed in your environment weren't deleted.")
+                break
+            else:
+                print("Invalid input. Please enter again.")
+            
+    def delete_prev_results(self):
+        # drop database
+        if database_exists(self.storage):
+            drop_database(self.storage)
+        # delete directory
+        if os.path.exists(self.save_path):
+            self._delete_directory(self.save_path)
 
+    def _delete_directory(self, save_path):
+        for root, dirs, files in os.walk(save_path, topdown=False):
+            for name in files:
+                file_path = os.path.join(root, name)
+                os.remove(file_path)
+            for name in dirs:
+                dir_path = os.path.join(root, name)
+                os.rmdir(dir_path)
+        shutil.rmtree(save_path)
+
+    def _gw_alignment(self, compute_OT, target_device=None):
+        """_summary_
+
+        Args:
+            compute_OT (_type_): _description_
+            target_device (_type_, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
+        
         if not os.path.exists(self.save_path):
-            if compute_OT != False:
+            if compute_OT == False:
                 warnings.warn(
                     "This computing is running for the first time in the 'results_dir'.",
                     UserWarning
@@ -525,7 +561,7 @@ class PairwiseAnalysis:
 
             compute_OT = True
 
-        study = self._run_optimization(filename, self.save_path, self.storage, compute_OT, target_device)
+        study = self._run_optimization(compute_OT, target_device)
 
         best_trial = study.best_trial
         df_trial = study.trials_dataframe()
@@ -538,10 +574,13 @@ class PairwiseAnalysis:
 
             OT = OT.to("cpu").numpy()
 
-        return OT, df_trial, self.save_path
+        return OT, df_trial
 
     def _run_optimization(
-        self, filename, save_path, storage, compute_OT, target_device, n_jobs_for_pairwise_analysis=1
+        self, 
+        compute_OT,
+        target_device,
+        n_jobs_for_pairwise_analysis=1,
     ):
         """_summary_
 
@@ -561,7 +600,7 @@ class PairwiseAnalysis:
         """
         # generate instance optimize gw_alignment
         opt = gw_optimizer.load_optimizer(
-            save_path,
+            self.save_path,
             n_jobs=n_jobs_for_pairwise_analysis,
             num_trial=self.config.num_trial,
             to_types=self.config.to_types,
@@ -570,8 +609,8 @@ class PairwiseAnalysis:
             pruner_name=self.config.pruner_name,
             pruner_params=self.config.pruner_params,
             n_iter=self.config.n_iter,
-            filename=filename,
-            storage=storage,
+            filename=self.filename,
+            storage=self.storage,
         )
 
         if compute_OT:
@@ -585,7 +624,7 @@ class PairwiseAnalysis:
                 self.RDM_target,
                 p,
                 q,
-                save_path,
+                self.save_path,
                 max_iter=self.config.max_iter,
                 n_iter=self.config.n_iter,
                 to_types=self.config.to_types,
@@ -630,9 +669,8 @@ class PairwiseAnalysis:
     ):
 
         if df_trial is None:
-            _, df_trial, _ = self._gw_alignment(
-                results_dir, compute_OT=False, filename=filename, delete_results=False, target_device=target_device
-            )
+            self._save_path_checker(results_dir, filename, compute_OT=False)
+            _, df_trial = self._gw_alignment(compute_OT=False, target_device=target_device)
 
         # figure plotting epsilon as x-axis and GWD as y-axis
         sns.scatterplot(data=df_trial, x="params_eps", y="value", s=50)
@@ -718,24 +756,6 @@ class PairwiseAnalysis:
 
             else:
                 raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
-
-    def delete_prev_results(self):
-        # drop database
-        if database_exists(self.storage):
-            drop_database(self.storage)
-        # delete directory
-        if os.path.exists(self.save_path):
-            self._delete_directory(self.save_path)
-
-    def _delete_directory(self, save_path):
-        for root, dirs, files in os.walk(save_path, topdown=False):
-            for name in files:
-                file_path = os.path.join(root, name)
-                os.remove(file_path)
-            for name in dirs:
-                dir_path = os.path.join(root, name)
-                os.rmdir(dir_path)
-        shutil.rmtree(save_path)
 
     def calc_category_level_accuracy(self, category_mat: pd.DataFrame):
         category_mat = category_mat.values
@@ -938,6 +958,8 @@ class AlignRepresentations:
         show_log=False,
         fig_dir=None,
         ticks=None,
+        filename=None,
+        target_device=None,
     ):
 
         OT_list = []
@@ -952,6 +974,8 @@ class AlignRepresentations:
                 show_log=show_log,
                 fig_dir=fig_dir,
                 ticks=ticks,
+                filename=filename,
+                target_device=target_device,
             )
 
             OT_list.append(OT)
@@ -969,6 +993,7 @@ class AlignRepresentations:
         show_log=False,
         fig_dir=None,
         ticks=None,
+        filename=None,
     ):
         """_summary_
 
@@ -1033,6 +1058,7 @@ class AlignRepresentations:
                         show_log=show_log,
                         fig_dir=fig_dir,
                         ticks=ticks,
+                        filename=filename,
                         target_device=target_device,
                     )
 
@@ -1053,6 +1079,7 @@ class AlignRepresentations:
                     show_log=show_log,
                     fig_dir=fig_dir,
                     ticks=ticks,
+                    filename=filename,
                 )
 
         if self.config.n_jobs == 1:
@@ -1066,6 +1093,7 @@ class AlignRepresentations:
                 show_log=show_log,
                 fig_dir=fig_dir,
                 ticks=ticks,
+                filename=filename,
             )
 
         if return_data:

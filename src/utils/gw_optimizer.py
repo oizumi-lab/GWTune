@@ -158,17 +158,15 @@ class RunOptuna:
 
         # If there is no db file, multi_run will not work properly if you don't let it load here.
         # PyMySQL implementation will be here if necessary.
-        if "sqlite" in self.storage and not os.path.exists(self.save_path + "/" + self.filename + ".db"):
-            self.create_study()
-
-        objective_device = functools.partial(objective, device=device)
 
         try:
             study = self.load_study(seed=seed)
         except KeyError:
-            print("Study not found, creating a new one.")
+            print("Study for " + self.filename + " was not found, creating a new one...")
             self.create_study()
             study = self.load_study(seed=seed)
+        
+        objective_device = functools.partial(objective, device=device)
 
         if self.n_jobs > 1:
             warnings.filterwarnings("always")
