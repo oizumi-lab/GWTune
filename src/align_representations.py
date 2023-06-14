@@ -468,7 +468,7 @@ class PairwiseAnalysis:
             OT : Optimal Transportation matrix
         """
         self.OT, df_trial, save_path = self._gw_alignment(
-            results_dir, compute_OT=compute_OT, filename=filename, target_device=target_device
+            results_dir, compute_OT=compute_OT, filename=filename, delete_results=self.config.delete_results, target_device=target_device
         )
 
         if fig_dir is None:
@@ -489,7 +489,7 @@ class PairwiseAnalysis:
 
         return OT
 
-    def _gw_alignment(self, results_dir, compute_OT, filename=None, target_device=None):
+    def _gw_alignment(self, results_dir, compute_OT, filename=None, delete_results=False, target_device=None):
         """_summary_
 
         Args:
@@ -513,7 +513,7 @@ class PairwiseAnalysis:
             self.storage = URL.create(database=filename, **self.config.db_params).render_as_string(hide_password=False)
 
         # Delete the previous results if the flag is True.
-        if self.config.delete_results:
+        if delete_results:
             self.delete_prev_results()
 
         if not os.path.exists(self.save_path):
@@ -631,7 +631,7 @@ class PairwiseAnalysis:
 
         if df_trial is None:
             _, df_trial, _ = self._gw_alignment(
-                results_dir, compute_OT=False, filename=filename, target_device=target_device
+                results_dir, compute_OT=False, filename=filename, delete_results=False, target_device=target_device
             )
 
         # figure plotting epsilon as x-axis and GWD as y-axis
