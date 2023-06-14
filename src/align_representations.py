@@ -946,6 +946,7 @@ class AlignRepresentations:
         self,
         sim_mat_format="default",
         visualization_config: VisualizationConfig = VisualizationConfig(),
+        visualization_config_dist: VisualizationConfig = VisualizationConfig(),
         fig_dir=None,
         show_distribution=True,
         ticks=None
@@ -969,7 +970,7 @@ class AlignRepresentations:
 
             if show_distribution:
                 representation.show_sim_mat_distribution(
-                    **visualization_config())
+                    **visualization_config_dist())
 
     def _single_computation(
         self,
