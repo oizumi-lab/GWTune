@@ -14,8 +14,8 @@ import torch
 from tqdm.auto import tqdm
 
 # warnings.simplefilter("ignore")
-from utils.backend import Backend
-from utils.init_matrix import InitMatrix
+from .utils.backend import Backend
+from .utils.init_matrix import InitMatrix
 
 # nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
 
