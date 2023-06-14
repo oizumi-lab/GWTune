@@ -34,6 +34,8 @@ rsatoolbox = "^0.1.2"
 cryptography = "^40.0.1"
 sqlalchemy = "^2.0.9"
 django = "^4.2"
+ipykernel = "^6.23.2"
+ipython = "^8.14.0"
 
 [poetry.group.dev.dependencies]
 autopep8 = "^2.0.1"
