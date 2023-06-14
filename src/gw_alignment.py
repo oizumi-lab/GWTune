@@ -288,7 +288,7 @@ class MainGromovWasserstainComputation:
 
         gw_loss = logv["gw_dist"]
 
-        if self.back_end.check_zeros(gw):
+        if (self.back_end.check_zeros(gw)) or (gw_loss < 0):
             gw_loss = float("nan")
             acc = float("nan")
 
