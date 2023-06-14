@@ -36,15 +36,12 @@ class OptimizationConfig:
         device="cpu",
         to_types="numpy",
         n_jobs=1,
-        use_parallel=False,
-        parallel_method="multithread",
         multi_gpu: Union[bool, List[int]] = False,
         db_params={"drivername": "mysql", "username": "root", "password": "", "host": "localhost", "port": 3306},
         init_plans_list=["random"],
         n_iter=1,
         max_iter=200,
         data_name="THINGS",
-        delete_results=False,
         sampler_name="tpe",
         sampler_seed=42,
         pruner_name="hyperband",
@@ -59,15 +56,12 @@ class OptimizationConfig:
             device (str, optional): _description_. Defaults to "cpu".
             to_types (str, optional): _description_. Defaults to "numpy".
             n_jobs (int, optional): _description_. Defaults to 1.
-            use_parallel (bool, optional): _description_. Defaults to False.
-            parallel_method (str, optional): _description_. Defaults to "multithread".
             multi_gpu (Union[bool, List[int]], optional): _description_. Defaults to False.
             db_params (dict, optional): _description_. Defaults to {"drivername": "mysql", "username": "root", "password": "", "host": "", "port": 3306}.
             init_plans_list (list, optional): _description_. Defaults to ["random"].
             n_iter (int, optional): _description_. Defaults to 1.
             max_iter (int, optional): _description_. Defaults to 200.
             data_name (str, optional): _description_. Defaults to "THINGS".
-            delete_results (bool, optional): _description_. Defaults to False.
             sampler_name (str, optional): _description_. Defaults to "tpe".
             sampler_seed (int, optional): _description_. Defaults to 42.
             pruner_name (str, optional): _description_. Defaults to "hyperband".
@@ -82,8 +76,6 @@ class OptimizationConfig:
         self.device = device
 
         self.n_jobs = n_jobs
-        self.use_parallel = use_parallel
-        self.parallel_method = parallel_method
         self.multi_gpu = multi_gpu
 
         self.db_params = db_params
@@ -95,7 +87,6 @@ class OptimizationConfig:
         self.sampler_seed = sampler_seed
 
         self.data_name = data_name
-        self.delete_results = delete_results
 
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
@@ -440,6 +431,7 @@ class PairwiseAnalysis:
         self,
         results_dir,
         compute_OT=False,
+        delete_results=False,
         OT_format="default",
         return_data=False,
         return_figure=True,
@@ -450,6 +442,7 @@ class PairwiseAnalysis:
         filename=None,
         target_device=None,
     ):
+        
         """
         Main Computation
 
@@ -463,12 +456,19 @@ class PairwiseAnalysis:
             show_log = False,
             fig_dir = None,
             ticks = None
+            filename=None,
+            target_device=None,
 
         Returns:
             OT : Optimal Transportation matrix
         """
         
-        self._save_path_checker(results_dir, filename, compute_OT)
+        self._save_path_checker(
+            results_dir, 
+            filename, 
+            compute_OT, 
+            delete_results=delete_results    
+        )
         
         self.OT, df_trial = self._gw_alignment(compute_OT, target_device=target_device)
 
@@ -490,7 +490,13 @@ class PairwiseAnalysis:
 
         return OT
     
-    def _save_path_checker(self, results_dir, filename, compute_OT):
+    def _save_path_checker(
+        self, 
+        results_dir, 
+        filename, 
+        compute_OT, 
+        delete_results=False
+    ):
         if filename is None:
             filename = self.config.data_name + "_" + self.pair_name
 
@@ -504,7 +510,7 @@ class PairwiseAnalysis:
             self.storage = URL.create(database=filename, **self.config.db_params).render_as_string(hide_password=False)
 
         # Delete the previous results if the flag is True.
-        if self.config.delete_results:
+        if delete_results:
             if not compute_OT and os.path.exists(self.save_path) and self.config.n_jobs == 1:
                 self._confirm_delete()
                 
@@ -669,7 +675,7 @@ class PairwiseAnalysis:
     ):
 
         if df_trial is None:
-            self._save_path_checker(results_dir, filename, compute_OT=False)
+            self._save_path_checker(results_dir, filename, compute_OT=False, delete_results=False)
             _, df_trial = self._gw_alignment(compute_OT=False, target_device=target_device)
 
         # figure plotting epsilon as x-axis and GWD as y-axis
@@ -951,6 +957,7 @@ class AlignRepresentations:
         self,
         results_dir,
         compute_OT=False,
+        delete_results=False,
         return_data=False,
         return_figure=True,
         OT_format="default",
@@ -967,6 +974,7 @@ class AlignRepresentations:
             OT = pairwise.run_gw(
                 results_dir=results_dir,
                 compute_OT=compute_OT,
+                delete_results=delete_results,
                 return_data=return_data,
                 return_figure=return_figure,
                 OT_format=OT_format,
@@ -986,6 +994,7 @@ class AlignRepresentations:
         self,
         results_dir,
         compute_OT=False,
+        delete_results=False,
         return_data=False,
         return_figure=True,
         OT_format="default",
@@ -1019,16 +1028,7 @@ class AlignRepresentations:
             OT_list = []
             processes = []
 
-            if self.config.parallel_method == "multiprocess":
-                pool = ProcessPoolExecutor(self.config.n_jobs)
-
-            elif self.config.parallel_method == "multithread":
-                pool = ThreadPoolExecutor(self.config.n_jobs)
-
-            else:
-                raise ValueError("please choose 'multiprocess' or 'multithread'. ")
-
-            with pool:
+            with ThreadPoolExecutor(self.config.n_jobs) as pool:
                 for pair_number in range(len(self.pairwise_list)):
 
                     if self.config.multi_gpu:
@@ -1051,7 +1051,8 @@ class AlignRepresentations:
                         pairwise.run_gw,
                         results_dir=results_dir,
                         compute_OT=compute_OT,
-                        return_data=return_data,
+                        delete_results=delete_results,
+                        return_data=False,
                         return_figure=False,
                         OT_format=OT_format,
                         visualization_config=visualization_config,
@@ -1065,15 +1066,15 @@ class AlignRepresentations:
                     processes.append(future)
 
                 for future in as_completed(processes):
-                    OT = future.result()
-                    OT_list.append(OT)
+                    future.result()
 
-            if return_figure:
-                self._single_computation(
+            if return_figure or return_data:
+                OT_list = self._single_computation(
                     results_dir=results_dir,
                     compute_OT=False,
-                    return_data=False,
-                    return_figure=True,
+                    delete_results=False,
+                    return_data=return_data,
+                    return_figure=return_figure,
                     OT_format=OT_format,
                     visualization_config=visualization_config,
                     show_log=show_log,
@@ -1086,6 +1087,7 @@ class AlignRepresentations:
             OT_list = self._single_computation(
                 results_dir=results_dir,
                 compute_OT=compute_OT,
+                delete_results=delete_results,
                 return_data=return_data,
                 return_figure=return_figure,
                 OT_format=OT_format,
@@ -1156,6 +1158,7 @@ class AlignRepresentations:
         n_iter,
         results_dir,
         compute_OT=False,
+        delete_results=False,
         return_data=False,
         return_figure=True,
         OT_format="default",
@@ -1179,6 +1182,7 @@ class AlignRepresentations:
             pairwise.run_gw(
                 results_dir=results_dir,
                 compute_OT=compute_OT,
+                delete_results=delete_results,
                 return_data=return_data,
                 return_figure=return_figure,
                 OT_format=OT_format,
@@ -1281,7 +1285,11 @@ class AlignRepresentations:
         print("Mean : \n", accuracy.iloc[:, 1:].mean(axis="columns"))
 
     def calc_category_level_accuracy(
-        self, make_hist=False, fig_dir=None, fig_name="Category_level_accuracy.png", category_mat=None
+        self,
+        category_mat=None,
+        make_hist=False, 
+        fig_dir=None, 
+        fig_name="Category_level_accuracy.png", 
     ):
 
         acc_list = []
@@ -1294,8 +1302,12 @@ class AlignRepresentations:
             plt.figure()
             plt.hist(acc_list)
             plt.xlabel("Accuracy")
-            plt.savefig(os.path.join(fig_dir, fig_name))
+            
+            if fig_dir is not None:
+                plt.savefig(os.path.join(fig_dir, fig_name))
+            
             plt.show()
+            plt.close()
 
     def _get_dataframe(self, eval_type="ot_plan", concat=True):
         df = self.top_k_accuracy if eval_type == "ot_plan" else self.k_nearest_matching_rate
