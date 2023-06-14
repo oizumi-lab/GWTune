@@ -885,8 +885,6 @@ class AlignRepresentations:
 
             pairwise = PairwiseAnalysis(config=self.config, source=s, target=t)
 
-            print(f"Pair number {i} : {pairwise.pair_name.replace('_', ' ')}")
-
             if self.histogram_matching:
                 pairwise.match_sim_mat_distribution()
 
@@ -906,7 +904,7 @@ class AlignRepresentations:
         self,
         sim_mat_format="default",
         visualization_config: VisualizationConfig = VisualizationConfig(),
-        visualization_config_dist: VisualizationConfig = VisualizationConfig(),
+        visualization_config_hist: VisualizationConfig = VisualizationConfig(),
         fig_dir=None,
         show_distribution=True,
         ticks=None,
@@ -927,7 +925,7 @@ class AlignRepresentations:
 
             if show_distribution:
                 representation.show_sim_mat_distribution(
-                    **visualization_config_dist())
+                    **visualization_config_hist())
 
     def _single_computation(
         self,
