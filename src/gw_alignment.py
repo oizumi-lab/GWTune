@@ -14,9 +14,8 @@ import torch
 from tqdm.auto import tqdm
 
 # warnings.simplefilter("ignore")
-
-from .utils.backend import Backend
-from .utils.init_matrix import InitMatrix
+from utils.backend import Backend
+from utils.init_matrix import InitMatrix
 
 # nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
 
@@ -24,14 +23,14 @@ from .utils.init_matrix import InitMatrix
 # %%
 class GW_Alignment:
     def __init__(
-        self, 
-        pred_dist, 
-        target_dist, 
-        p, 
-        q, 
-        save_path, 
-        max_iter=1000, 
-        numItermax=1000, 
+        self,
+        pred_dist,
+        target_dist,
+        p,
+        q,
+        save_path,
+        max_iter=1000,
+        numItermax=1000,
         n_iter=100,
         to_types="torch",
         sinkhorn_method="sinkhorn",
@@ -103,10 +102,10 @@ class GW_Alignment:
         2.  Compute GW alignment with hyperparameters defined above.
         """
         gw, logv, gw_loss, init_mat, trial = self.main_compute.compute_GW_with_init_plans(
-            trial, 
-            eps, 
-            init_mat_plan, 
-            device, 
+            trial,
+            eps,
+            init_mat_plan,
+            device,
             sinkhorn_method = self.sinkhorn_method
         )
 
@@ -175,18 +174,8 @@ class GW_Alignment:
 
 
 class MainGromovWasserstainComputation:
-    def __init__(
-        self, 
-        pred_dist, 
-        target_dist, 
-        p, 
-        q, 
-        to_types, 
-        max_iter=1000, 
-        numItermax=1000, 
-        n_iter=100
-    ) -> None:
-        
+    def __init__(self, pred_dist, target_dist, p, q, to_types, max_iter=1000, numItermax=1000, n_iter=100) -> None:
+
         self.to_types = to_types
 
         self.pred_dist, self.target_dist, self.p, self.q = pred_dist, target_dist, p, q
@@ -207,16 +196,16 @@ class MainGromovWasserstainComputation:
         self.back_end = Backend("cpu", self.to_types)  # 並列計算をしない場合は、こちらにおいた方がはやい。(2023.4.19 佐々木)
 
     def entropic_gw(
-        self, 
-        device, 
+        self,
+        device,
         epsilon,
-        T, 
-        max_iter=1000, 
-        numItermax=1000, 
-        tol=1e-9, 
+        T,
+        max_iter=1000,
+        numItermax=1000,
+        tol=1e-9,
         trial=None,
         sinkhorn_method="sinkhorn",
-        log=True, 
+        log=True,
         verbose=False
     ):
         """
@@ -269,13 +258,13 @@ class MainGromovWasserstainComputation:
             return T
 
     def gw_alignment_computation(
-        self, 
-        init_mat_plan, 
-        eps, 
-        max_iter, 
-        numItermax, 
-        device, 
-        trial=None, 
+        self,
+        init_mat_plan,
+        eps,
+        max_iter,
+        numItermax,
+        device,
+        trial=None,
         seed=42,
         sinkhorn_method="sinkhorn",
     ):
@@ -286,17 +275,17 @@ class MainGromovWasserstainComputation:
         """
 
         init_mat = self.init_mat_builder.make_initial_T(init_mat_plan, seed)
-        
+
         gw, logv = self.entropic_gw(
-            device, 
-            eps, 
-            init_mat, 
-            max_iter=max_iter, 
+            device,
+            eps,
+            init_mat,
+            max_iter=max_iter,
             numItermax=numItermax,
-            trial=trial, 
+            trial=trial,
             sinkhorn_method=sinkhorn_method,
         )
-        
+
         gw_loss = logv["gw_dist"]
 
         if self.back_end.check_zeros(gw):
@@ -354,11 +343,11 @@ class MainGromovWasserstainComputation:
             )
 
     def compute_GW_with_init_plans(
-        self, 
+        self,
         trial,
-        eps, 
-        init_mat_plan, 
-        device, 
+        eps,
+        init_mat_plan,
+        device,
         sinkhorn_method = "sinkhorn"
     ):
         """
@@ -377,11 +366,11 @@ class MainGromovWasserstainComputation:
 
         if init_mat_plan in ["uniform", "diag"]:
             gw, logv, gw_loss, acc, init_mat = self.gw_alignment_computation(
-                init_mat_plan, 
-                eps, 
-                self.max_iter, 
-                self.numItermax, 
-                device, 
+                init_mat_plan,
+                eps,
+                self.max_iter,
+                self.numItermax,
+                device,
                 sinkhorn_method=sinkhorn_method,
             )
             trial = self._save_results(gw_loss, acc, trial, init_mat_plan)
@@ -396,12 +385,12 @@ class MainGromovWasserstainComputation:
 
             for i, seed in enumerate(pbar):
                 c_gw, c_logv, c_gw_loss, c_acc, c_init_mat = self.gw_alignment_computation(
-                    init_mat_plan, 
-                    eps, 
-                    self.max_iter, 
-                    self.numItermax, 
-                    device, 
-                    seed=seed, 
+                    init_mat_plan,
+                    eps,
+                    self.max_iter,
+                    self.numItermax,
+                    device,
+                    seed=seed,
                     sinkhorn_method=sinkhorn_method,
                 )
 
@@ -413,15 +402,8 @@ class MainGromovWasserstainComputation:
                         c_acc,
                         c_init_mat,
                     )
-                    
-                    trial = self._save_results(
-                        best_gw_loss, 
-                        best_acc, 
-                        trial, 
-                        init_mat_plan, 
-                        num_iter=i, 
-                        seed=seed
-                    )
+
+                    trial = self._save_results(best_gw_loss, best_acc, trial, init_mat_plan, num_iter=i, seed=seed)
 
                 self._check_pruner_should_work(c_gw_loss, trial, init_mat_plan, eps, num_iter=i)
 
