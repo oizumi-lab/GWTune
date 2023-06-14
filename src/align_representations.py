@@ -127,10 +127,11 @@ class VisualizationConfig():
         markers_list=None,
         marker_size=30,
         cmap = 'cividis',
-        draw_category_line=True,
+        draw_category_line=False,
         category_line_color='C2',
         category_line_alpha=0.2,
         category_line_style='dashed',
+        show_figure=True,
     ) -> None:
 
         self.visualization_params = {
@@ -156,6 +157,7 @@ class VisualizationConfig():
             'category_line_color': category_line_color,
             'category_line_alpha': category_line_alpha,
             'category_line_style': category_line_style,
+            'show_figure':show_figure,
         }
 
     def __call__(self):
@@ -671,13 +673,15 @@ class PairwiseAnalysis():
 
         return study
 
-    def get_optimization_log(self, 
-            df_trial=None, 
-            results_dir=None,
-            filename=None,
-            target_device=None,
-            fig_dir=None,          
-        ):
+    def get_optimization_log(
+        self, 
+        df_trial=None, 
+        results_dir=None,
+        filename=None,
+        target_device=None,
+        fig_dir=None, 
+        show_figure=True,
+    ):
         
         if df_trial is None:
             _, df_trial, _ = self._gw_alignment(
@@ -697,7 +701,10 @@ class PairwiseAnalysis():
                 fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png")
             plt.savefig(fig_path)
         plt.tight_layout()
-        plt.show()
+        
+        if show_figure:
+            plt.show()
+        
         plt.close()
 
         # figure plotting GWD as x-axis and accuracy as y-axis
@@ -711,7 +718,10 @@ class PairwiseAnalysis():
                 fig_dir, f"Optim_log_acc_GWD_{self.pair_name}.png")
             plt.savefig(fig_path)
         plt.tight_layout()
-        plt.show()
+        
+        if show_figure:
+            plt.show()
+        
         plt.close()
 
     def _show_OT(
@@ -791,7 +801,14 @@ class PairwiseAnalysis():
 
         return accuracy
 
-    def eval_accuracy(self, top_k_list, eval_type="ot_plan", metric="cosine", barycenter=False, supervised=False):
+    def eval_accuracy(
+        self, 
+        top_k_list, 
+        eval_type="ot_plan", 
+        metric="cosine", 
+        barycenter=False, 
+        supervised=False
+    ):
         df = pd.DataFrame()
         df["top_n"] = top_k_list
 
@@ -1124,13 +1141,15 @@ class AlignRepresentations:
         results_dir,
         filename=None,
         fig_dir=None,
+        show_figure=True,
     ):
         for pairwise in self.pairwise_list:
             pairwise.get_optimization_log(
                 results_dir=results_dir,
                 filename=filename,
-                fig_dir=fig_dir
-                )
+                fig_dir=fig_dir,
+                show_figure=show_figure,
+            )
             
     def calc_barycenter(self, X_init=None):
         embedding_list = [representation.embedding for representation in self.representations_list]
