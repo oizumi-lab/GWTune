@@ -38,13 +38,12 @@ class OptimizationConfig:
         use_parallel=False,
         parallel_method="multithread",
         multi_gpu: Union[bool, List[int]] = False,
-        storage=None,
         db_params={"drivername": "mysql", "username": "root", "password": "", "host": "localhost", "port": 3306},
         init_plans_list=["random"],
         n_iter=1,
         max_iter=200,
         data_name="THINGS",
-        delete_study=False,
+        delete_results=False,
         sampler_name="tpe",
         sampler_seed=42,
         pruner_name="hyperband",
@@ -62,13 +61,12 @@ class OptimizationConfig:
             use_parallel (bool, optional): _description_. Defaults to False.
             parallel_method (str, optional): _description_. Defaults to "multithread".
             multi_gpu (Union[bool, List[int]], optional): _description_. Defaults to False.
-            storage (_type_, optional): _description_. Defaults to None.
             db_params (dict, optional): _description_. Defaults to {"drivername": "mysql", "username": "root", "password": "", "host": "", "port": 3306}.
             init_plans_list (list, optional): _description_. Defaults to ["random"].
             n_iter (int, optional): _description_. Defaults to 1.
             max_iter (int, optional): _description_. Defaults to 200.
             data_name (str, optional): _description_. Defaults to "THINGS".
-            delete_study (bool, optional): _description_. Defaults to False.
+            delete_results (bool, optional): _description_. Defaults to False.
             sampler_name (str, optional): _description_. Defaults to "tpe".
             sampler_seed (int, optional): _description_. Defaults to 42.
             pruner_name (str, optional): _description_. Defaults to "hyperband".
@@ -86,7 +84,6 @@ class OptimizationConfig:
         self.parallel_method = parallel_method
         self.multi_gpu = multi_gpu
 
-        self.storage = storage
         self.db_params = db_params
 
         self.init_plans_list = init_plans_list
@@ -96,8 +93,7 @@ class OptimizationConfig:
         self.sampler_seed = sampler_seed
 
         self.data_name = data_name
-        self.delete_study = delete_study
-        self.storage = storage
+        self.delete_results = delete_results
 
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
@@ -501,38 +497,41 @@ class PairwiseAnalysis:
             _type_: _description_
         """
         if filename is None:
-            filename = self.config.data_name + " " + self.pair_name
+            filename = self.config.data_name + "_" + self.pair_name
 
-        save_path = os.path.join(results_dir, filename)
-        self.save_path = save_path
+        self.save_path = os.path.join(results_dir, filename)
         self.filename = filename
 
         # Generate the URL for the database. Syntax differs for SQLite and others.
         if self.config.db_params["drivername"] == "sqlite":
-            self.storage = "sqlite:///" + save_path + "/" + filename + ".db"
+            self.storage = "sqlite:///" + self.save_path + "/" + filename + ".db"
         else:
             self.storage = URL.create(database=filename, **self.config.db_params).render_as_string(hide_password=False)
 
-        if not os.path.exists(save_path):
+        # Delete the previous results if the flag is True.
+        if self.config.delete_results:
+            self.delete_prev_results()
+
+        if not os.path.exists(self.save_path):
             if compute_OT != False:
                 warnings.warn("This computing is running for the first time in the 'results_dir'.", UserWarning)
 
             compute_OT = True
 
-        study = self._run_optimization(filename, save_path, self.storage, compute_OT, target_device)
+        study = self._run_optimization(filename, self.save_path, self.storage, compute_OT, target_device)
 
         best_trial = study.best_trial
         df_trial = study.trials_dataframe()
 
         if self.config.to_types == "numpy":
-            OT = np.load(save_path + "/" + best_trial.params["initialize"] + f"/gw_{best_trial.number}.npy")
+            OT = np.load(self.save_path + "/" + best_trial.params["initialize"] + f"/gw_{best_trial.number}.npy")
 
         elif self.config.to_types == "torch":
-            OT = torch.load(save_path + "/" + best_trial.params["initialize"] + f"/gw_{best_trial.number}.pt")
+            OT = torch.load(self.save_path + "/" + best_trial.params["initialize"] + f"/gw_{best_trial.number}.pt")
 
             OT = OT.to("cpu").numpy()
 
-        return OT, df_trial, save_path
+        return OT, df_trial, self.save_path
 
     def _run_optimization(
         self, filename, save_path, storage, compute_OT, target_device, n_jobs_for_pairwise_analysis=1
@@ -566,7 +565,6 @@ class PairwiseAnalysis:
             n_iter=self.config.n_iter,
             filename=filename,
             storage=storage,
-            delete_study=self.config.delete_study,
         )
 
         if compute_OT:
@@ -705,6 +703,24 @@ class PairwiseAnalysis:
 
             else:
                 raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
+
+    def delete_prev_results(self):
+        # drop database
+        if database_exists(self.storage):
+            drop_database(self.storage)
+        # delete directory
+        if os.path.exists(self.save_path):
+            self._delete_directory(self.save_path)
+
+    def _delete_directory(self, save_path):
+        for root, dirs, files in os.walk(save_path, topdown=False):
+            for name in files:
+                file_path = os.path.join(root, name)
+                os.remove(file_path)
+            for name in dirs:
+                dir_path = os.path.join(root, name)
+                os.rmdir(dir_path)
+        shutil.rmtree(save_path)
 
     def calc_category_level_accuracy(self, category_mat: pd.DataFrame):
         category_mat = category_mat.values
@@ -847,7 +863,7 @@ class AlignRepresentations:
 
             pairwise = PairwiseAnalysis(config=self.config, source=s, target=t)
 
-            print(f"Pair number {i} : {pairwise.pair_name}")
+            print(f"Pair number {i} : {pairwise.pair_name.replace('_', ' ')}")
 
             if self.histogram_matching:
                 pairwise.match_sim_mat_distribution()
@@ -1033,33 +1049,23 @@ class AlignRepresentations:
         if return_data:
             return OT_list
 
-    def drop_gw_alignment_files(self, drop_filenames: Optional[List[str]]=None, drop_all: bool=False):
-        '''Delete the specified database and directory with the given filename
+    def drop_gw_alignment_files(self, drop_filenames: Optional[List[str]] = None, drop_all: bool = False):
+        """Delete the specified database and directory with the given filename
 
         Args:
             drop_filenames (Optional[List[str]], optional): [description]. Defaults to None.
             drop_all (bool, optional): [description]. Defaults to False.
-        '''
+        """
         if drop_all:
             drop_filenames = [pairwise.filename for pairwise in self.pairwise_list]
+
+        if drop_filenames is None:
+            raise ValueError("Specify the results name in drop_filenames or set drop_all=True")
 
         for pairwise in self.pairwise_list:
             if (pairwise.filename not in drop_filenames) or (not database_exists(pairwise.storage)):
                 continue
-            # drop database
-            drop_database(pairwise.storage)
-            # delete directory
-            self._delete_results(pairwise.save_path)
-
-    def _delete_results(self, save_path):
-        for root, dirs, files in os.walk(save_path, topdown=False):
-            for name in files:
-                file_path = os.path.join(root, name)
-                os.remove(file_path)
-            for name in dirs:
-                dir_path = os.path.join(root, name)
-                os.rmdir(dir_path)
-        shutil.rmtree(save_path)
+            pairwise.delete_prev_results()
 
     def show_optimization_log(
         self,

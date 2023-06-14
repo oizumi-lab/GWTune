@@ -28,7 +28,6 @@ def load_optimizer(
     n_iter=10,
     filename="test",
     storage=None,
-    delete_study=False,
 ):
 
     """
@@ -56,17 +55,7 @@ def load_optimizer(
 
     if method == "optuna":
         Opt = RunOptuna(
-            save_path,
-            to_types,
-            storage,
-            filename,
-            sampler_name,
-            pruner_name,
-            pruner_params,
-            n_iter,
-            n_jobs,
-            num_trial,
-            delete_study,
+            save_path, to_types, storage, filename, sampler_name, pruner_name, pruner_params, n_iter, n_jobs, num_trial
         )
     else:
         raise ValueError("no implemented method.")
@@ -87,7 +76,6 @@ class RunOptuna:
         n_iter,
         n_jobs,
         num_trial,
-        delete_study,
     ):
 
         # the path or file name to save the results.
@@ -104,7 +92,6 @@ class RunOptuna:
         # parameters for optuna.study
         self.n_jobs = n_jobs
         self.num_trial = num_trial
-        self.delete_study = delete_study
 
         # MedianPruner
         self.n_startup_trials = 5
@@ -127,24 +114,6 @@ class RunOptuna:
                 setattr(self, key, value)
             else:
                 print(f"{key} is not a parameter of the pruner.")
-
-    def _confirm_delete(self) -> None:
-        while True:
-            confirmation = input(
-                f"This code will delete the study named '{self.filename}'.\nDo you want to execute the code? (y/n)"
-            )
-            if confirmation == "y":
-                try:
-                    optuna.delete_study(storage=self.storage, study_name=self.filename)
-                    print(f"delete the study '{self.filename}'!")
-                    break
-                except:
-                    print(f"study '{self.filename}' does not exist.")
-                    break
-            elif confirmation == "n":
-                raise ValueError("If you don't want to delete study, use 'delete_study = False'.")
-            else:
-                print("Invalid input. Please enter again.")
 
     def create_study(self, direction="minimize"):
         study = optuna.create_study(
@@ -191,9 +160,6 @@ class RunOptuna:
         # PyMySQL implementation will be here if necessary.
         if "sqlite" in self.storage and not os.path.exists(self.save_path + "/" + self.filename + ".db"):
             self.create_study()
-
-        if self.delete_study:
-            self._confirm_delete()
 
         objective_device = functools.partial(objective, device=device)
 
