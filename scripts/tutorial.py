@@ -99,7 +99,7 @@ if data_select == "THINGS":
 config = OptimizationConfig(
     eps_list=[0.02, 0.2],  # [1, 10] for THINGS data, [0.02, 0.2] for colors data
     eps_log=True,
-    num_trial=4,
+    num_trial=1,
     device="cpu",
     to_types="numpy",
     n_jobs=1,
@@ -109,11 +109,12 @@ config = OptimizationConfig(
         2,
     ],  # "True" : all the GPU installed in your environment, "list (e.g.[0,2,3])"" : cuda:0,2,3, and "False" : single gpu (or cpu for numpy) will use for parallel computation.
     init_plans_list=["random"],
-    db_params={"drivername": "mysql+pymysql", "username": "root", "password": "olabGPU61", "host": "localhost"},
+    # db_params={"drivername": "mysql+pymysql", "username": "root", "password": "olabGPU61", "host": "localhost"},
+    db_params={"drivername": "sqlite"},
     n_iter=1,
     max_iter=200,
     data_name=data_select,
-    delete_study=False,
+    delete_study=True,
     sampler_name="tpe",
     pruner_name="hyperband",
     pruner_params={"n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3},
@@ -189,7 +190,7 @@ if data_select == "color":
 
     align_representation.gw_alignment(
         results_dir="../results",
-        compute_OT=True,
+        compute_OT=False,
         return_data=False,
         return_figure=True,
         OT_format=sim_mat_format,  # "default"
@@ -265,9 +266,9 @@ if data_select == "color":
 # If you want to delete the results of gw_alignment, please fill in the desired filename in drop_filenames and use the drop_gw_alignment_files method.
 
 # %%
-# drop_filenames = ['color_Group1_vs_Group2', 'color_Group1_vs_Group3']
+# drop_filenames = ['color Group1_vs_Group2', 'color Group1_vs_Group3']
 # align_representation.drop_gw_alignment_files(drop_filenames=drop_filenames)
-#%%
+# #%%
 # If you want to delete all the results, set drop_all True.
-#  align_representation.drop_gw_alignment_files(drop_all=True)
+align_representation.drop_gw_alignment_files(drop_all=True)
 #%%
