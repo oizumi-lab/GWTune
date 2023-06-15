@@ -19,6 +19,7 @@ from scipy.stats import pearsonr, spearmanr
 from sklearn import manifold
 from sqlalchemy import create_engine, URL
 from sqlalchemy_utils import create_database, database_exists, drop_database
+import glob
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
 from .gw_alignment import GW_Alignment
@@ -285,6 +286,7 @@ class Representation:
         plt.ylabel("Count")
         plt.grid(True)
         plt.show()
+        plt.clf()
         plt.close()
 
     def show_embedding(
@@ -390,6 +392,7 @@ class PairwiseAnalysis:
         plt.legend(loc="upper left")
         plt.tight_layout()
         plt.show()
+        plt.clf()
         plt.close()
 
     def RSA(self, metric="spearman", method="normal"):
@@ -440,29 +443,29 @@ class PairwiseAnalysis:
         fig_dir=None,
         ticks=None,
         filename=None,
+        save_dataframe=False,
         target_device=None,
     ):
-        
-        """
-        Main Computation
+        """_summary_
 
         Args:
-            results_dir,
-            compute_OT = False,
-            OT_format = "default",
-            return_data = False,
-            return_figure = True,
-            visualization_config : VisualizationConfig = VisualizationConfig(),
-            show_log = False,
-            fig_dir = None,
-            ticks = None
-            filename=None,
-            target_device=None,
+            results_dir (_type_): _description_
+            compute_OT (bool, optional): _description_. Defaults to False.
+            delete_results (bool, optional): _description_. Defaults to False.
+            OT_format (str, optional): _description_. Defaults to "default".
+            return_data (bool, optional): _description_. Defaults to False.
+            return_figure (bool, optional): _description_. Defaults to True.
+            visualization_config (VisualizationConfig, optional): _description_. Defaults to VisualizationConfig().
+            show_log (bool, optional): _description_. Defaults to False.
+            fig_dir (_type_, optional): _description_. Defaults to None.
+            ticks (_type_, optional): _description_. Defaults to None.
+            filename (_type_, optional): _description_. Defaults to None.
+            save_dataframe (bool, optional): _description_. Defaults to False.
+            target_device (_type_, optional): _description_. Defaults to None.
 
         Returns:
-            OT : Optimal Transportation matrix
+            _type_: _description_
         """
-        
         self._save_path_checker(
             results_dir, 
             filename, 
@@ -487,6 +490,9 @@ class PairwiseAnalysis:
 
         if show_log:
             self.get_optimization_log(df_trial=df_trial, fig_dir=fig_dir)
+        
+        if save_dataframe:
+            df_trial.to_csv(self.save_path + '/' + self.filename + '.csv')
 
         return OT
     
@@ -562,10 +568,12 @@ class PairwiseAnalysis:
         
         if not os.path.exists(self.save_path):
             if compute_OT == False:
+                warnings.simplefilter("always")
                 warnings.warn(
-                    "This computing is running for the first time in the 'results_dir'.",
+                    "compute_OT is False, but this computing is running for the first time in the 'results_dir'.",
                     UserWarning
                 )
+                warnings.simplefilter("ignore")
 
             compute_OT = True
 
@@ -573,35 +581,29 @@ class PairwiseAnalysis:
 
         best_trial = study.best_trial
         df_trial = study.trials_dataframe()
+                
+        ot_path = glob.glob(self.save_path + "/" + best_trial.params["initialize"] + f"/gw_{best_trial.number}.*")[0]
 
-        if self.config.to_types == "numpy":
-            OT = np.load(self.save_path + "/" + best_trial.params["initialize"] + f"/gw_{best_trial.number}.npy")
+        if '.npy' in ot_path:
+            OT = np.load(ot_path)
 
-        elif self.config.to_types == "torch":
-            OT = torch.load(self.save_path + "/" + best_trial.params["initialize"] + f"/gw_{best_trial.number}.pt")
-
-            OT = OT.to("cpu").numpy()
+        elif '.pt' in ot_path:
+            OT = torch.load(ot_path).to("cpu").numpy()
 
         return OT, df_trial
 
     def _run_optimization(
         self, 
         compute_OT,
-        target_device,
+        target_device = None,
         n_jobs_for_pairwise_analysis=1,
     ):
         """_summary_
 
         Args:
-            filename (_type_): _description_
-            save_path (_type_): _description_
-            storage (_type_): _description_
             compute_OT (_type_): _description_
-            target_device (_type_): _description_
-
-            n_jobs_for_pairwise_analysis (int, optional): Defaults to 1.
-                When calculating the alignment for a single pair, the optuna specification does not allow for parallel computation to speed up the process.
-                The implementation itself is possible, however.
+            target_device (_type_, optional): _description_. Defaults to None.
+            n_jobs_for_pairwise_analysis (int, optional): _description_. Defaults to 1.
 
         Returns:
             _type_: _description_
@@ -643,9 +645,12 @@ class PairwiseAnalysis:
             # 1. choose the initial matrix for GW alignment computation.
             init_plans = init_matrix.InitMatrix().implemented_init_plans(self.config.init_plans_list)
 
-            # used only in grid search sampler below the two lines
-            eps_space = opt.define_eps_space(self.config.eps_list, self.config.eps_log, self.config.num_trial)
-            search_space = {"eps": eps_space, "initialize": init_plans}
+            if self.config.sampler_name == "grid":
+                # used only in grid search sampler below the two lines
+                eps_space = opt.define_eps_space(self.config.eps_list, self.config.eps_log, self.config.num_trial)
+                search_space = {"eps": eps_space, "initialize": init_plans}
+            else:
+                search_space = None
 
             if target_device == None:
                 target_device = self.config.device
@@ -672,15 +677,22 @@ class PairwiseAnalysis:
         df_trial=None,
         filename=None,
         fig_dir=None,
-        show_figure=True,
+        **kwargs,
     ):
-
+        figsize = kwargs.get('figsize', (8,6))
+        cmap = kwargs.get('cmap', 'C0')
+        marker_size = kwargs.get('marker_size', 20)
+        show_figure = kwargs.get('show_figure', False)
+        
         if df_trial is None:
             self._save_path_checker(results_dir, filename, compute_OT=False, delete_results=False)
-            _, df_trial = self._gw_alignment(compute_OT=False, target_device=None)
-
+            study = self._run_optimization(compute_OT = False)
+            df_trial = study.trials_dataframe()
+        
         # figure plotting epsilon as x-axis and GWD as y-axis
-        sns.scatterplot(data=df_trial, x="params_eps", y="value", s=50)
+        plt.figure(figsize=figsize)
+        # sns.scatterplot(data=df_trial, x="params_eps", y="value", s=50)
+        plt.scatter(df_trial["params_eps"], df_trial["value"], color = cmap, s = marker_size)
         plt.xlabel("$\epsilon$")
         plt.ylabel("GWD")
         plt.title(f"$\epsilon$ - GWD ({self.pair_name})")
@@ -688,27 +700,30 @@ class PairwiseAnalysis:
 
         if show_figure:
             plt.show()
-        else:
-            if fig_dir is None:
-                fig_dir = self.save_path
-            plt.savefig(os.path.join(fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png"))
-
+   
+        if fig_dir is None:
+            fig_dir = self.save_path
+        
+        plt.savefig(os.path.join(fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png"))
+        plt.clf()
         plt.close()
 
         # figure plotting GWD as x-axis and accuracy as y-axis
-        sns.scatterplot(data=df_trial, x="value", y="user_attrs_best_acc", s=50)
-        plt.xlabel("GWD")
-        plt.ylabel("accuracy")
-        plt.title(f"GWD - accuracy ({self.pair_name})")
+        plt.figure(figsize=figsize)
+        # sns.scatterplot(data=df_trial, x="value", y="user_attrs_best_acc", s=50)
+        plt.scatter(df_trial["user_attrs_best_acc"], df_trial["value"], color = cmap, s = marker_size)
+        plt.xlabel("accuracy")
+        plt.ylabel("GWD")
+        plt.title(f"accuracy - GWD ({self.pair_name})")
         # plt.tight_layout()
 
         if show_figure:
             plt.show()
-        else:
-            if fig_dir is None:
-                fig_dir = self.save_path
-            plt.savefig(os.path.join(fig_dir, f"Optim_log_acc_GWD_{self.pair_name}.png"))
 
+        if fig_dir is None:
+            fig_dir = self.save_path
+        plt.savefig(os.path.join(fig_dir, f"Optim_log_acc_GWD_{self.pair_name}.png"))
+        plt.clf()
         plt.close()
 
     def _show_OT(
@@ -969,6 +984,7 @@ class AlignRepresentations:
         fig_dir=None,
         ticks=None,
         filename=None,
+        save_dataframe=False,
         target_device=None,
     ):
 
@@ -986,6 +1002,7 @@ class AlignRepresentations:
                 fig_dir=fig_dir,
                 ticks=ticks,
                 filename=filename,
+                save_dataframe=save_dataframe,
                 target_device=target_device,
             )
 
@@ -1006,6 +1023,7 @@ class AlignRepresentations:
         fig_dir=None,
         ticks=None,
         filename=None,
+        save_dataframe=False,
     ):
         """_summary_
 
@@ -1063,7 +1081,8 @@ class AlignRepresentations:
                         fig_dir=None,
                         ticks=None,
                         filename=filename,
-                        target_device=target_device,
+                        save_dataframe=save_dataframe,
+                        target_device=target_device,   
                     )
 
                     processes.append(future)
@@ -1084,6 +1103,7 @@ class AlignRepresentations:
                     fig_dir=fig_dir,
                     ticks=ticks,
                     filename=filename,
+                    save_dataframe=save_dataframe,
                 )
 
         if self.config.n_jobs == 1:
@@ -1099,6 +1119,7 @@ class AlignRepresentations:
                 fig_dir=fig_dir,
                 ticks=ticks,
                 filename=filename,
+                save_dataframe=save_dataframe,
             )
         
         if self.config.n_jobs < 1:
@@ -1131,14 +1152,14 @@ class AlignRepresentations:
         results_dir,
         filename=None,
         fig_dir=None,
-        show_figure=True
+        visualization_config=VisualizationConfig(),
     ):
         for pairwise in self.pairwise_list:
             pairwise.get_optimization_log(
                 results_dir=results_dir,
                 filename=filename,
                 fig_dir=fig_dir,
-                show_figure=show_figure
+                **visualization_config(),
             )
 
     def calc_barycenter(self, X_init=None):
@@ -1313,12 +1334,10 @@ class AlignRepresentations:
             
             if show_figure:
                 plt.show()
-            else:
-                if fig_dir is None:
-                    fig_dir = os.path.dirname(pairwise.save_path)
-                plt.savefig(os.path.join(fig_dir, fig_name))
-            
-            plt.show()
+                
+            if fig_dir is None:
+                fig_dir = os.path.dirname(pairwise.save_path)
+            plt.savefig(os.path.join(fig_dir, fig_name))
             plt.close()
 
     def _get_dataframe(self, eval_type="ot_plan", concat=True):

@@ -166,6 +166,7 @@ def show_heatmap(
     if show_figure:
         plt.show()
     
+    plt.clf()
     plt.close()
 
 
