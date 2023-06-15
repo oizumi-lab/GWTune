@@ -684,8 +684,10 @@ class PairwiseAnalysis:
             study = self._run_optimization(compute_OT = False)
             df_trial = study.trials_dataframe()
 
+        figsize = kwargs.get('figsize', (8,6))
         
         # figure plotting epsilon as x-axis and GWD as y-axis
+        plt.figure(figsize=figsize)
         sns.scatterplot(data=df_trial, x="params_eps", y="value", s=50)
         plt.xlabel("$\epsilon$")
         plt.ylabel("GWD")
@@ -697,11 +699,13 @@ class PairwiseAnalysis:
    
         if fig_dir is None:
             fig_dir = self.save_path
+        
         plt.savefig(os.path.join(fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png"))
-
+        plt.clf()
         plt.close()
 
         # figure plotting GWD as x-axis and accuracy as y-axis
+        plt.figure(figsize=figsize)
         sns.scatterplot(data=df_trial, x="value", y="user_attrs_best_acc", s=50)
         plt.xlabel("GWD")
         plt.ylabel("accuracy")
@@ -714,7 +718,7 @@ class PairwiseAnalysis:
         if fig_dir is None:
             fig_dir = self.save_path
         plt.savefig(os.path.join(fig_dir, f"Optim_log_acc_GWD_{self.pair_name}.png"))
-
+        plt.clf()
         plt.close()
 
     def _show_OT(
