@@ -677,18 +677,18 @@ class PairwiseAnalysis:
         df_trial=None,
         filename=None,
         fig_dir=None,
-        show_figure=True,
         **kwargs,
     ):
-
-        if df_trial is None:
-            self._save_path_checker(results_dir, filename, compute_OT=False, delete_results=False)
-            study = self._run_optimization(compute_OT = False)
-            df_trial = study.trials_dataframe()
 
         figsize = kwargs.get('figsize', (8,6))
         cmap = kwargs.get('cmap', 'C0')
         marker_size = kwargs.get('marker_size', 20)
+        show_figure = kwargs.get('show_figure', False)
+        
+        if df_trial is None:
+            self._save_path_checker(results_dir, filename, compute_OT=False, delete_results=False)
+            study = self._run_optimization(compute_OT = False)
+            df_trial = study.trials_dataframe()
         
         # figure plotting epsilon as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
@@ -1153,14 +1153,14 @@ class AlignRepresentations:
         results_dir,
         filename=None,
         fig_dir=None,
-        show_figure=True,
+        visualization_config=VisualizationConfig(),
     ):
         for pairwise in self.pairwise_list:
             pairwise.get_optimization_log(
                 results_dir=results_dir,
                 filename=filename,
                 fig_dir=fig_dir,
-                show_figure=show_figure,
+                **visualization_config(),
             )
 
     def calc_barycenter(self, X_init=None):
