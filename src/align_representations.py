@@ -562,10 +562,12 @@ class PairwiseAnalysis:
         
         if not os.path.exists(self.save_path):
             if compute_OT == False:
+                warnings.simplefilter("always")
                 warnings.warn(
-                    "This computing is running for the first time in the 'results_dir'.",
+                    "compute_OT is False, but this computing is running for the first time in the 'results_dir'.",
                     UserWarning
                 )
+                warnings.simplefilter("ignore")
 
             compute_OT = True
 
@@ -587,21 +589,15 @@ class PairwiseAnalysis:
     def _run_optimization(
         self, 
         compute_OT,
-        target_device,
+        target_device = None,
         n_jobs_for_pairwise_analysis=1,
     ):
         """_summary_
 
         Args:
-            filename (_type_): _description_
-            save_path (_type_): _description_
-            storage (_type_): _description_
             compute_OT (_type_): _description_
-            target_device (_type_): _description_
-
-            n_jobs_for_pairwise_analysis (int, optional): Defaults to 1.
-                When calculating the alignment for a single pair, the optuna specification does not allow for parallel computation to speed up the process.
-                The implementation itself is possible, however.
+            target_device (_type_, optional): _description_. Defaults to None.
+            n_jobs_for_pairwise_analysis (int, optional): _description_. Defaults to 1.
 
         Returns:
             _type_: _description_
@@ -643,9 +639,12 @@ class PairwiseAnalysis:
             # 1. choose the initial matrix for GW alignment computation.
             init_plans = init_matrix.InitMatrix().implemented_init_plans(self.config.init_plans_list)
 
-            # used only in grid search sampler below the two lines
-            eps_space = opt.define_eps_space(self.config.eps_list, self.config.eps_log, self.config.num_trial)
-            search_space = {"eps": eps_space, "initialize": init_plans}
+            if self.config.sampler_name == "grid":
+                # used only in grid search sampler below the two lines
+                eps_space = opt.define_eps_space(self.config.eps_list, self.config.eps_log, self.config.num_trial)
+                search_space = {"eps": eps_space, "initialize": init_plans}
+            else:
+                search_space = None
 
             if target_device == None:
                 target_device = self.config.device
@@ -677,7 +676,8 @@ class PairwiseAnalysis:
 
         if df_trial is None:
             self._save_path_checker(results_dir, filename, compute_OT=False, delete_results=False)
-            _, df_trial = self._gw_alignment(compute_OT=False, target_device=None)
+            study = self._run_optimization(compute_OT = False)
+            df_trial = study.trials_dataframe()
 
         # figure plotting epsilon as x-axis and GWD as y-axis
         sns.scatterplot(data=df_trial, x="params_eps", y="value", s=50)
@@ -688,10 +688,10 @@ class PairwiseAnalysis:
 
         if show_figure:
             plt.show()
-        else:
-            if fig_dir is None:
-                fig_dir = self.save_path
-            plt.savefig(os.path.join(fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png"))
+   
+        if fig_dir is None:
+            fig_dir = self.save_path
+        plt.savefig(os.path.join(fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png"))
 
         plt.close()
 
@@ -704,10 +704,10 @@ class PairwiseAnalysis:
 
         if show_figure:
             plt.show()
-        else:
-            if fig_dir is None:
-                fig_dir = self.save_path
-            plt.savefig(os.path.join(fig_dir, f"Optim_log_acc_GWD_{self.pair_name}.png"))
+
+        if fig_dir is None:
+            fig_dir = self.save_path
+        plt.savefig(os.path.join(fig_dir, f"Optim_log_acc_GWD_{self.pair_name}.png"))
 
         plt.close()
 
@@ -1313,12 +1313,10 @@ class AlignRepresentations:
             
             if show_figure:
                 plt.show()
-            else:
-                if fig_dir is None:
-                    fig_dir = os.path.dirname(pairwise.save_path)
-                plt.savefig(os.path.join(fig_dir, fig_name))
-            
-            plt.show()
+                
+            if fig_dir is None:
+                fig_dir = os.path.dirname(pairwise.save_path)
+            plt.savefig(os.path.join(fig_dir, fig_name))
             plt.close()
 
     def _get_dataframe(self, eval_type="ot_plan", concat=True):

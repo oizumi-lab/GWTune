@@ -152,7 +152,7 @@ class RunOptuna:
         else:
             if kwargs.get("search_space") is not None:
                 warnings.warn("except for grid search, search space is ignored.", UserWarning)
-                del kwargs["search_space"]
+            del kwargs["search_space"]
 
         objective = functools.partial(objective, **kwargs)
 
@@ -175,6 +175,7 @@ class RunOptuna:
                 This doesn't always provide a benefit to speed up or to get a better results.",
                 UserWarning,
             )
+            warnings.filterwarnings("ignore")
 
         study.optimize(objective_device, self.num_trial, n_jobs=self.n_jobs)
 
