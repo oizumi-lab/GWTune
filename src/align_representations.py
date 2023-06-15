@@ -495,13 +495,13 @@ class PairwiseAnalysis:
         results_dir, 
         filename, 
         compute_OT, 
-        delete_results=False
+        delete_results=False,
     ):
         if filename is None:
             filename = self.config.data_name + "_" + self.pair_name
-
+        
         self.filename = filename
-        self.save_path = os.path.join(results_dir, filename)
+        self.save_path = os.path.join(results_dir, self.config.data_name, filename)
 
         # Generate the URL for the database. Syntax differs for SQLite and others.
         if self.config.db_params["drivername"] == "sqlite":
@@ -513,6 +513,8 @@ class PairwiseAnalysis:
         if delete_results:
             if not compute_OT and os.path.exists(self.save_path) and self.config.n_jobs == 1:
                 self._confirm_delete()
+            else:
+                self.delete_prev_results()
                 
     
     def _confirm_delete(self) -> None:
@@ -666,30 +668,30 @@ class PairwiseAnalysis:
 
     def get_optimization_log(
         self,
+        results_dir,
         df_trial=None,
-        results_dir=None,
         filename=None,
-        target_device=None,
         fig_dir=None,
         show_figure=True,
     ):
 
         if df_trial is None:
             self._save_path_checker(results_dir, filename, compute_OT=False, delete_results=False)
-            _, df_trial = self._gw_alignment(compute_OT=False, target_device=target_device)
+            _, df_trial = self._gw_alignment(compute_OT=False, target_device=None)
 
         # figure plotting epsilon as x-axis and GWD as y-axis
         sns.scatterplot(data=df_trial, x="params_eps", y="value", s=50)
         plt.xlabel("$\epsilon$")
         plt.ylabel("GWD")
         plt.title(f"$\epsilon$ - GWD ({self.pair_name})")
-        if fig_dir is not None:
-            fig_path = os.path.join(fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png")
-            plt.savefig(fig_path)
-        plt.tight_layout()
+        # plt.tight_layout()
 
         if show_figure:
             plt.show()
+        else:
+            if fig_dir is None:
+                fig_dir = self.save_path
+            plt.savefig(os.path.join(fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png"))
 
         plt.close()
 
@@ -698,13 +700,14 @@ class PairwiseAnalysis:
         plt.xlabel("GWD")
         plt.ylabel("accuracy")
         plt.title(f"GWD - accuracy ({self.pair_name})")
-        if fig_dir is not None:
-            fig_path = os.path.join(fig_dir, f"Optim_log_acc_GWD_{self.pair_name}.png")
-            plt.savefig(fig_path)
-        plt.tight_layout()
+        # plt.tight_layout()
 
         if show_figure:
             plt.show()
+        else:
+            if fig_dir is None:
+                fig_dir = self.save_path
+            plt.savefig(os.path.join(fig_dir, f"Optim_log_acc_GWD_{self.pair_name}.png"))
 
         plt.close()
 
@@ -1097,6 +1100,10 @@ class AlignRepresentations:
                 ticks=ticks,
                 filename=filename,
             )
+        
+        if self.config.n_jobs < 1:
+            raise ValueError("n_jobs > 0 is required in this toolbox.")
+            
 
         if return_data:
             return OT_list
@@ -1290,6 +1297,7 @@ class AlignRepresentations:
         make_hist=False, 
         fig_dir=None, 
         fig_name="Category_level_accuracy.png", 
+        show_figure=False,
     ):
 
         acc_list = []
@@ -1303,7 +1311,11 @@ class AlignRepresentations:
             plt.hist(acc_list)
             plt.xlabel("Accuracy")
             
-            if fig_dir is not None:
+            if show_figure:
+                plt.show()
+            else:
+                if fig_dir is None:
+                    fig_dir = os.path.dirname(pairwise.save_path)
                 plt.savefig(os.path.join(fig_dir, fig_name))
             
             plt.show()
