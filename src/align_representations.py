@@ -286,6 +286,7 @@ class Representation:
         plt.ylabel("Count")
         plt.grid(True)
         plt.show()
+        plt.clf()
         plt.close()
 
     def show_embedding(
