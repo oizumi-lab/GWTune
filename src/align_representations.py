@@ -495,13 +495,13 @@ class PairwiseAnalysis:
         results_dir, 
         filename, 
         compute_OT, 
-        delete_results=False
+        delete_results=False,
     ):
         if filename is None:
             filename = self.config.data_name + "_" + self.pair_name
-
+        
         self.filename = filename
-        self.save_path = os.path.join(results_dir, filename)
+        self.save_path = os.path.join(results_dir, self.config.data_name, filename)
 
         # Generate the URL for the database. Syntax differs for SQLite and others.
         if self.config.db_params["drivername"] == "sqlite":
