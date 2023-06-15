@@ -390,6 +390,7 @@ class PairwiseAnalysis:
         plt.legend(loc="upper left")
         plt.tight_layout()
         plt.show()
+        plt.clf()
         plt.close()
 
     def RSA(self, metric="spearman", method="normal"):
@@ -440,29 +441,29 @@ class PairwiseAnalysis:
         fig_dir=None,
         ticks=None,
         filename=None,
+        save_dataframe=False,
         target_device=None,
     ):
-        
-        """
-        Main Computation
+        """_summary_
 
         Args:
-            results_dir,
-            compute_OT = False,
-            OT_format = "default",
-            return_data = False,
-            return_figure = True,
-            visualization_config : VisualizationConfig = VisualizationConfig(),
-            show_log = False,
-            fig_dir = None,
-            ticks = None
-            filename=None,
-            target_device=None,
+            results_dir (_type_): _description_
+            compute_OT (bool, optional): _description_. Defaults to False.
+            delete_results (bool, optional): _description_. Defaults to False.
+            OT_format (str, optional): _description_. Defaults to "default".
+            return_data (bool, optional): _description_. Defaults to False.
+            return_figure (bool, optional): _description_. Defaults to True.
+            visualization_config (VisualizationConfig, optional): _description_. Defaults to VisualizationConfig().
+            show_log (bool, optional): _description_. Defaults to False.
+            fig_dir (_type_, optional): _description_. Defaults to None.
+            ticks (_type_, optional): _description_. Defaults to None.
+            filename (_type_, optional): _description_. Defaults to None.
+            save_dataframe (bool, optional): _description_. Defaults to False.
+            target_device (_type_, optional): _description_. Defaults to None.
 
         Returns:
-            OT : Optimal Transportation matrix
+            _type_: _description_
         """
-        
         self._save_path_checker(
             results_dir, 
             filename, 
@@ -487,6 +488,9 @@ class PairwiseAnalysis:
 
         if show_log:
             self.get_optimization_log(df_trial=df_trial, fig_dir=fig_dir)
+        
+        if save_dataframe:
+            df_trial.to_csv(self.save_path + '/' + self.filename + '.csv')
 
         return OT
     
@@ -672,6 +676,7 @@ class PairwiseAnalysis:
         filename=None,
         fig_dir=None,
         show_figure=True,
+        **kwargs,
     ):
 
         if df_trial is None:
@@ -679,6 +684,7 @@ class PairwiseAnalysis:
             study = self._run_optimization(compute_OT = False)
             df_trial = study.trials_dataframe()
 
+        
         # figure plotting epsilon as x-axis and GWD as y-axis
         sns.scatterplot(data=df_trial, x="params_eps", y="value", s=50)
         plt.xlabel("$\epsilon$")
@@ -969,6 +975,7 @@ class AlignRepresentations:
         fig_dir=None,
         ticks=None,
         filename=None,
+        save_dataframe=False,
         target_device=None,
     ):
 
@@ -986,6 +993,7 @@ class AlignRepresentations:
                 fig_dir=fig_dir,
                 ticks=ticks,
                 filename=filename,
+                save_dataframe=save_dataframe,
                 target_device=target_device,
             )
 
@@ -1006,6 +1014,7 @@ class AlignRepresentations:
         fig_dir=None,
         ticks=None,
         filename=None,
+        save_dataframe=False,
     ):
         """_summary_
 
@@ -1063,7 +1072,8 @@ class AlignRepresentations:
                         fig_dir=None,
                         ticks=None,
                         filename=filename,
-                        target_device=target_device,
+                        save_dataframe=save_dataframe,
+                        target_device=target_device,   
                     )
 
                     processes.append(future)
@@ -1084,6 +1094,7 @@ class AlignRepresentations:
                     fig_dir=fig_dir,
                     ticks=ticks,
                     filename=filename,
+                    save_dataframe=save_dataframe,
                 )
 
         if self.config.n_jobs == 1:
@@ -1099,6 +1110,7 @@ class AlignRepresentations:
                 fig_dir=fig_dir,
                 ticks=ticks,
                 filename=filename,
+                save_dataframe=save_dataframe,
             )
         
         if self.config.n_jobs < 1:
