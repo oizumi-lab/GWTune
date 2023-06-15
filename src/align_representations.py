@@ -19,6 +19,7 @@ from scipy.stats import pearsonr, spearmanr
 from sklearn import manifold
 from sqlalchemy import create_engine, URL
 from sqlalchemy_utils import create_database, database_exists, drop_database
+import glob
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
 from .gw_alignment import GW_Alignment
@@ -579,14 +580,14 @@ class PairwiseAnalysis:
 
         best_trial = study.best_trial
         df_trial = study.trials_dataframe()
+                
+        ot_path = glob.glob(self.save_path + "/" + best_trial.params["initialize"] + f"/gw_{best_trial.number}.*")[0]
 
-        if self.config.to_types == "numpy":
-            OT = np.load(self.save_path + "/" + best_trial.params["initialize"] + f"/gw_{best_trial.number}.npy")
+        if '.npy' in ot_path:
+            OT = np.load(ot_path)
 
-        elif self.config.to_types == "torch":
-            OT = torch.load(self.save_path + "/" + best_trial.params["initialize"] + f"/gw_{best_trial.number}.pt")
-
-            OT = OT.to("cpu").numpy()
+        elif '.pt' in ot_path:
+            OT = torch.load(ot_path).to("cpu").numpy()
 
         return OT, df_trial
 
