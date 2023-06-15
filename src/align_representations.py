@@ -900,12 +900,12 @@ class AlignRepresentations:
 
     def _get_pairwise_list(self, pair_number_list) -> List[PairwiseAnalysis]:
         if pair_number_list == "all":
-            pairs = itertools.combinations(range(len(self.representations_list)), 2)
+            self.pair_number_list = list(itertools.combinations(range(len(self.representations_list)), 2))
         else:
-            pairs = pair_number_list
+            self.pair_number_list = pair_number_list
 
         pairwise_list = []
-        for i, pair in enumerate(pairs):
+        for i, pair in enumerate(self.pair_number_list):
             s = self.representations_list[pair[0]]
             t = self.representations_list[pair[1]]
 
@@ -1124,14 +1124,14 @@ class AlignRepresentations:
         results_dir,
         filename=None,
         fig_dir=None,
-        show_figure=True,
+        show_figure=True
     ):
         for pairwise in self.pairwise_list:
             pairwise.get_optimization_log(
                 results_dir=results_dir,
                 filename=filename,
                 fig_dir=fig_dir,
-                show_figure=show_figure,
+                show_figure=show_figure
             )
 
     def calc_barycenter(self, X_init=None):
@@ -1344,9 +1344,40 @@ class AlignRepresentations:
             plt.savefig(os.path.join(fig_dir, fig_name))
         plt.show()
 
-    def procrustes_to_pivot(self):
-        pass
+    def _procrustes_to_pivot(self, pivot):
+        the_others, pivot_idx_list = self._check_pairs(pivot)
+        
+        # check whether 'pair_number_list' includes all pairs between the pivot and the other Representations
+        assert len(the_others) == len(self.representations_list)-1, "'pair_number_list' must include all pairs between the pivot and the other Representations."
+        
+        for pair_idx, pivot_idx in pivot_idx_list:
+            pairwise = self.pairwise_list[pair_idx]
+            
+            if pivot_idx == 0: # when the pivot is the source of the pairwise
+                source_idx = 1
+                OT = pairwise.OT.T
+                
+            elif pivot_idx == 1:# when the pivot is the target of the pairwise
+                source_idx = 0 
+                OT = pairwise.OT
+                
+            pivot = (pairwise.source, pairwise.target)[pivot_idx]
+            source = (pairwise.source, pairwise.target)[source_idx]
 
+            source.embedding = pairwise.procrustes(pivot.embedding, source.embedding, OT)
+    
+    def _check_pairs(self, pivot):
+        the_others = set()
+        pivot_idx_list = [] # [pair_idx, paivot_idx]
+        for i, pair in enumerate(self.pair_number_list):
+            if pivot in pair:
+                the_others.add(filter(lambda x: x != pivot, pair))
+                
+                pivot_idx = pair.index(pivot)
+                pivot_idx_list.append([i, pivot_idx])
+        
+        return the_others, pivot_idx_list
+    
     def visualize_embedding(
         self,
         dim,
@@ -1386,10 +1417,10 @@ class AlignRepresentations:
             fig_path = None
 
         if pivot != "barycenter":
-            # self.procrustes_to_pivot()
-            for i in range(len(self.pairwise_list) // 2):
-                pair = self.pairwise_list[i]
-                pair.source.embedding = pair.get_new_source_embedding()
+            self._procrustes_to_pivot(pivot)
+            #for i in range(len(self.pairwise_list) // 2):
+            #    pair = self.pairwise_list[i]
+            #    pair.source.embedding = pair.get_new_source_embedding()
 
         else:
             assert self.barycenter is not None
