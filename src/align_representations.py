@@ -687,10 +687,13 @@ class PairwiseAnalysis:
             df_trial = study.trials_dataframe()
 
         figsize = kwargs.get('figsize', (8,6))
+        cmap = kwargs.get('cmap', 'C0')
+        marker_size = kwargs.get('marker_size', 20)
         
         # figure plotting epsilon as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
-        sns.scatterplot(data=df_trial, x="params_eps", y="value", s=50)
+        # sns.scatterplot(data=df_trial, x="params_eps", y="value", s=50)
+        plt.scatter(df_trial["params_eps"], df_trial["value"], color = cmap, s = marker_size)
         plt.xlabel("$\epsilon$")
         plt.ylabel("GWD")
         plt.title(f"$\epsilon$ - GWD ({self.pair_name})")
@@ -708,10 +711,11 @@ class PairwiseAnalysis:
 
         # figure plotting GWD as x-axis and accuracy as y-axis
         plt.figure(figsize=figsize)
-        sns.scatterplot(data=df_trial, x="value", y="user_attrs_best_acc", s=50)
-        plt.xlabel("GWD")
-        plt.ylabel("accuracy")
-        plt.title(f"GWD - accuracy ({self.pair_name})")
+        # sns.scatterplot(data=df_trial, x="value", y="user_attrs_best_acc", s=50)
+        plt.scatter(df_trial["user_attrs_best_acc"], df_trial["value"], color = cmap, s = marker_size)
+        plt.xlabel("accuracy")
+        plt.ylabel("GWD")
+        plt.title(f"accuracy - GWD ({self.pair_name})")
         # plt.tight_layout()
 
         if show_figure:
