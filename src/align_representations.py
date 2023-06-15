@@ -668,8 +668,8 @@ class PairwiseAnalysis:
 
     def get_optimization_log(
         self,
+        results_dir,
         df_trial=None,
-        results_dir=None,
         filename=None,
         target_device=None,
         fig_dir=None,
