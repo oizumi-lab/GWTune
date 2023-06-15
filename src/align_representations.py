@@ -513,6 +513,8 @@ class PairwiseAnalysis:
         if delete_results:
             if not compute_OT and os.path.exists(self.save_path) and self.config.n_jobs == 1:
                 self._confirm_delete()
+            else:
+                self.delete_prev_results()
                 
     
     def _confirm_delete(self) -> None:
