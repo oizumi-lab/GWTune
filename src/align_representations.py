@@ -684,10 +684,7 @@ class PairwiseAnalysis:
         plt.xlabel("$\epsilon$")
         plt.ylabel("GWD")
         plt.title(f"$\epsilon$ - GWD ({self.pair_name})")
-        if fig_dir is not None:
-            fig_path = os.path.join(fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png")
-            plt.savefig(fig_path)
-        plt.tight_layout()
+        # plt.tight_layout()
 
         if show_figure:
             plt.show()
@@ -703,10 +700,7 @@ class PairwiseAnalysis:
         plt.xlabel("GWD")
         plt.ylabel("accuracy")
         plt.title(f"GWD - accuracy ({self.pair_name})")
-        if fig_dir is not None:
-            fig_path = os.path.join(fig_dir, f"Optim_log_acc_GWD_{self.pair_name}.png")
-            plt.savefig(fig_path)
-        plt.tight_layout()
+        # plt.tight_layout()
 
         if show_figure:
             plt.show()
