@@ -671,14 +671,13 @@ class PairwiseAnalysis:
         results_dir,
         df_trial=None,
         filename=None,
-        target_device=None,
         fig_dir=None,
         show_figure=True,
     ):
 
         if df_trial is None:
             self._save_path_checker(results_dir, filename, compute_OT=False, delete_results=False)
-            _, df_trial = self._gw_alignment(compute_OT=False, target_device=target_device)
+            _, df_trial = self._gw_alignment(compute_OT=False, target_device=None)
 
         # figure plotting epsilon as x-axis and GWD as y-axis
         sns.scatterplot(data=df_trial, x="params_eps", y="value", s=50)
