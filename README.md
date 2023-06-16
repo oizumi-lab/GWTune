@@ -18,7 +18,8 @@ For compatibility information, see the [official pytorch page](https://pytorch.o
 `data`: Dataset for tutorials.  
 `scripts`: Scripts for the GWOT optimization tutorials.  
 `src`: Core modules for GWOT hyperparameter optimization.  
-`utils`: Utility modules that are not specific for GWOT optimization but are useful for general purposes.  
+`src/utils`: Utility modules that are not specific for GWOT optimization but are useful for general purposes.  
+`experiment`: Folder for development and testing. 
 
 ## Core modules in src  
 
