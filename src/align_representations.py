@@ -489,7 +489,7 @@ class PairwiseAnalysis:
         )
 
         if show_log:
-            self.get_optimization_log(df_trial=df_trial, fig_dir=fig_dir)
+            self.get_optimization_log(results_dir, df_trial=df_trial, fig_dir=fig_dir)
         
         if save_dataframe:
             df_trial.to_csv(self.save_path + '/' + self.filename + '.csv')
