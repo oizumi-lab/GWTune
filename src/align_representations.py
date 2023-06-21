@@ -513,17 +513,17 @@ class PairwiseAnalysis:
         self.filename = filename
         self.save_path = os.path.join(results_dir, self.config.data_name, filename)
         
-        self.figure_path = self.save_path + '/figure/' + self.config.init_mat_plan
+        self.figure_path = os.path.join(self.save_path, self.config.init_mat_plan, 'figure')
 
         # Generate the URL for the database. Syntax differs for SQLite and others.
         if self.config.db_params["drivername"] == "sqlite":
             self.storage = "sqlite:///" + self.save_path + "/" + filename + "_" + self.config.init_mat_plan + ".db"
         else:
-            self.storage = URL.create(database=filename, **self.config.db_params).render_as_string(hide_password=False)
+            # self.storage = URL.create(database=filename, **self.config.db_params).render_as_string(hide_password=False)
             # MySQL用の修正案です。使いやすいようにしてもらえたらと思います。
-            # self.storage = URL.create(
-            #     database=filename + "_" + self.config.init_mat_plan, 
-            #     **self.config.db_params).render_as_string(hide_password=False)
+            self.storage = URL.create(
+                database=filename + "_" + self.config.init_mat_plan, 
+                **self.config.db_params).render_as_string(hide_password=False)
 
         # Delete the previous results if the flag is True.
         if delete_results:
@@ -702,7 +702,6 @@ class PairwiseAnalysis:
         
         # figure plotting epsilon as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
-        # sns.scatterplot(data=df_trial, x="params_eps", y="value", s=50)
         plt.scatter(df_trial["params_eps"], df_trial["value"], color = cmap, s = marker_size)
         plt.xlabel("$\epsilon$")
         plt.ylabel("GWD")
@@ -722,7 +721,6 @@ class PairwiseAnalysis:
 
         # figure plotting GWD as x-axis and accuracy as y-axis
         plt.figure(figsize=figsize)
-        # sns.scatterplot(data=df_trial, x="value", y="user_attrs_best_acc", s=50)
         plt.scatter(df_trial["user_attrs_best_acc"], df_trial["value"], color = cmap, s = marker_size)
         plt.xlabel("accuracy")
         plt.ylabel("GWD")
