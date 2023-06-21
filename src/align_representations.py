@@ -781,27 +781,14 @@ class PairwiseAnalysis:
             else:
                 raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
 
-    def calc_category_level_accuracy(self, category_mat: pd.DataFrame):
-        category_mat = category_mat.values
-        count = 0
-
-        for i in range(self.OT.shape[0]):
-            max_index = np.argmax(self.OT[i])
-
-            if np.array_equal(category_mat[i], category_mat[max_index]):
-                count += 1
-
-        accuracy = count / self.OT.shape[0] * 100
-
-        return accuracy
-
     def eval_accuracy(
         self,
         top_k_list,
         eval_type="ot_plan",
         metric="cosine",
         barycenter=False,
-        supervised=False
+        supervised=False,
+        category_mat=None
     ):
         df = pd.DataFrame()
         df["top_n"] = top_k_list
@@ -827,15 +814,31 @@ class PairwiseAnalysis:
             elif eval_type == "ot_plan":
                 acc = self._calc_accuracy_with_topk_diagonal(OT, k=k, order="maximum")
 
+            elif eval_type == "category":
+                assert category_mat is not None
+                acc = self._calc_accuracy_with_topk_diagonal(OT, k=k, order="maximum", category_mat=category_mat)
+
             acc_list.append(acc)
 
         df[self.pair_name] = acc_list
 
         return df
 
-    def _calc_accuracy_with_topk_diagonal(self, matrix, k, order="maximum"):
+    def _calc_accuracy_with_topk_diagonal(self, matrix, k, order="maximum", category_mat=None):
         # Get the diagonal elements
-        diagonal = np.diag(matrix)
+        if category_mat is None:
+            diagonal = np.diag(matrix)
+        else:
+            category_mat = category_mat.values
+            
+            diagonal = []
+            for i in range(matrix.shape[0]):
+                category = category_mat[i]
+
+                matching_rows = np.where(np.all(category_mat == category, axis=1))[0]
+                matching_elements = matrix[i, matching_rows] # get the columns of which category are the same as i-th row
+
+                diagonal.append(np.max(matching_elements))
 
         # Get the top k values for each row
         if order == "maximum":
@@ -1291,12 +1294,12 @@ class AlignRepresentations:
             OT *= len(OT)  # normalize
             self.pairwise_list[i].OT = OT
 
-    def calc_accuracy(self, top_k_list, eval_type="ot_plan", barycenter=False):
+    def calc_accuracy(self, top_k_list, eval_type="ot_plan", category_mat=None, barycenter=False):
         accuracy = pd.DataFrame()
         accuracy["top_n"] = top_k_list
 
         for pairwise in self.pairwise_list:
-            df = pairwise.eval_accuracy(top_k_list, eval_type=eval_type, metric=self.metric, barycenter=barycenter)
+            df = pairwise.eval_accuracy(top_k_list, eval_type=eval_type, metric=self.metric, barycenter=barycenter, category_mat=category_mat)
 
             accuracy = pd.merge(accuracy, df, on="top_n")
 
@@ -1310,38 +1313,19 @@ class AlignRepresentations:
             self.k_nearest_matching_rate = accuracy
             print("K nearest matching rate : \n", accuracy)
 
+        elif eval_type == "category":
+            self.category_level_accuracy = accuracy
+            print("category level accuracy : \n", accuracy)
+
         print("Mean : \n", accuracy.iloc[:, 1:].mean(axis="columns"))
 
-    def calc_category_level_accuracy(
-        self,
-        category_mat=None,
-        make_hist=False, 
-        fig_dir=None, 
-        fig_name="Category_level_accuracy.png", 
-        show_figure=False,
-    ):
-
-        acc_list = []
-        for pairwise in self.pairwise_list:
-            acc = pairwise.calc_category_level_accuracy(category_mat=category_mat)
-            print(f"{pairwise.pair_name} :  {acc}")
-            acc_list.append(acc)
-
-        if make_hist:
-            plt.figure()
-            plt.hist(acc_list)
-            plt.xlabel("Accuracy")
-            
-            if show_figure:
-                plt.show()
-                
-            if fig_dir is None:
-                fig_dir = os.path.dirname(pairwise.save_path)
-            plt.savefig(os.path.join(fig_dir, fig_name))
-            plt.close()
-
     def _get_dataframe(self, eval_type="ot_plan", concat=True):
-        df = self.top_k_accuracy if eval_type == "ot_plan" else self.k_nearest_matching_rate
+        if eval_type == "ot_plan":
+            df = self.top_k_accuracy
+        elif eval_type == "k_nearest":
+            df = self.k_nearest_matching_rate
+        elif eval_type == "category":
+            df = self.category_level_accuracy
 
         cols = [col for col in df.columns if "top_n" not in col]
         df = df[cols]
