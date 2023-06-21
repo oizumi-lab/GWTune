@@ -6,29 +6,25 @@ import ot
 class InitMatrix():
     def __init__(self, matrix_size = None):
         self.matrix_size = matrix_size
-        self.initialize = ['uniform', 'random', 'permutation', 'diag'] # 実装済みの方法の名前を入れる。
+        self.initialize = ['uniform', 'random', 'permutation', 'diag'] # already implemented.
 
-    def implemented_init_plans(self, init_plans_list): # リストを入力して、実行可能な方法のみをリストにして返す。
-        """
-        ここから、初期値の条件を1個または複数個選択することができる。
-        選択はself.initializeの中にあるものの中から。
-        選択したい条件が1つであっても、リストで入力をすること。
+    def implemented_init_plans(self, init_mat_plan):
+        """_summary_
 
         Args:
-            init_plans_list (list) : 初期値の条件を1個または複数個入れたリスト。
+            init_mat_plan (_type_): _description_
 
         Raises:
-            ValueError: 選択したい条件が1つであっても、リストで入力をすること。
+            ValueError: _description_
 
         Returns:
-            list : 選択希望の条件のリスト。
+            _type_: _description_
         """
-
-        if type(init_plans_list) != list:
-            raise ValueError('variable named "init_plans_list" is not list!')
+        if init_mat_plan not in self.initialize:
+            raise ValueError('init_mat_plan :' + init_mat_plan + ' was not implemented in this toolbox.')
 
         else:
-            return [v for v in self.initialize if v in init_plans_list]
+            return init_mat_plan
 
     def make_initial_T(self, initialize, seed = 42):
         """

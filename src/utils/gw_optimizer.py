@@ -27,6 +27,7 @@ def load_optimizer(
     pruner_params=None,
     n_iter=10,
     filename="test",
+    init_mat_plan="random",
     storage=None,
 ):
 
@@ -55,7 +56,17 @@ def load_optimizer(
 
     if method == "optuna":
         Opt = RunOptuna(
-            save_path, to_types, storage, filename, sampler_name, pruner_name, pruner_params, n_iter, n_jobs, num_trial
+            save_path, 
+            to_types, 
+            storage, 
+            filename, 
+            init_mat_plan,
+            sampler_name, 
+            pruner_name, 
+            pruner_params, 
+            n_iter, 
+            n_jobs, 
+            num_trial,
         )
     else:
         raise ValueError("no implemented method.")
@@ -70,6 +81,7 @@ class RunOptuna:
         to_types,
         storage,
         filename,
+        init_mat_plan,
         sampler_name,
         pruner_name,
         pruner_params,
@@ -83,6 +95,7 @@ class RunOptuna:
         self.to_types = to_types
         self.storage = storage
         self.filename = filename
+        self.init_mat_plan = init_mat_plan
 
         # setting of optuna
         self.sampler_name = sampler_name
@@ -118,7 +131,7 @@ class RunOptuna:
     def create_study(self, direction="minimize"):
         study = optuna.create_study(
             direction=direction,
-            study_name=self.filename,
+            study_name=self.filename + "_" + self.init_mat_plan,
             storage=self.storage,
             load_if_exists=True,
         )
@@ -133,7 +146,7 @@ class RunOptuna:
             _type_: _description_
         """
         study = optuna.load_study(
-            study_name=self.filename,
+            study_name=self.filename + "_" + self.init_mat_plan,
             sampler=self.choose_sampler(seed=seed),
             pruner=self.choose_pruner(),
             storage=self.storage,
@@ -162,7 +175,7 @@ class RunOptuna:
         try:
             study = self.load_study(seed=seed)
         except KeyError:
-            print("Study for " + self.filename + " was not found, creating a new one...")
+            print("Study for " + self.filename + "_" + self.init_mat_plan + " was not found, creating a new one...")
             self.create_study()
             study = self.load_study(seed=seed)
         
@@ -212,11 +225,14 @@ class RunOptuna:
         """
         if self.pruner_name == "median":
             pruner = optuna.pruners.MedianPruner(
-                n_startup_trials=self.n_startup_trials, n_warmup_steps=self.n_warmup_steps
+                n_startup_trials=self.n_startup_trials, 
+                n_warmup_steps=self.n_warmup_steps
             )
         elif self.pruner_name.lower() == "hyperband":
             pruner = optuna.pruners.HyperbandPruner(
-                min_resource=self.min_resource, max_resource=self.n_iter, reduction_factor=self.reduction_factor
+                min_resource=self.min_resource, 
+                max_resource=self.n_iter, 
+                reduction_factor=self.reduction_factor
             )
         elif self.pruner_name.lower() == "nop":
             pruner = optuna.pruners.NopPruner()

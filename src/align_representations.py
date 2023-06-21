@@ -24,7 +24,7 @@ import glob
 sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
 from .gw_alignment import GW_Alignment
 from .histogram_matching import SimpleHistogramMatching
-from .utils import gw_optimizer, init_matrix, visualize_functions
+from .utils import gw_optimizer, visualize_functions
 
 # %%
 class OptimizationConfig:
@@ -39,12 +39,11 @@ class OptimizationConfig:
         n_jobs=1,
         multi_gpu: Union[bool, List[int]] = False,
         db_params={"drivername": "mysql", "username": "root", "password": "", "host": "localhost", "port": 3306},
-        init_plans_list=["random"],
+        init_mat_plan="random",
         n_iter=1,
         max_iter=200,
         data_name="THINGS",
         sampler_name="tpe",
-        sampler_seed=42,
         pruner_name="hyperband",
         pruner_params={"n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3},
     ) -> None:
@@ -64,7 +63,6 @@ class OptimizationConfig:
             max_iter (int, optional): _description_. Defaults to 200.
             data_name (str, optional): _description_. Defaults to "THINGS".
             sampler_name (str, optional): _description_. Defaults to "tpe".
-            sampler_seed (int, optional): _description_. Defaults to 42.
             pruner_name (str, optional): _description_. Defaults to "hyperband".
             pruner_params (dict, optional): _description_. Defaults to { "n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3 }.
         """
@@ -81,17 +79,15 @@ class OptimizationConfig:
 
         self.db_params = db_params
 
-        self.init_plans_list = init_plans_list
+        self.init_mat_plan = init_mat_plan
         self.n_iter = n_iter
         self.max_iter = max_iter
         self.sampler_name = sampler_name
-        self.sampler_seed = sampler_seed
-
+        
         self.data_name = data_name
 
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
-
 
 class VisualizationConfig:
     def __init__(
@@ -149,7 +145,6 @@ class VisualizationConfig:
 
     def __call__(self):
         return self.visualization_params
-
 
 class Representation:
     """
@@ -445,6 +440,7 @@ class PairwiseAnalysis:
         filename=None,
         save_dataframe=False,
         target_device=None,
+        sampler_seed=42,
     ):
         """_summary_
 
@@ -473,10 +469,18 @@ class PairwiseAnalysis:
             delete_results=delete_results    
         )
         
-        self.OT, df_trial = self._gw_alignment(compute_OT, target_device=target_device)
+        self.OT, df_trial = self._gw_alignment(
+            compute_OT, 
+            target_device=target_device, 
+            sampler_seed=sampler_seed,
+        )
 
         if fig_dir is None:
-            fig_dir = self.save_path
+            fig_dir = self.figure_path
+            
+            if not os.path.exists(fig_dir):
+                os.makedirs(fig_dir, exist_ok=True)
+        
 
         OT = self._show_OT(
             title=f"$\Gamma$ ({self.pair_name})",
@@ -508,12 +512,18 @@ class PairwiseAnalysis:
         
         self.filename = filename
         self.save_path = os.path.join(results_dir, self.config.data_name, filename)
+        
+        self.figure_path = self.save_path + '/figure/' + self.config.init_mat_plan
 
         # Generate the URL for the database. Syntax differs for SQLite and others.
         if self.config.db_params["drivername"] == "sqlite":
-            self.storage = "sqlite:///" + self.save_path + "/" + filename + ".db"
+            self.storage = "sqlite:///" + self.save_path + "/" + filename + "_" + self.config.init_mat_plan + ".db"
         else:
             self.storage = URL.create(database=filename, **self.config.db_params).render_as_string(hide_password=False)
+            # MySQL用の修正案です。使いやすいようにしてもらえたらと思います。
+            # self.storage = URL.create(
+            #     database=filename + "_" + self.config.init_mat_plan, 
+            #     **self.config.db_params).render_as_string(hide_password=False)
 
         # Delete the previous results if the flag is True.
         if delete_results:
@@ -522,7 +532,6 @@ class PairwiseAnalysis:
             else:
                 self.delete_prev_results()
                 
-    
     def _confirm_delete(self) -> None:
         while True:
             confirmation = input(
@@ -555,7 +564,7 @@ class PairwiseAnalysis:
                 os.rmdir(dir_path)
         shutil.rmtree(save_path)
 
-    def _gw_alignment(self, compute_OT, target_device=None):
+    def _gw_alignment(self, compute_OT, target_device=None, sampler_seed=42):
         """_summary_
 
         Args:
@@ -577,12 +586,12 @@ class PairwiseAnalysis:
 
             compute_OT = True
 
-        study = self._run_optimization(compute_OT, target_device)
-
+        study = self._run_optimization(compute_OT, target_device, sampler_seed=sampler_seed)
+        
         best_trial = study.best_trial
         df_trial = study.trials_dataframe()
                 
-        ot_path = glob.glob(self.save_path + "/" + best_trial.params["initialize"] + f"/gw_{best_trial.number}.*")[0]
+        ot_path = glob.glob(self.save_path + "/" + self.config.init_mat_plan + f"/gw_{best_trial.number}.*")[0]
 
         if '.npy' in ot_path:
             OT = np.load(ot_path)
@@ -596,6 +605,7 @@ class PairwiseAnalysis:
         self, 
         compute_OT,
         target_device = None,
+        sampler_seed = 42,
         n_jobs_for_pairwise_analysis=1,
     ):
         """_summary_
@@ -620,6 +630,7 @@ class PairwiseAnalysis:
             pruner_params=self.config.pruner_params,
             n_iter=self.config.n_iter,
             filename=self.filename,
+            init_mat_plan=self.config.init_mat_plan,
             storage=self.storage,
         )
 
@@ -643,12 +654,12 @@ class PairwiseAnalysis:
 
             # optimization
             # 1. choose the initial matrix for GW alignment computation.
-            init_plans = init_matrix.InitMatrix().implemented_init_plans(self.config.init_plans_list)
+            init_plan = gw.main_compute.init_mat_builder.implemented_init_plans(self.config.init_mat_plan)
 
             if self.config.sampler_name == "grid":
                 # used only in grid search sampler below the two lines
                 eps_space = opt.define_eps_space(self.config.eps_list, self.config.eps_log, self.config.num_trial)
-                search_space = {"eps": eps_space, "initialize": init_plans}
+                search_space = {"eps": eps_space}
             else:
                 search_space = None
 
@@ -659,8 +670,8 @@ class PairwiseAnalysis:
             study = opt.run_study(
                 gw,
                 target_device,
-                seed=self.config.sampler_seed,
-                init_plans_list=init_plans,
+                seed=sampler_seed,
+                init_mat_plan=init_plan,
                 eps_list=self.config.eps_list,
                 eps_log=self.config.eps_log,
                 search_space=search_space,
@@ -697,14 +708,15 @@ class PairwiseAnalysis:
         plt.ylabel("GWD")
         plt.title(f"$\epsilon$ - GWD ({self.pair_name})")
         # plt.tight_layout()
-
+        
+        if fig_dir is None:
+            fig_dir = self.figure_path
+            
+        plt.savefig(os.path.join(fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png"))
+        
         if show_figure:
             plt.show()
-   
-        if fig_dir is None:
-            fig_dir = self.save_path
         
-        plt.savefig(os.path.join(fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png"))
         plt.clf()
         plt.close()
 
@@ -717,12 +729,16 @@ class PairwiseAnalysis:
         plt.title(f"accuracy - GWD ({self.pair_name})")
         # plt.tight_layout()
 
-        if show_figure:
-            plt.show()
+    
 
         if fig_dir is None:
-            fig_dir = self.save_path
+            fig_dir = self.figure_path
+            
         plt.savefig(os.path.join(fig_dir, f"Optim_log_acc_GWD_{self.pair_name}.png"))
+        
+        if show_figure:
+            plt.show()
+        
         plt.clf()
         plt.close()
 
@@ -989,10 +1005,15 @@ class AlignRepresentations:
         filename=None,
         save_dataframe=False,
         target_device=None,
+        change_sampler_seed=False,
+        sampler_seed=42,
     ):
 
         OT_list = []
         for pairwise in self.pairwise_list:
+            if change_sampler_seed:
+                sampler_seed += 1
+ 
             OT = pairwise.run_gw(
                 results_dir=results_dir,
                 compute_OT=compute_OT,
@@ -1007,6 +1028,7 @@ class AlignRepresentations:
                 filename=filename,
                 save_dataframe=save_dataframe,
                 target_device=target_device,
+                sampler_seed=sampler_seed,
             )
 
             OT_list.append(OT)
@@ -1027,12 +1049,15 @@ class AlignRepresentations:
         ticks=None,
         filename=None,
         save_dataframe=False,
+        change_sampler_seed=False,
+        fix_sampler_seed=42,
     ):
         """_summary_
 
         Args:
             results_dir (_type_): _description_
             compute_OT (bool, optional): _description_. Defaults to False.
+            delete_results (bool, optional): _description_. Defaults to False.
             return_data (bool, optional): _description_. Defaults to False.
             return_figure (bool, optional): _description_. Defaults to True.
             OT_format (str, optional): _description_. Defaults to "default".
@@ -1040,6 +1065,10 @@ class AlignRepresentations:
             show_log (bool, optional): _description_. Defaults to False.
             fig_dir (_type_, optional): _description_. Defaults to None.
             ticks (_type_, optional): _description_. Defaults to None.
+            filename (_type_, optional): _description_. Defaults to None.
+            save_dataframe (bool, optional): _description_. Defaults to False.
+            change_sampler_seed (bool, optional): _description_. Defaults to False.
+            fix_sampler_seed (Union[bool, int], optional): _description_. Defaults to 42.
 
         Raises:
             ValueError: _description_
@@ -1047,6 +1076,11 @@ class AlignRepresentations:
         Returns:
             _type_: _description_
         """
+        
+        if isinstance(fix_sampler_seed, int) and fix_sampler_seed > -1:
+            first_sampler_seed = fix_sampler_seed
+        else:
+            raise ValueError("please 'sampler_seed' = True or False or int > 0.")
 
         if self.config.n_jobs > 1:
             OT_list = []
@@ -1070,6 +1104,11 @@ class AlignRepresentations:
                         if self.config.multi_gpu != False:
                             warnings.warn("numpy doesn't use GPU. Please 'multi_GPU = False'.", UserWarning)
                         target_device = self.config.device
+                    
+                    if change_sampler_seed:
+                        sampler_seed = first_sampler_seed + pair_number
+                    else:
+                        sampler_seed = first_sampler_seed
 
                     future = pool.submit(
                         pairwise.run_gw,
@@ -1085,7 +1124,8 @@ class AlignRepresentations:
                         ticks=None,
                         filename=filename,
                         save_dataframe=save_dataframe,
-                        target_device=target_device,   
+                        target_device=target_device,
+                        sampler_seed=sampler_seed,   
                     )
 
                     processes.append(future)
@@ -1123,6 +1163,8 @@ class AlignRepresentations:
                 ticks=ticks,
                 filename=filename,
                 save_dataframe=save_dataframe,
+                change_sampler_seed=change_sampler_seed,
+                sampler_seed=first_sampler_seed,
             )
         
         if self.config.n_jobs < 1:
@@ -1350,7 +1392,7 @@ class AlignRepresentations:
                 plt.plot(df.index, df[group], c="blue")
 
         plt.ylim(0, 100)
-        plt.xlabel("k")
+        plt.xlabel("top k")
         plt.ylabel("Matching rate")
         # plt.legend(loc = "best")
         plt.tick_params(axis="both", which="major")

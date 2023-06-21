@@ -77,7 +77,7 @@ class GW_Alignment:
 
         return trial, eps
 
-    def __call__(self, trial, device, init_plans_list, eps_list, eps_log=True):
+    def __call__(self, trial, device, init_mat_plan, eps_list, eps_log=True):
         if self.to_types == "numpy":
             assert device == "cpu", "numpy does not run in CUDA."
 
@@ -87,9 +87,9 @@ class GW_Alignment:
 
         trial, eps = self.define_eps_range(trial, eps_list, eps_log)
 
-        init_mat_plan = trial.suggest_categorical(
-            "initialize", init_plans_list
-        )  # init_matをdeviceに上げる作業はentropic_gw中で行うことにしました。(2023/3/14 阿部)
+        # init_mat_plan = trial.suggest_categorical(
+        #     "initialize", init_plans_list
+        # )  # init_matをdeviceに上げる作業はentropic_gw中で行うことにしました。(2023/3/14 阿部)
 
         trial.set_user_attr("size", self.size)
 
@@ -125,52 +125,6 @@ class GW_Alignment:
         gc.collect()
 
         return gw_loss
-
-    def load_graph(self, study):
-        best_trial = study.best_trial
-        eps = best_trial.params["eps"]
-        init_plan = best_trial.params["initialize"]
-
-        acc = best_trial.user_attrs["best_acc"]
-
-        # size = best_trial.user_attrs['size']
-        number = best_trial.number
-
-        if self.to_types == "torch":
-            gw = torch.load(self.save_path + "/" + init_plan + f"/gw_{number}.pt")
-        elif self.to_types == "numpy":
-            gw = np.load(self.save_path + "/" + init_plan + f"/gw_{number}.npy")
-
-        self.plot_coupling(gw, eps, acc)
-
-    def make_eval_graph(self, study):
-        df_test = study.trials_dataframe()
-        success_test = df_test[df_test["values_0"] != float("nan")]
-
-        plt.figure()
-        plt.title("The evaluation of GW results for random pictures")
-        plt.scatter(
-            success_test["values_1"],
-            np.log(success_test["values_0"]),
-            label="init diag plan (" + str(self.size) + ")",
-            c="C0",
-        )
-        plt.xlabel("accuracy")
-        plt.ylabel("log(GWD)")
-        plt.legend()
-        plt.show()
-
-    def plot_coupling(self, T, epsilon, acc):
-        mplstyle.use("fast")
-        N = T.shape[0]
-        plt.figure(figsize=(8, 6))
-        if self.to_types == "torch":
-            T = T.to("cpu").numpy()
-        sns.heatmap(T)
-
-        plt.title("GW results ({} pictures, eps={}, acc.= {})".format(N, round(epsilon, 6), round(acc, 4)))
-        plt.tight_layout()
-        plt.show()
 
 
 class MainGromovWasserstainComputation:
@@ -417,47 +371,3 @@ class MainGromovWasserstainComputation:
 
         else:
             raise ValueError("Not defined initialize matrix.")
-
-
-# %%
-if __name__ == "__main__":
-
-    os.chdir(os.path.dirname(__file__))
-
-    path1 = "../data/model1.pt"
-    path2 = "../data/model2.pt"
-    unittest_save_path = "../results/unittest/gw_alignment"
-
-    model1 = torch.load(path1)
-    model2 = torch.load(path2)
-    p = ot.unif(len(model1))
-    q = ot.unif(len(model2))
-
-    init_mat_types = ["random"]
-    eps_list = [1e-3, 1e-2]
-    eps_log = True
-
-    dataset = GW_Alignment(model1, model2, p, q, max_iter=100, n_iter=4, save_path=unittest_save_path)
-
-    # %%
-    seed = 42
-    study = optuna.create_study(
-        direction="minimize",
-        study_name="test",
-        sampler=optuna.samplers.TPESampler(seed=seed),
-        pruner=optuna.pruners.MedianPruner(),
-        storage="sqlite:///" + unittest_save_path + "/" + init_mat_types[0] + ".db",
-        load_if_exists=True,
-    )
-
-    device = "cuda"
-
-    start = time.time()
-    study.optimize(lambda trial: dataset(trial, device, init_mat_types, eps_list), n_trials=20)
-    end = time.time() - start
-    print("Time", end)
-    #%%
-    df = study.trials_dataframe()
-    print(df)
-    # %%
-    df.dropna()
