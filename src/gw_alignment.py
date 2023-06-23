@@ -335,10 +335,16 @@ class MainGromovWasserstainComputation:
             best_gw_loss = float("inf")
 
             pbar = tqdm(np.random.randint(0, 100000, self.n_iter))
-            pbar.set_description("trial number : " + str(trial.number))
+            pbar.set_description("trial: " + str(trial.number) + ", eps:" + str(round(eps, 3)))
 
             for i, seed in enumerate(pbar):
-                c_gw, c_logv, c_gw_loss, c_acc, c_init_mat = self.gw_alignment_computation(
+                (
+                    c_gw, 
+                    c_logv, 
+                    c_gw_loss, 
+                    c_acc, 
+                    c_init_mat
+                ) = self.gw_alignment_computation(
                     init_mat_plan,
                     eps,
                     self.max_iter,
@@ -349,7 +355,13 @@ class MainGromovWasserstainComputation:
                 )
 
                 if c_gw_loss < best_gw_loss:
-                    best_gw, best_logv, best_gw_loss, best_acc, best_init_mat = (
+                    (
+                        best_gw, 
+                        best_logv, 
+                        best_gw_loss, 
+                        best_acc, 
+                        best_init_mat, 
+                    ) = (
                         c_gw,
                         c_logv,
                         c_gw_loss,
