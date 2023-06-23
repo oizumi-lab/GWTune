@@ -77,9 +77,11 @@ def revised(matrix, k, order="maximum", category_mat=None):
 
     # Get the top k values for each row
     if order == "maximum":
-        _indices = np.argpartition(matrix, -k, axis=0)[-k:, :]
-        topk_values = np.take_along_axis(matrix, _indices, axis=0)
+        idx = np.argpartition(matrix, -k, axis=0)[-k:, :]
+        topk_values = np.take_along_axis(matrix, idx, axis=0)
     elif order == "minimum":
+        idx = np.argpartition(matrix, k, axis=0)[:k, :]
+        topk_values = np.take_along_axis(matrix, idx, axis=0)
         pass
     else:
         raise ValueError("Invalid order parameter. Must be 'maximum' or 'minimum'.")
@@ -109,6 +111,7 @@ print(diag_ii)
 print(argmin_ii) # 実際
 print(np.arange(ot_shape)) # 正解
 
-original(ii, k=1, order='minimum')
+print(original(ii, k=1, order='minimum'))
+print(revised(ii, k=1, order='minimum'))
 
 # %%
