@@ -77,7 +77,7 @@ def revised(matrix, k, order="maximum", category_mat=None):
     # Get the top k values for each row
     if order == "maximum":
         _indices = np.argpartition(matrix, -k, axis=0)[-k:, :]
-        topk_values = np.take_along_axis(ii, _indices, axis=0)
+        topk_values = np.take_along_axis(matrix, _indices, axis=0)
     elif order == "minimum":
         pass
     else:
