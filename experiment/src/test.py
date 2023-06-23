@@ -24,6 +24,7 @@ print(argmax_ii) # 実際
 print(np.arange(ot_shape)) # 正解
 
 # %%
+# 武田さんのコード
 def original(matrix, k, order="maximum", category_mat=None):
     # Get the diagonal elements
     if category_mat is None:
@@ -57,7 +58,7 @@ def original(matrix, k, order="maximum", category_mat=None):
 
     return accuracy
     
-    
+# 修正後 
 def revised(matrix, k, order="maximum", category_mat=None):    
     # Get the diagonal elements
     if category_mat is None:
