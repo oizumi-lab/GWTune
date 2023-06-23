@@ -335,7 +335,7 @@ class MainGromovWasserstainComputation:
             best_gw_loss = float("inf")
 
             pbar = tqdm(np.random.randint(0, 100000, self.n_iter))
-            pbar.set_description("trial: " + str(trial.number) + ", eps:" + str(round(eps, 3)))
+            pbar.set_description(f"Trial No.:{trial.number}, eps:{eps:.3e}")
 
             for i, seed in enumerate(pbar):
                 (
