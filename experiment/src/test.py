@@ -14,8 +14,8 @@ plt.colorbar()
 
 # %%
 diag_ii = np.diag(ii)
-argmax_ii = np.argmax(ii, axis=0) 
-max_ii = np.max(ii, axis=0)
+argmax_ii = np.argmax(ii, axis=1) 
+max_ii = np.max(ii, axis=1)
 
 print(max_ii)
 print(diag_ii)
@@ -102,8 +102,8 @@ print(revised(ii, k=1))
 # diag = minの場合
 # 武田さんに確認中・・・
 diag_ii = np.diag(ii)
-argmin_ii = np.argmin(ii, axis=0) 
-min_ii = np.min(ii, axis=0)
+argmin_ii = np.argmin(ii, axis=1) 
+min_ii = np.min(ii, axis=1)
 
 print(min_ii)
 print(diag_ii)
