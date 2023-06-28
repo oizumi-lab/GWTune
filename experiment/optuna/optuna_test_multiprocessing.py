@@ -4,7 +4,7 @@ import torch
 import torch.multiprocessing as mp
 import numpy as np
 torch.manual_seed(42)
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 
 
 def objective(trial, test_arr):
@@ -18,27 +18,33 @@ def multi_run(seed, i, n_trials):
     device = 'cuda:0'#+str(i)
     test_arr = torch.randn(10).to(device)
 
-    # sampler = optuna.samplers.RandomSampler(seed = seed + i)
-    sampler = optuna.samplers.GridSampler(search_space, seed = seed + i)
+    sampler = optuna.samplers.RandomSampler(seed = seed + i)
+    # sampler = optuna.samplers.GridSampler(search_space, seed = seed + i)
     loaded_study = optuna.load_study(sampler = sampler, study_name="my_study", storage="sqlite:///cuda_test.db")
     loaded_study.optimize(lambda trial: objective(trial, test_arr), n_trials = n_trials)
 
 processes = []
 n_jobs = 2
-n_trials = 4
+n_trials = 10
 seed = 42
 
 search_space = {'x' : np.logspace(0, 1, num = n_trials)}
 
 # %%
 # プロセスを生成する
-processes = []
-for i in range(n_jobs):
-    p = mp.Process(target=multi_run, args=(seed, i, n_trials // n_jobs))
-    p.start()
-    processes.append(p)
+with ProcessPoolExecutor(n_jobs) as pool:
+    processes = []
+    for i in range(n_jobs):
+        p = pool.submit(
+            multi_run,
+            seed = seed, 
+            i=i, 
+            n_trials = n_trials // n_jobs,
+        )
 
-for p in processes:
-    p.join()
+        processes.append(p)
+
+    for p in processes:
+        p.result()
 
 # %%

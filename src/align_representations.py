@@ -36,15 +36,12 @@ class OptimizationConfig:
         device="cpu",
         to_types="numpy",
         n_jobs=1,
-        use_parallel=False,
-        parallel_method="multithread",
         multi_gpu: Union[bool, List[int]] = False,
         db_params={"drivername": "mysql", "username": "root", "password": "", "host": "localhost", "port": 3306},
         init_plans_list=["random"],
         n_iter=1,
         max_iter=200,
         data_name="THINGS",
-        delete_results=False,
         sampler_name="tpe",
         sampler_seed=42,
         pruner_name="hyperband",
@@ -59,15 +56,12 @@ class OptimizationConfig:
             device (str, optional): _description_. Defaults to "cpu".
             to_types (str, optional): _description_. Defaults to "numpy".
             n_jobs (int, optional): _description_. Defaults to 1.
-            use_parallel (bool, optional): _description_. Defaults to False.
-            parallel_method (str, optional): _description_. Defaults to "multithread".
             multi_gpu (Union[bool, List[int]], optional): _description_. Defaults to False.
             db_params (dict, optional): _description_. Defaults to {"drivername": "mysql", "username": "root", "password": "", "host": "", "port": 3306}.
             init_plans_list (list, optional): _description_. Defaults to ["random"].
             n_iter (int, optional): _description_. Defaults to 1.
             max_iter (int, optional): _description_. Defaults to 200.
             data_name (str, optional): _description_. Defaults to "THINGS".
-            delete_results (bool, optional): _description_. Defaults to False.
             sampler_name (str, optional): _description_. Defaults to "tpe".
             sampler_seed (int, optional): _description_. Defaults to 42.
             pruner_name (str, optional): _description_. Defaults to "hyperband".
@@ -82,8 +76,6 @@ class OptimizationConfig:
         self.device = device
 
         self.n_jobs = n_jobs
-        self.use_parallel = use_parallel
-        self.parallel_method = parallel_method
         self.multi_gpu = multi_gpu
 
         self.db_params = db_params
@@ -95,7 +87,6 @@ class OptimizationConfig:
         self.sampler_seed = sampler_seed
 
         self.data_name = data_name
-        self.delete_results = delete_results
 
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
@@ -353,10 +344,10 @@ class PairwiseAnalysis:
         self.RDM_source = self.source.sim_mat
         self.RDM_target = self.target.sim_mat
         self.pair_name = f"{source.name}_vs_{target.name}"
-
-        self.storage = None
-        self.save_path = None
-        self.filename = None
+        
+        # self.storage = None
+        # self.save_path = None
+        # self.filename = None
 
         assert self.RDM_source.shape == self.RDM_target.shape, "the shape of sim_mat is not the same."
 
@@ -440,6 +431,7 @@ class PairwiseAnalysis:
         self,
         results_dir,
         compute_OT=False,
+        delete_results=False,
         OT_format="default",
         return_data=False,
         return_figure=True,
@@ -450,6 +442,7 @@ class PairwiseAnalysis:
         filename=None,
         target_device=None,
     ):
+        
         """
         Main Computation
 
@@ -463,16 +456,24 @@ class PairwiseAnalysis:
             show_log = False,
             fig_dir = None,
             ticks = None
+            filename=None,
+            target_device=None,
 
         Returns:
             OT : Optimal Transportation matrix
         """
-        self.OT, df_trial, save_path = self._gw_alignment(
-            results_dir, compute_OT=compute_OT, filename=filename, delete_results=self.config.delete_results, target_device=target_device
+        
+        self._save_path_checker(
+            results_dir, 
+            filename, 
+            compute_OT, 
+            delete_results=delete_results    
         )
+        
+        self.OT, df_trial = self._gw_alignment(compute_OT, target_device=target_device)
 
         if fig_dir is None:
-            fig_dir = save_path
+            fig_dir = self.save_path
 
         OT = self._show_OT(
             title=f"$\Gamma$ ({self.pair_name})",
@@ -488,23 +489,19 @@ class PairwiseAnalysis:
             self.get_optimization_log(df_trial=df_trial, fig_dir=fig_dir)
 
         return OT
-
-    def _gw_alignment(self, results_dir, compute_OT, filename=None, delete_results=False, target_device=None):
-        """_summary_
-
-        Args:
-            results_dir (_type_): _description_
-            compute_OT (_type_): _description_
-            target_device (_type_, optional): _description_. Defaults to None.
-
-        Returns:
-            _type_: _description_
-        """
+    
+    def _save_path_checker(
+        self, 
+        results_dir, 
+        filename, 
+        compute_OT, 
+        delete_results=False
+    ):
         if filename is None:
             filename = self.config.data_name + "_" + self.pair_name
 
-        self.save_path = os.path.join(results_dir, filename)
         self.filename = filename
+        self.save_path = os.path.join(results_dir, filename)
 
         # Generate the URL for the database. Syntax differs for SQLite and others.
         if self.config.db_params["drivername"] == "sqlite":
@@ -514,10 +511,55 @@ class PairwiseAnalysis:
 
         # Delete the previous results if the flag is True.
         if delete_results:
-            self.delete_prev_results()
+            if not compute_OT and os.path.exists(self.save_path) and self.config.n_jobs == 1:
+                self._confirm_delete()
+                
+    
+    def _confirm_delete(self) -> None:
+        while True:
+            confirmation = input(
+                f"The study, result folder, and database named '{self.filename}' existed in your environment will be deleted.\n \
+                 Do you want to execute it? (Y/n)"
+            )
+            if confirmation == "Y":
+               self.delete_prev_results()
+            elif confirmation == "n":
+                print(f"The study, result folder, and database named '{self.filename}' existed in your environment weren't deleted.")
+                break
+            else:
+                print("Invalid input. Please enter again.")
+            
+    def delete_prev_results(self):
+        # drop database
+        if database_exists(self.storage):
+            drop_database(self.storage)
+        # delete directory
+        if os.path.exists(self.save_path):
+            self._delete_directory(self.save_path)
 
+    def _delete_directory(self, save_path):
+        for root, dirs, files in os.walk(save_path, topdown=False):
+            for name in files:
+                file_path = os.path.join(root, name)
+                os.remove(file_path)
+            for name in dirs:
+                dir_path = os.path.join(root, name)
+                os.rmdir(dir_path)
+        shutil.rmtree(save_path)
+
+    def _gw_alignment(self, compute_OT, target_device=None):
+        """_summary_
+
+        Args:
+            compute_OT (_type_): _description_
+            target_device (_type_, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
+        
         if not os.path.exists(self.save_path):
-            if compute_OT != False:
+            if compute_OT == False:
                 warnings.warn(
                     "This computing is running for the first time in the 'results_dir'.",
                     UserWarning
@@ -525,7 +567,7 @@ class PairwiseAnalysis:
 
             compute_OT = True
 
-        study = self._run_optimization(filename, self.save_path, self.storage, compute_OT, target_device)
+        study = self._run_optimization(compute_OT, target_device)
 
         best_trial = study.best_trial
         df_trial = study.trials_dataframe()
@@ -538,10 +580,13 @@ class PairwiseAnalysis:
 
             OT = OT.to("cpu").numpy()
 
-        return OT, df_trial, self.save_path
+        return OT, df_trial
 
     def _run_optimization(
-        self, filename, save_path, storage, compute_OT, target_device, n_jobs_for_pairwise_analysis=1
+        self, 
+        compute_OT,
+        target_device,
+        n_jobs_for_pairwise_analysis=1,
     ):
         """_summary_
 
@@ -561,7 +606,7 @@ class PairwiseAnalysis:
         """
         # generate instance optimize gw_alignment
         opt = gw_optimizer.load_optimizer(
-            save_path,
+            self.save_path,
             n_jobs=n_jobs_for_pairwise_analysis,
             num_trial=self.config.num_trial,
             to_types=self.config.to_types,
@@ -570,8 +615,8 @@ class PairwiseAnalysis:
             pruner_name=self.config.pruner_name,
             pruner_params=self.config.pruner_params,
             n_iter=self.config.n_iter,
-            filename=filename,
-            storage=storage,
+            filename=self.filename,
+            storage=self.storage,
         )
 
         if compute_OT:
@@ -585,7 +630,7 @@ class PairwiseAnalysis:
                 self.RDM_target,
                 p,
                 q,
-                save_path,
+                self.save_path,
                 max_iter=self.config.max_iter,
                 n_iter=self.config.n_iter,
                 to_types=self.config.to_types,
@@ -630,9 +675,8 @@ class PairwiseAnalysis:
     ):
 
         if df_trial is None:
-            _, df_trial, _ = self._gw_alignment(
-                results_dir, compute_OT=False, filename=filename, delete_results=False, target_device=target_device
-            )
+            self._save_path_checker(results_dir, filename, compute_OT=False, delete_results=False)
+            _, df_trial = self._gw_alignment(compute_OT=False, target_device=target_device)
 
         # figure plotting epsilon as x-axis and GWD as y-axis
         sns.scatterplot(data=df_trial, x="params_eps", y="value", s=50)
@@ -718,24 +762,6 @@ class PairwiseAnalysis:
 
             else:
                 raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
-
-    def delete_prev_results(self):
-        # drop database
-        if database_exists(self.storage):
-            drop_database(self.storage)
-        # delete directory
-        if os.path.exists(self.save_path):
-            self._delete_directory(self.save_path)
-
-    def _delete_directory(self, save_path):
-        for root, dirs, files in os.walk(save_path, topdown=False):
-            for name in files:
-                file_path = os.path.join(root, name)
-                os.remove(file_path)
-            for name in dirs:
-                dir_path = os.path.join(root, name)
-                os.rmdir(dir_path)
-        shutil.rmtree(save_path)
 
     def calc_category_level_accuracy(self, category_mat: pd.DataFrame):
         category_mat = category_mat.values
@@ -931,6 +957,7 @@ class AlignRepresentations:
         self,
         results_dir,
         compute_OT=False,
+        delete_results=False,
         return_data=False,
         return_figure=True,
         OT_format="default",
@@ -938,6 +965,8 @@ class AlignRepresentations:
         show_log=False,
         fig_dir=None,
         ticks=None,
+        filename=None,
+        target_device=None,
     ):
 
         OT_list = []
@@ -945,6 +974,7 @@ class AlignRepresentations:
             OT = pairwise.run_gw(
                 results_dir=results_dir,
                 compute_OT=compute_OT,
+                delete_results=delete_results,
                 return_data=return_data,
                 return_figure=return_figure,
                 OT_format=OT_format,
@@ -952,6 +982,8 @@ class AlignRepresentations:
                 show_log=show_log,
                 fig_dir=fig_dir,
                 ticks=ticks,
+                filename=filename,
+                target_device=target_device,
             )
 
             OT_list.append(OT)
@@ -962,6 +994,7 @@ class AlignRepresentations:
         self,
         results_dir,
         compute_OT=False,
+        delete_results=False,
         return_data=False,
         return_figure=True,
         OT_format="default",
@@ -969,6 +1002,7 @@ class AlignRepresentations:
         show_log=False,
         fig_dir=None,
         ticks=None,
+        filename=None,
     ):
         """_summary_
 
@@ -994,16 +1028,7 @@ class AlignRepresentations:
             OT_list = []
             processes = []
 
-            if self.config.parallel_method == "multiprocess":
-                pool = ProcessPoolExecutor(self.config.n_jobs)
-
-            elif self.config.parallel_method == "multithread":
-                pool = ThreadPoolExecutor(self.config.n_jobs)
-
-            else:
-                raise ValueError("please choose 'multiprocess' or 'multithread'. ")
-
-            with pool:
+            with ThreadPoolExecutor(self.config.n_jobs) as pool:
                 for pair_number in range(len(self.pairwise_list)):
 
                     if self.config.multi_gpu:
@@ -1026,39 +1051,43 @@ class AlignRepresentations:
                         pairwise.run_gw,
                         results_dir=results_dir,
                         compute_OT=compute_OT,
-                        return_data=return_data,
+                        delete_results=delete_results,
+                        return_data=False,
                         return_figure=False,
-                        OT_format=OT_format,
+                        OT_format="default",
                         visualization_config=visualization_config,
-                        show_log=show_log,
-                        fig_dir=fig_dir,
-                        ticks=ticks,
+                        show_log=False,
+                        fig_dir=None,
+                        ticks=None,
+                        filename=filename,
                         target_device=target_device,
                     )
 
                     processes.append(future)
 
                 for future in as_completed(processes):
-                    OT = future.result()
-                    OT_list.append(OT)
+                    future.result()
 
-            if return_figure:
-                self._single_computation(
+            if return_figure or return_data:
+                OT_list = self._single_computation(
                     results_dir=results_dir,
                     compute_OT=False,
-                    return_data=False,
-                    return_figure=True,
+                    delete_results=False,
+                    return_data=return_data,
+                    return_figure=return_figure,
                     OT_format=OT_format,
                     visualization_config=visualization_config,
                     show_log=show_log,
                     fig_dir=fig_dir,
                     ticks=ticks,
+                    filename=filename,
                 )
 
         if self.config.n_jobs == 1:
             OT_list = self._single_computation(
                 results_dir=results_dir,
                 compute_OT=compute_OT,
+                delete_results=delete_results,
                 return_data=return_data,
                 return_figure=return_figure,
                 OT_format=OT_format,
@@ -1066,6 +1095,7 @@ class AlignRepresentations:
                 show_log=show_log,
                 fig_dir=fig_dir,
                 ticks=ticks,
+                filename=filename,
             )
 
         if return_data:
@@ -1128,6 +1158,7 @@ class AlignRepresentations:
         n_iter,
         results_dir,
         compute_OT=False,
+        delete_results=False,
         return_data=False,
         return_figure=True,
         OT_format="default",
@@ -1151,6 +1182,7 @@ class AlignRepresentations:
             pairwise.run_gw(
                 results_dir=results_dir,
                 compute_OT=compute_OT,
+                delete_results=delete_results,
                 return_data=return_data,
                 return_figure=return_figure,
                 OT_format=OT_format,
@@ -1253,7 +1285,11 @@ class AlignRepresentations:
         print("Mean : \n", accuracy.iloc[:, 1:].mean(axis="columns"))
 
     def calc_category_level_accuracy(
-        self, make_hist=False, fig_dir=None, fig_name="Category_level_accuracy.png", category_mat=None
+        self,
+        category_mat=None,
+        make_hist=False, 
+        fig_dir=None, 
+        fig_name="Category_level_accuracy.png", 
     ):
 
         acc_list = []
@@ -1266,8 +1302,12 @@ class AlignRepresentations:
             plt.figure()
             plt.hist(acc_list)
             plt.xlabel("Accuracy")
-            plt.savefig(os.path.join(fig_dir, fig_name))
+            
+            if fig_dir is not None:
+                plt.savefig(os.path.join(fig_dir, fig_name))
+            
             plt.show()
+            plt.close()
 
     def _get_dataframe(self, eval_type="ot_plan", concat=True):
         df = self.top_k_accuracy if eval_type == "ot_plan" else self.k_nearest_matching_rate
