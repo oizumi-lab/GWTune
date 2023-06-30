@@ -16,9 +16,7 @@ from tqdm.auto import tqdm
 # warnings.simplefilter("ignore")
 from utils.backend import Backend
 from utils.init_matrix import InitMatrix
-
-# nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
-
+# nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv 
 
 # %%
 class GW_Alignment:
@@ -33,6 +31,7 @@ class GW_Alignment:
         numItermax=1000,
         n_iter=100,
         to_types="torch",
+        data_type="double",
         sinkhorn_method="sinkhorn",
     ):
         """
@@ -47,6 +46,7 @@ class GW_Alignment:
         初期値ランダムで複数: 乱数
         """
         self.to_types = to_types
+        self.data_type = data_type
         self.sinkhorn_method = sinkhorn_method
         self.size = len(p)
 
@@ -57,7 +57,15 @@ class GW_Alignment:
         self.n_iter = n_iter
 
         self.main_compute = MainGromovWasserstainComputation(
-            pred_dist, target_dist, p, q, self.to_types, max_iter=max_iter, numItermax=numItermax, n_iter=n_iter
+            pred_dist, 
+            target_dist, 
+            p, 
+            q, 
+            self.to_types, 
+            data_type=self.data_type,
+            max_iter=max_iter, 
+            numItermax=numItermax, 
+            n_iter=n_iter,
         )
 
     def define_eps_range(self, trial, eps_list, eps_log):
@@ -128,9 +136,21 @@ class GW_Alignment:
 
 
 class MainGromovWasserstainComputation:
-    def __init__(self, pred_dist, target_dist, p, q, to_types, max_iter=1000, numItermax=1000, n_iter=100) -> None:
+    def __init__(
+        self, 
+        pred_dist, 
+        target_dist, 
+        p, 
+        q, 
+        to_types, 
+        data_type='double', 
+        max_iter=1000, 
+        numItermax=1000, 
+        n_iter=100
+    ) -> None:
 
         self.to_types = to_types
+        self.data_type = data_type
 
         self.pred_dist, self.target_dist, self.p, self.q = pred_dist, target_dist, p, q
         self.size = len(p)
@@ -147,7 +167,7 @@ class MainGromovWasserstainComputation:
         # 初期値のiteration回数, かつ hyperbandのparameter
         self.n_iter = n_iter
 
-        self.back_end = Backend("cpu", self.to_types)  # 並列計算をしない場合は、こちらにおいた方がはやい。(2023.4.19 佐々木)
+        self.back_end = Backend("cpu", self.to_types, self.data_type)  # 並列計算をしない場合は、こちらにおいた方がはやい。(2023.4.19 佐々木)
 
     def entropic_gw(
         self,

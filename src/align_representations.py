@@ -36,6 +36,7 @@ class OptimizationConfig:
         sinkhorn_method='sinkhorn',
         device="cpu",
         to_types="numpy",
+        data_type="double",
         n_jobs=1,
         multi_gpu: Union[bool, List[int]] = False,
         db_params={"drivername": "mysql", "username": "root", "password": "", "host": "localhost", "port": 3306},
@@ -72,6 +73,7 @@ class OptimizationConfig:
         self.sinkhorn_method = sinkhorn_method
 
         self.to_types = to_types
+        self.data_type = data_type
         self.device = device
 
         self.n_jobs = n_jobs
@@ -649,6 +651,7 @@ class PairwiseAnalysis:
                 max_iter=self.config.max_iter,
                 n_iter=self.config.n_iter,
                 to_types=self.config.to_types,
+                data_type=self.config.data_type,
                 sinkhorn_method=self.config.sinkhorn_method,
             )
 
@@ -911,7 +914,6 @@ class AlignRepresentations:
     This object has methods for conducting N groups level analysis and corresponding results.
     This has information of all pairs of representations.
     """
-
     def __init__(
         self,
         config: OptimizationConfig,
@@ -981,7 +983,10 @@ class AlignRepresentations:
         """
         for representation in self.representations_list:
             representation.show_sim_mat(
-                sim_mat_format=sim_mat_format, visualization_config=visualization_config, fig_dir=fig_dir, ticks=ticks
+                sim_mat_format=sim_mat_format, 
+                visualization_config=visualization_config, 
+                fig_dir=fig_dir, 
+                ticks=ticks,
             )
 
             if show_distribution:
@@ -1049,6 +1054,7 @@ class AlignRepresentations:
         save_dataframe=False,
         change_sampler_seed=False,
         fix_sampler_seed=42,
+        parallel_method="multiprocess",
     ):
         """_summary_
 
@@ -1066,9 +1072,11 @@ class AlignRepresentations:
             filename (_type_, optional): _description_. Defaults to None.
             save_dataframe (bool, optional): _description_. Defaults to False.
             change_sampler_seed (bool, optional): _description_. Defaults to False.
-            fix_sampler_seed (Union[bool, int], optional): _description_. Defaults to 42.
+            fix_sampler_seed (int, optional): _description_. Defaults to 42.
+            parallel_method (str, optional): _description_. Defaults to "multiprocess".
 
         Raises:
+            ValueError: _description_
             ValueError: _description_
 
         Returns:
@@ -1083,8 +1091,15 @@ class AlignRepresentations:
         if self.config.n_jobs > 1:
             OT_list = []
             processes = []
-
-            with ThreadPoolExecutor(self.config.n_jobs) as pool:
+            
+            if parallel_method == "multiprocess":
+                pool = ProcessPoolExecutor(self.config.n_jobs)
+            elif parallel_method == "multithread":
+                pool = ThreadPoolExecutor(self.config.n_jobs)
+            else:
+                raise ValueError('parallel_method = "multiprocess" or "multithread".')
+        
+            with pool:
                 for pair_number in range(len(self.pairwise_list)):
 
                     if self.config.multi_gpu:
@@ -1334,7 +1349,13 @@ class AlignRepresentations:
             OT *= len(OT)  # normalize
             self.pairwise_list[i].OT = OT
 
-    def calc_accuracy(self, top_k_list, eval_type="ot_plan", category_mat=None, barycenter=False):
+    def calc_accuracy(
+        self, 
+        top_k_list, 
+        eval_type="ot_plan", 
+        category_mat=None, 
+        barycenter=False
+    ):
         accuracy = pd.DataFrame()
         accuracy["top_n"] = top_k_list
 
@@ -1375,7 +1396,13 @@ class AlignRepresentations:
             df = df.rename("matching rate")
         return df
 
-    def plot_accuracy(self, eval_type="ot_plan", fig_dir=None, fig_name="Accuracy_ot_plan.png", scatter=True):
+    def plot_accuracy(
+        self, 
+        eval_type="ot_plan", 
+        fig_dir=None, 
+        fig_name="Accuracy_ot_plan.png", 
+        scatter=True,
+    ):
         plt.figure(figsize=(5, 3))
 
         if scatter:
