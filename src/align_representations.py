@@ -708,8 +708,11 @@ class PairwiseAnalysis:
         plt.scatter(df_trial["params_eps"], df_trial["value"], color = cmap, s = marker_size)
         plt.xlabel("$\epsilon$")
         plt.ylabel("GWD")
+        plt.xticks(rotation=45)
         plt.title(f"$\epsilon$ - GWD ({self.pair_name})")
-        # plt.tight_layout()
+        plt.tight_layout()
+        plt.grid(True)
+        plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
         
         if fig_dir is None:
             fig_dir = self.figure_path
@@ -728,7 +731,8 @@ class PairwiseAnalysis:
         plt.xlabel("accuracy")
         plt.ylabel("GWD")
         plt.title(f"accuracy - GWD ({self.pair_name})")
-        # plt.tight_layout()
+        plt.grid(True)
+        plt.tight_layout()
 
     
 
@@ -742,7 +746,25 @@ class PairwiseAnalysis:
         
         plt.clf()
         plt.close()
+        
+        # fig = plt.figure(figsize=(8,8))
+        # ax = fig.add_subplot(111, projection='3d')
+        # sc = ax.scatter(
+        #     df_trial["params_eps"], 
+        #     df_trial["user_attrs_best_acc"],
+        #     df_trial["value"],
+        #     edgecolor="r", facecolor="gold"
+        # )
+        
+        # plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
+        
+        # ax.set_xlabel('eps')
+        # ax.set_ylabel('accuracy')
+        # ax.set_zlabel('GWD')
 
+        # plt.tight_layout()
+        # plt.show()
+        
     def _show_OT(
         self,
         title,
@@ -1417,6 +1439,7 @@ class AlignRepresentations:
                 plt.plot(df.index, df[group], c="blue")
 
         plt.ylim(0, 100)
+        plt.title(eval_type)
         plt.xlabel("top k")
         plt.ylabel("Matching rate")
         # plt.legend(loc = "best")
