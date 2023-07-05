@@ -747,21 +747,26 @@ class PairwiseAnalysis:
         plt.clf()
         plt.close()
         
-        # fig = plt.figure(figsize=(8,8))
-        # ax = fig.add_subplot(111, projection='3d')
-        # sc = ax.scatter(
-        #     df_trial["params_eps"], 
-        #     df_trial["user_attrs_best_acc"],
-        #     df_trial["value"],
-        #     edgecolor="r", facecolor="gold"
-        # )
+        plt.figure(figsize=(8, 6))
+        plt.scatter(df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"])
         
         # plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
+        # plt.xticks(rotation=45)
+        plt.title(self.pair_name)
+        plt.xlabel("accuracy")
+        plt.ylabel("GWD")
+        plt.colorbar(label='eps')
+        plt.grid(True)
+        # plt.gca().images[-1].colorbar.set_major_formatter(plt.FormatStrFormatter('%.1e'))
         
-        # ax.set_xlabel('eps')
-        # ax.set_ylabel('accuracy')
-        # ax.set_zlabel('GWD')
-
+        if show_figure:
+            plt.show()
+        
+        plt.savefig(os.path.join(fig_dir, f"acc_gwd_eps({self.pair_name}).png"))
+        
+        plt.clf()
+        plt.close()
+        
         # plt.tight_layout()
         # plt.show()
         
