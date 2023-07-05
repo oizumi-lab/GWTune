@@ -468,7 +468,7 @@ class PairwiseAnalysis:
             results_dir, 
             filename, 
             compute_OT, 
-            delete_results=delete_results    
+            delete_results=delete_results,    
         )
         
         self.OT, df_trial = self._gw_alignment(
@@ -513,10 +513,13 @@ class PairwiseAnalysis:
             filename = self.config.data_name + "_" + self.pair_name
         
         self.filename = filename
-        self.save_path = os.path.join(results_dir, self.config.data_name, filename)
         
-        self.figure_path = os.path.join(self.save_path, self.config.init_mat_plan, 'figure')
-
+        self.save_path = os.path.join(results_dir, self.config.data_name, filename, self.config.init_mat_plan)
+        
+        self.figure_path = os.path.join(self.save_path, 'figure')
+        
+        self.data_path = os.path.join(self.save_path, 'data')
+        
         # Generate the URL for the database. Syntax differs for SQLite and others.
         if self.config.db_params["drivername"] == "sqlite":
             self.storage = "sqlite:///" + self.save_path + "/" + filename + "_" + self.config.init_mat_plan + ".db"
@@ -593,7 +596,7 @@ class PairwiseAnalysis:
         best_trial = study.best_trial
         df_trial = study.trials_dataframe()
                 
-        ot_path = glob.glob(self.save_path + "/" + self.config.init_mat_plan + f"/gw_{best_trial.number}.*")[0]
+        ot_path = glob.glob(self.data_path + f"/gw_{best_trial.number}.*")[0]
 
         if '.npy' in ot_path:
             OT = np.load(ot_path)
@@ -622,18 +625,17 @@ class PairwiseAnalysis:
         """
         # generate instance optimize gw_alignment
         opt = gw_optimizer.load_optimizer(
-            self.save_path,
-            n_jobs=n_jobs_for_pairwise_analysis,
+            save_path=self.save_path,
+            filename=self.filename,
+            storage=self.storage,
+            init_mat_plan=self.config.init_mat_plan,
+            n_iter=self.config.n_iter,
             num_trial=self.config.num_trial,
-            to_types=self.config.to_types,
+            n_jobs=n_jobs_for_pairwise_analysis,
             method="optuna",
             sampler_name=self.config.sampler_name,
             pruner_name=self.config.pruner_name,
             pruner_params=self.config.pruner_params,
-            n_iter=self.config.n_iter,
-            filename=self.filename,
-            init_mat_plan=self.config.init_mat_plan,
-            storage=self.storage,
         )
 
         if compute_OT:
@@ -647,7 +649,7 @@ class PairwiseAnalysis:
                 self.RDM_target,
                 p,
                 q,
-                self.save_path,
+                self.data_path,
                 max_iter=self.config.max_iter,
                 n_iter=self.config.n_iter,
                 to_types=self.config.to_types,
@@ -710,7 +712,6 @@ class PairwiseAnalysis:
         plt.ylabel("GWD")
         plt.xticks(rotation=45)
         plt.title(f"$\epsilon$ - GWD ({self.pair_name})")
-        plt.tight_layout()
         plt.grid(True)
         plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
         
@@ -734,7 +735,6 @@ class PairwiseAnalysis:
         plt.grid(True)
         plt.tight_layout()
 
-    
 
         if fig_dir is None:
             fig_dir = self.figure_path
@@ -757,12 +757,13 @@ class PairwiseAnalysis:
         plt.ylabel("GWD")
         plt.colorbar(label='eps')
         plt.grid(True)
+        plt.tight_layout()
         # plt.gca().images[-1].colorbar.set_major_formatter(plt.FormatStrFormatter('%.1e'))
+        
+        plt.savefig(os.path.join(fig_dir, f"acc_gwd_eps({self.pair_name}).png"))
         
         if show_figure:
             plt.show()
-        
-        plt.savefig(os.path.join(fig_dir, f"acc_gwd_eps({self.pair_name}).png"))
         
         plt.clf()
         plt.close()

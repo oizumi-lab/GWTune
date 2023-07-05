@@ -26,7 +26,7 @@ class GW_Alignment:
         target_dist,
         p,
         q,
-        save_path,
+        data_path,
         max_iter=1000,
         numItermax=1000,
         n_iter=100,
@@ -50,9 +50,9 @@ class GW_Alignment:
         self.sinkhorn_method = sinkhorn_method
         self.size = len(p)
 
-        self.save_path = save_path
-        if not os.path.exists(self.save_path):
-            os.makedirs(self.save_path)
+        self.data_path = data_path
+        if not os.path.exists(self.data_path):
+            os.makedirs(self.data_path, exist_ok=True)
 
         self.n_iter = n_iter
 
@@ -74,14 +74,14 @@ class GW_Alignment:
 
         epsの範囲を指定する関数。
         """
-        if len(eps_list) == 2:
+        if len(eps_list) == 2 and eps_log == True:
             ep_lower, ep_upper = eps_list
             eps = trial.suggest_float("eps", ep_lower, ep_upper, log=eps_log)
-        elif len(eps_list) == 3:
+        elif len(eps_list) == 3 and eps_log == False:
             ep_lower, ep_upper, ep_step = eps_list
             eps = trial.suggest_float("eps", ep_lower, ep_upper, step=ep_step)
         else:
-            raise ValueError("The eps_list doesn't match.")
+            raise ValueError("The eps_list and/or eps_log doesn't match.")
 
         return trial, eps
 
@@ -94,17 +94,7 @@ class GW_Alignment:
         """
 
         trial, eps = self.define_eps_range(trial, eps_list, eps_log)
-
-        # init_mat_plan = trial.suggest_categorical(
-        #     "initialize", init_plans_list
-        # )  # init_matをdeviceに上げる作業はentropic_gw中で行うことにしました。(2023/3/14 阿部)
-
         trial.set_user_attr("size", self.size)
-
-        file_path = self.save_path + "/" + init_mat_plan  # ここのパス設定はoptimizer.py側でも使う可能性があるので、変更の可能性あり。
-
-        if not os.path.exists(file_path):
-            os.makedirs(file_path, exist_ok=True)
 
         """
         2.  Compute GW alignment with hyperparameters defined above.
@@ -122,7 +112,7 @@ class GW_Alignment:
             If not, set the result of accuracy and gw_loss as float('nan'), respectively. This will be used as a handy marker as bad results to be removed in the evaluation analysis.
         """
 
-        self.main_compute.back_end.save_computed_results(gw, init_mat, file_path, trial.number)
+        self.main_compute.back_end.save_computed_results(gw, init_mat, self.data_path, trial.number)
 
         """
         4. delete unnecessary memory for next computation. If not, memory error would happen especially when using CUDA.

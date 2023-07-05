@@ -17,24 +17,23 @@ from sqlalchemy_utils import create_database, database_exists
 
 # %%
 def load_optimizer(
-    save_path,
-    n_jobs=1,
+    save_path=None,
+    filename=None,
+    storage=None,
+    init_mat_plan="random",
+    n_iter=10,
     num_trial=20,
-    to_types="torch",
+    n_jobs=1,
     method="optuna",
     sampler_name="random",
     pruner_name="median",
     pruner_params=None,
-    n_iter=10,
-    filename="test",
-    init_mat_plan="random",
-    storage=None,
 ):
 
     """
     (usage example)
     >>> dataset = mydataset()
-    >>> opt = load_optimizer(save_path)
+    >>> opt = load_optimizer(filename)
     >>> study = Opt.run_study(dataset)
 
     Raises:
@@ -56,17 +55,15 @@ def load_optimizer(
 
     if method == "optuna":
         Opt = RunOptuna(
-            save_path, 
-            to_types, 
-            storage, 
             filename, 
+            storage, 
             init_mat_plan,
+            num_trial,
+            n_iter, 
+            n_jobs, 
             sampler_name, 
             pruner_name, 
             pruner_params, 
-            n_iter, 
-            n_jobs, 
-            num_trial,
         )
     else:
         raise ValueError("no implemented method.")
@@ -77,31 +74,38 @@ def load_optimizer(
 class RunOptuna:
     def __init__(
         self,
-        save_path,
-        to_types,
-        storage,
-        filename,
+        filename, 
+        storage, 
         init_mat_plan,
-        sampler_name,
-        pruner_name,
-        pruner_params,
-        n_iter,
-        n_jobs,
         num_trial,
+        n_iter, 
+        n_jobs, 
+        sampler_name, 
+        pruner_name, 
+        pruner_params, 
     ):
 
         # the path or file name to save the results.
-        self.save_path = save_path
-        self.to_types = to_types
-        self.storage = storage
         self.filename = filename
+        self.storage = storage
         self.init_mat_plan = init_mat_plan
+        
+        # parameters for optuna.study
+        self.num_trial = num_trial
+        self.n_iter = n_iter
+        self.n_jobs = n_jobs
 
         # setting of optuna
         self.sampler_name = sampler_name
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
 
+
+        # parameters for optuna.study
+        self.n_jobs = n_jobs
+        self.num_trial = num_trial
+
+        
         # parameters for optuna.study
         self.n_jobs = n_jobs
         self.num_trial = num_trial
@@ -113,7 +117,6 @@ class RunOptuna:
         # HyperbandPruner
         self.min_resource = 5
         self.reduction_factor = 2
-        self.n_iter = n_iter
 
         if pruner_params is not None:
             self._set_params(pruner_params)
@@ -184,7 +187,7 @@ class RunOptuna:
         if self.n_jobs > 1:
             warnings.filterwarnings("always")
             warnings.warn(
-                "UserWarning : The parallel computation is done by the functions implemented in Optuna.\n \
+                "The parallel computation is done by the functions implemented in Optuna.\n \
                 This doesn't always provide a benefit to speed up or to get a better results.",
                 UserWarning,
             )
