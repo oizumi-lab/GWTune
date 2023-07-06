@@ -4,27 +4,16 @@ import ot
 
 # %%
 class InitMatrix():
-    def __init__(self, matrix_size = None):
-        self.matrix_size = matrix_size
+    def __init__(self, source_size, target_size):
+        self.source_size = source_size
+        self.target_size = target_size
         self.initialize = ['uniform', 'random', 'permutation', 'diag'] # already implemented.
 
-    def implemented_init_plans(self, init_mat_plan):
-        """_summary_
-
-        Args:
-            init_mat_plan (_type_): _description_
-
-        Raises:
-            ValueError: _description_
-
-        Returns:
-            _type_: _description_
-        """
-        if init_mat_plan not in self.initialize:
-            raise ValueError('init_mat_plan :' + init_mat_plan + ' was not implemented in this toolbox.')
-
-        else:
-            return init_mat_plan
+    @property
+    def set_user_define_init_mat_list(self, mat):
+        if isinstance(mat, list):
+            self.user_define_init_mat_list = mat
+            
 
     def make_initial_T(self, initialize, seed = 42):
         """
@@ -48,10 +37,10 @@ class InitMatrix():
             T = self.initialize_matrix(ts=ts)
 
         elif initialize == 'uniform':
-            T = np.outer(ot.unif(self.matrix_size), ot.unif(self.matrix_size))
+            T = np.outer(ot.unif(self.source_size), ot.unif(self.target_size))
 
         elif initialize == 'diag':
-            T = np.diag(ot.unif(self.matrix_size))
+            T = np.diag(ot.unif(self.source_size))
 
         else:
             raise ValueError('Not defined initialize matrix.')
@@ -66,14 +55,14 @@ class InitMatrix():
         Returns
             np.ndarray 重複なしのindexを要素に持つmatrix
         """
-        matrix = np.zeros((self.matrix_size, self.matrix_size))
+        matrix = np.zeros((self.source_size, self.target_size))
         rows = np.tile(np.arange(0, self.matrix_size), 2)
 
         for i in range(self.matrix_size):
             matrix[i, :] = rows[i : i + self.matrix_size]
 
-        r = np.random.choice(self.matrix_size, self.matrix_size, replace=False)
-        c = np.random.choice(self.matrix_size, self.matrix_size, replace=False)
+        r = np.random.choice(self.source_size, self.target_size, replace=False)
+        c = np.random.choice(self.source_size, self.target_size, replace=False)
         matrix = matrix[r, :]
         matrix = matrix[:, c]
         return matrix.astype(int)
@@ -99,7 +88,7 @@ class InitMatrix():
         大泉先生が作ったもの。
         """
         # make random initial transportation plan (N x N matrix)
-        T = np.random.rand(self.matrix_size, self.matrix_size) # create a random matrix of size n x n
+        T = np.random.rand(self.source_size, self.target_size) # create a random matrix of size n x n
         rep = 100 # number of repetitions
         for _ in range(rep):
             # normalize each row so that the sum is 1
