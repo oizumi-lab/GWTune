@@ -9,10 +9,12 @@ class InitMatrix():
         self.target_size = target_size
         self.initialize = ['uniform', 'random', 'permutation', 'diag'] # already implemented.
 
-    @property
     def set_user_define_init_mat_list(self, mat):
         if isinstance(mat, list):
             self.user_define_init_mat_list = mat
+        
+        elif isinstance(mat, np.ndarray):
+            self.user_define_init_mat_list = [mat]
             
 
     def make_initial_T(self, initialize, seed = 42):
