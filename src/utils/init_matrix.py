@@ -47,7 +47,7 @@ class InitMatrix():
 
         return T
 
-    def randOrderedMatrix(self):
+    def randOrderedMatrix(self): #ここも間違っているかもしれないです(2023/7/6)
         """
         各行・各列に重複なしに[0,n]のindexを持つmatrixを作成
         Parameters
@@ -97,7 +97,7 @@ class InitMatrix():
             # normalize each column so that the sum is 1
             q = T.sum(axis=0, keepdims=True)
             T = T / q
-        T = T / self.matrix_size
+        T = T / self.source_size #ここ間違っているかもしれないです・・・ 
         return T
 
 # %%
