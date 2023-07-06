@@ -768,9 +768,6 @@ class PairwiseAnalysis:
         plt.clf()
         plt.close()
         
-        # plt.tight_layout()
-        # plt.show()
-        
     def _show_OT(
         self,
         title,
@@ -1082,7 +1079,7 @@ class AlignRepresentations:
         save_dataframe=False,
         change_sampler_seed=False,
         fix_sampler_seed=42,
-        parallel_method="multiprocess",
+        parallel_method="multithread",
     ):
         """_summary_
 
@@ -1101,7 +1098,7 @@ class AlignRepresentations:
             save_dataframe (bool, optional): _description_. Defaults to False.
             change_sampler_seed (bool, optional): _description_. Defaults to False.
             fix_sampler_seed (int, optional): _description_. Defaults to 42.
-            parallel_method (str, optional): _description_. Defaults to "multiprocess".
+            parallel_method (str, optional): _description_. Defaults to "multithread".
 
         Raises:
             ValueError: _description_
