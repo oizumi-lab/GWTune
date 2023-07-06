@@ -297,7 +297,16 @@ class MainGromovWasserstainComputation:
                 f"Trial was pruned at iteration {num_iter} with parameters: {{'eps': {eps:.5e}, 'gw_loss': '{gw_loss:.5e}'}}"
             )
 
-    def _compute_GW_with_init_plans(self, trial, init_mat_plan, eps, device, sinkhorn_method, num_iter=None, seed=None):
+    def _compute_GW_with_init_plans(
+        self, 
+        trial, 
+        init_mat_plan, 
+        eps, 
+        device, 
+        sinkhorn_method, 
+        num_iter=None, 
+        seed=None
+    ):
         
         if init_mat_plan == "user_define":
             init_mat = seed
