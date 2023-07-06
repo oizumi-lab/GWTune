@@ -41,13 +41,13 @@ class OptimizationConfig:
         multi_gpu: Union[bool, List[int]] = False,
         db_params={"drivername": "mysql", "username": "root", "password": "", "host": "localhost", "port": 3306},
         init_mat_plan="random",
+        user_define_init_mat_list = None,
         n_iter=1,
         max_iter=200,
         data_name="THINGS",
         sampler_name="tpe",
         pruner_name="hyperband",
         pruner_params={"n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3},
-        user_define_init_mat_list = None,
     ) -> None:
         """_summary_
 
@@ -88,14 +88,14 @@ class OptimizationConfig:
         self.init_mat_plan = init_mat_plan
         self.n_iter = n_iter
         self.max_iter = max_iter
+        
         self.sampler_name = sampler_name
+        self.user_define_init_mat_list = user_define_init_mat_list
         
         self.data_name = data_name
 
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
-        
-        self.user_define_init_mat_list = user_define_init_mat_list
 
 class VisualizationConfig:
     def __init__(
