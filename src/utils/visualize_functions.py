@@ -158,7 +158,7 @@ def show_heatmap(
   
     plt.xlabel(xlabel, size = xlabel_size)
     plt.ylabel(ylabel, size = ylabel_size)
-    
+    plt.tight_layout()
     
     if save_file_name is not None:
         plt.savefig(save_file_name)
