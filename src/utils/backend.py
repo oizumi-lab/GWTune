@@ -16,13 +16,14 @@ import warnings
 str_type_error = "All array should be from the same type/backend. Current types are : {}"
 
 class Backend():
-    def __init__(self, device = 'cpu', to_types = 'torch'):
+    def __init__(self, device = 'cpu', to_types = 'torch', data_type = 'double'):
         """
         入力された変数の型を揃えてあげる。バラバラな場合でも、単一の型に変換できるはず。
         基本的には3つ(numpy, torch, jax)の型のみ受付られる。
         """
         self.device = device
         self.to_types = to_types
+        self.data_type = data_type
         pass
 
     def __call__(self, *args):
@@ -124,7 +125,10 @@ class Backend():
 
         if isinstance(args, np.ndarray):
             if device == 'cpu':
-                return args
+                if self.data_type == 'double' or self.data_type == 'float64':
+                    return args.astype(np.float64)
+                elif self.data_type == 'float' or self.data_type == 'float32':
+                    return args.astype(np.float32)
             else:
                 raise ValueError('Numpy only accepts CPU!!')
 
@@ -145,7 +149,11 @@ class Backend():
         #         return jax.device_put(args, cpus[0])
 
         elif isinstance(args, torch.Tensor):
-            return args.to(device).float()#.double()
+            if self.data_type == 'double' or self.data_type == 'float64':
+                return args.to(device).double()
+            elif self.data_type == 'float' or self.data_type == 'float32':
+                return args.to(device).float()
+            
 
         else:
             raise ValueError("Unknown type of non implemented here.")

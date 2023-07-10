@@ -24,7 +24,7 @@ import glob
 sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
 from .gw_alignment import GW_Alignment
 from .histogram_matching import SimpleHistogramMatching
-from .utils import gw_optimizer, init_matrix, visualize_functions
+from .utils import gw_optimizer, visualize_functions
 
 # %%
 class OptimizationConfig:
@@ -36,15 +36,16 @@ class OptimizationConfig:
         sinkhorn_method='sinkhorn',
         device="cpu",
         to_types="numpy",
+        data_type="double",
         n_jobs=1,
         multi_gpu: Union[bool, List[int]] = False,
         db_params={"drivername": "mysql", "username": "root", "password": "", "host": "localhost", "port": 3306},
-        init_plans_list=["random"],
+        init_mat_plan="random",
+        user_define_init_mat_list = None,
         n_iter=1,
         max_iter=200,
         data_name="THINGS",
         sampler_name="tpe",
-        sampler_seed=42,
         pruner_name="hyperband",
         pruner_params={"n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3},
     ) -> None:
@@ -54,19 +55,21 @@ class OptimizationConfig:
             eps_list (list, optional): _description_. Defaults to [1, 10].
             eps_log (bool, optional): _description_. Defaults to True.
             num_trial (int, optional): _description_. Defaults to 4.
+            sinkhorn_method (str, optional): _description_. Defaults to 'sinkhorn'.
             device (str, optional): _description_. Defaults to "cpu".
             to_types (str, optional): _description_. Defaults to "numpy".
+            data_type (str, optional): _description_. Defaults to "double".
             n_jobs (int, optional): _description_. Defaults to 1.
             multi_gpu (Union[bool, List[int]], optional): _description_. Defaults to False.
-            db_params (dict, optional): _description_. Defaults to {"drivername": "mysql", "username": "root", "password": "", "host": "", "port": 3306}.
-            init_plans_list (list, optional): _description_. Defaults to ["random"].
+            db_params (dict, optional): _description_. Defaults to {"drivername": "mysql", "username": "root", "password": "", "host": "localhost", "port": 3306}.
+            init_mat_plan (str, optional): _description_. Defaults to "random".
             n_iter (int, optional): _description_. Defaults to 1.
             max_iter (int, optional): _description_. Defaults to 200.
             data_name (str, optional): _description_. Defaults to "THINGS".
             sampler_name (str, optional): _description_. Defaults to "tpe".
-            sampler_seed (int, optional): _description_. Defaults to 42.
             pruner_name (str, optional): _description_. Defaults to "hyperband".
-            pruner_params (dict, optional): _description_. Defaults to { "n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3 }.
+            pruner_params (dict, optional): _description_. Defaults to {"n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3}.
+            user_define_init_mat_list (_type_, optional): _description_. Defaults to None.
         """
         self.eps_list = eps_list
         self.eps_log = eps_log
@@ -74,6 +77,7 @@ class OptimizationConfig:
         self.sinkhorn_method = sinkhorn_method
 
         self.to_types = to_types
+        self.data_type = data_type
         self.device = device
 
         self.n_jobs = n_jobs
@@ -81,17 +85,17 @@ class OptimizationConfig:
 
         self.db_params = db_params
 
-        self.init_plans_list = init_plans_list
+        self.init_mat_plan = init_mat_plan
         self.n_iter = n_iter
         self.max_iter = max_iter
+        
         self.sampler_name = sampler_name
-        self.sampler_seed = sampler_seed
-
+        self.user_define_init_mat_list = user_define_init_mat_list
+        
         self.data_name = data_name
 
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
-
 
 class VisualizationConfig:
     def __init__(
@@ -149,7 +153,6 @@ class VisualizationConfig:
 
     def __call__(self):
         return self.visualization_params
-
 
 class Representation:
     """
@@ -325,7 +328,6 @@ class Representation:
             name_list=[self.name], title=title, legend=legend, save_dir=fig_path, **visualization_config()
         )
 
-
 class PairwiseAnalysis:
     """
     A class object that has methods conducting gw-alignment and corresponding results
@@ -343,15 +345,9 @@ class PairwiseAnalysis:
         self.target = target
         self.config = config
 
-        self.RDM_source = self.source.sim_mat
-        self.RDM_target = self.target.sim_mat
         self.pair_name = f"{source.name}_vs_{target.name}"
         
-        # self.storage = None
-        # self.save_path = None
-        # self.filename = None
-
-        assert self.RDM_source.shape == self.RDM_target.shape, "the shape of sim_mat is not the same."
+        # assert self.source.sim_mat.shape == self.target.sim_mat.shape, "the shape of sim_mat is not the same."
 
         assert np.array_equal(
             self.source.num_category_list, self.target.num_category_list
@@ -363,8 +359,8 @@ class PairwiseAnalysis:
 
     def show_both_sim_mats(self):
 
-        a = self.RDM_source
-        b = self.RDM_target
+        a = self.source.sim_mat
+        b = self.target.sim_mat
 
         plt.figure()
         plt.subplot(121)
@@ -397,8 +393,8 @@ class PairwiseAnalysis:
 
     def RSA(self, metric="spearman", method="normal"):
         if method == "normal":
-            upper_tri_source = self.RDM_source[np.triu_indices(self.RDM_source.shape[0], k=1)]
-            upper_tri_target = self.RDM_target[np.triu_indices(self.RDM_target.shape[0], k=1)]
+            upper_tri_source = self.source.sim_mat[np.triu_indices(self.source.sim_mat.shape[0], k=1)]
+            upper_tri_target = self.target.sim_mat[np.triu_indices(self.target.sim_mat.shape[0], k=1)]
 
             if metric == "spearman":
                 corr, _ = spearmanr(upper_tri_source, upper_tri_target)
@@ -407,9 +403,9 @@ class PairwiseAnalysis:
 
         elif method == "all":
             if metric == "spearman":
-                corr, _ = spearmanr(self.RDM_source.flatten(), self.RDM_target.flatten())
+                corr, _ = spearmanr(self.source.sim_mat.flatten(), self.target.sim_mat.flatten())
             elif metric == "pearson":
-                corr, _ = pearsonr(self.RDM_source.flatten(), self.RDM_target.flatten())
+                corr, _ = pearsonr(self.source.sim_mat.flatten(), self.target.sim_mat.flatten())
 
         return corr
 
@@ -421,18 +417,19 @@ class PairwiseAnalysis:
         Returns:
             _type_: _description_
         """
-        matching = SimpleHistogramMatching(self.RDM_source, self.RDM_target)
+        matching = SimpleHistogramMatching(self.source.sim_mat, self.target.sim_mat)
 
         new_target = matching.simple_histogram_matching()
 
         if return_data:
             return new_target
         else:
-            self.RDM_target = new_target
+            self.target.sim_mat = new_target
 
     def run_gw(
         self,
         results_dir,
+        eps_list=None,
         compute_OT=False,
         delete_results=False,
         OT_format="default",
@@ -445,6 +442,7 @@ class PairwiseAnalysis:
         filename=None,
         save_dataframe=False,
         target_device=None,
+        sampler_seed=42,
     ):
         """_summary_
 
@@ -470,13 +468,22 @@ class PairwiseAnalysis:
             results_dir, 
             filename, 
             compute_OT, 
-            delete_results=delete_results    
+            delete_results=delete_results,    
         )
         
-        self.OT, df_trial = self._gw_alignment(compute_OT, target_device=target_device)
+        self.OT, df_trial = self._gw_alignment(
+            eps_list,
+            compute_OT, 
+            target_device=target_device, 
+            sampler_seed=sampler_seed,
+        )
 
         if fig_dir is None:
-            fig_dir = self.save_path
+            fig_dir = self.figure_path
+            
+            if not os.path.exists(fig_dir):
+                os.makedirs(fig_dir, exist_ok=True)
+        
 
         OT = self._show_OT(
             title=f"$\Gamma$ ({self.pair_name})",
@@ -507,13 +514,22 @@ class PairwiseAnalysis:
             filename = self.config.data_name + "_" + self.pair_name
         
         self.filename = filename
-        self.save_path = os.path.join(results_dir, self.config.data_name, filename)
-
+        
+        self.save_path = os.path.join(results_dir, self.config.data_name, filename, self.config.init_mat_plan)
+        
+        self.figure_path = os.path.join(self.save_path, 'figure')
+        
+        self.data_path = os.path.join(self.save_path, 'data')
+        
         # Generate the URL for the database. Syntax differs for SQLite and others.
         if self.config.db_params["drivername"] == "sqlite":
-            self.storage = "sqlite:///" + self.save_path + "/" + filename + ".db"
+            self.storage = "sqlite:///" + self.save_path + "/" + filename + "_" + self.config.init_mat_plan + ".db"
         else:
-            self.storage = URL.create(database=filename, **self.config.db_params).render_as_string(hide_password=False)
+            # self.storage = URL.create(database=filename, **self.config.db_params).render_as_string(hide_password=False)
+            # MySQL用の修正案です。使いやすいようにしてもらえたらと思います。
+            self.storage = URL.create(
+                database=filename + "_" + self.config.init_mat_plan, 
+                **self.config.db_params).render_as_string(hide_password=False)
 
         # Delete the previous results if the flag is True.
         if delete_results:
@@ -522,7 +538,6 @@ class PairwiseAnalysis:
             else:
                 self.delete_prev_results()
                 
-    
     def _confirm_delete(self) -> None:
         while True:
             confirmation = input(
@@ -555,7 +570,7 @@ class PairwiseAnalysis:
                 os.rmdir(dir_path)
         shutil.rmtree(save_path)
 
-    def _gw_alignment(self, compute_OT, target_device=None):
+    def _gw_alignment(self, eps_list, compute_OT, target_device=None, sampler_seed=42):
         """_summary_
 
         Args:
@@ -577,12 +592,17 @@ class PairwiseAnalysis:
 
             compute_OT = True
 
-        study = self._run_optimization(compute_OT, target_device)
-
+        study = self._run_optimization(
+            eps_list = eps_list, 
+            compute_OT = compute_OT, 
+            target_device = target_device, 
+            sampler_seed = sampler_seed,
+        )
+        
         best_trial = study.best_trial
         df_trial = study.trials_dataframe()
                 
-        ot_path = glob.glob(self.save_path + "/" + best_trial.params["initialize"] + f"/gw_{best_trial.number}.*")[0]
+        ot_path = glob.glob(self.data_path + f"/gw_{best_trial.number}.*")[0]
 
         if '.npy' in ot_path:
             OT = np.load(ot_path)
@@ -594,8 +614,10 @@ class PairwiseAnalysis:
 
     def _run_optimization(
         self, 
-        compute_OT,
+        eps_list=None,
+        compute_OT=False,
         target_device = None,
+        sampler_seed = 42,
         n_jobs_for_pairwise_analysis=1,
     ):
         """_summary_
@@ -610,45 +632,43 @@ class PairwiseAnalysis:
         """
         # generate instance optimize gw_alignment
         opt = gw_optimizer.load_optimizer(
-            self.save_path,
-            n_jobs=n_jobs_for_pairwise_analysis,
+            save_path=self.save_path,
+            filename=self.filename,
+            storage=self.storage,
+            init_mat_plan=self.config.init_mat_plan,
+            n_iter=self.config.n_iter,
             num_trial=self.config.num_trial,
-            to_types=self.config.to_types,
+            n_jobs=n_jobs_for_pairwise_analysis,
             method="optuna",
             sampler_name=self.config.sampler_name,
             pruner_name=self.config.pruner_name,
             pruner_params=self.config.pruner_params,
-            n_iter=self.config.n_iter,
-            filename=self.filename,
-            storage=self.storage,
         )
 
         if compute_OT:
-            # distribution in the source space, and target space
-            p = ot.unif(len(self.RDM_source))
-            q = ot.unif(len(self.RDM_target))
-
             # generate instance solves gw_alignment
             gw = GW_Alignment(
-                self.RDM_source,
-                self.RDM_target,
-                p,
-                q,
-                self.save_path,
+                self.source.sim_mat,
+                self.target.sim_mat,
+                self.data_path,
                 max_iter=self.config.max_iter,
                 n_iter=self.config.n_iter,
                 to_types=self.config.to_types,
+                data_type=self.config.data_type,
                 sinkhorn_method=self.config.sinkhorn_method,
             )
 
-            # optimization
-            # 1. choose the initial matrix for GW alignment computation.
-            init_plans = init_matrix.InitMatrix().implemented_init_plans(self.config.init_plans_list)
+            # setting for optimization
+            if self.config.init_mat_plan == "user_define":
+                gw.main_compute.init_mat_builder.set_user_define_init_mat_list(self.config.user_define_init_mat_list)
+                
+            if eps_list is None:
+                eps_list = self.config.eps_list
 
             if self.config.sampler_name == "grid":
                 # used only in grid search sampler below the two lines
-                eps_space = opt.define_eps_space(self.config.eps_list, self.config.eps_log, self.config.num_trial)
-                search_space = {"eps": eps_space, "initialize": init_plans}
+                eps_space = opt.define_eps_space(eps_list, self.config.eps_log, self.config.num_trial)
+                search_space = {"eps": eps_space}
             else:
                 search_space = None
 
@@ -659,9 +679,9 @@ class PairwiseAnalysis:
             study = opt.run_study(
                 gw,
                 target_device,
-                seed=self.config.sampler_seed,
-                init_plans_list=init_plans,
-                eps_list=self.config.eps_list,
+                seed=sampler_seed,
+                init_mat_plan=self.config.init_mat_plan,
+                eps_list=eps_list,
                 eps_log=self.config.eps_log,
                 search_space=search_space,
             )
@@ -691,41 +711,68 @@ class PairwiseAnalysis:
         
         # figure plotting epsilon as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
-        # sns.scatterplot(data=df_trial, x="params_eps", y="value", s=50)
         plt.scatter(df_trial["params_eps"], df_trial["value"], color = cmap, s = marker_size)
         plt.xlabel("$\epsilon$")
         plt.ylabel("GWD")
+        plt.xticks(rotation=30)
         plt.title(f"$\epsilon$ - GWD ({self.pair_name})")
-        # plt.tight_layout()
-
+        plt.grid(True)
+        plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
+        plt.tight_layout()
+        
+        if fig_dir is None:
+            fig_dir = self.figure_path
+            
+        plt.savefig(os.path.join(fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png"))
+        
         if show_figure:
             plt.show()
-   
-        if fig_dir is None:
-            fig_dir = self.save_path
         
-        plt.savefig(os.path.join(fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png"))
         plt.clf()
         plt.close()
 
         # figure plotting GWD as x-axis and accuracy as y-axis
         plt.figure(figsize=figsize)
-        # sns.scatterplot(data=df_trial, x="value", y="user_attrs_best_acc", s=50)
         plt.scatter(df_trial["user_attrs_best_acc"], df_trial["value"], color = cmap, s = marker_size)
         plt.xlabel("accuracy")
         plt.ylabel("GWD")
         plt.title(f"accuracy - GWD ({self.pair_name})")
-        # plt.tight_layout()
+        plt.grid(True)
+        plt.tight_layout()
 
-        if show_figure:
-            plt.show()
 
         if fig_dir is None:
-            fig_dir = self.save_path
+            fig_dir = self.figure_path
+            
         plt.savefig(os.path.join(fig_dir, f"Optim_log_acc_GWD_{self.pair_name}.png"))
+        
+        if show_figure:
+            plt.show()
+        
         plt.clf()
         plt.close()
-
+        
+        plt.figure(figsize=(8, 6))
+        plt.scatter(df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"])
+        
+        # plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
+        # plt.xticks(rotation=45)
+        plt.title(self.pair_name)
+        plt.xlabel("accuracy")
+        plt.ylabel("GWD")
+        plt.colorbar(label='eps')
+        plt.grid(True)
+        # plt.tight_layout()
+        # plt.gca().images[-1].colorbar.set_major_formatter(plt.FormatStrFormatter('%.1e'))
+        
+        plt.savefig(os.path.join(fig_dir, f"acc_gwd_eps({self.pair_name}).png"))
+        
+        if show_figure:
+            plt.show()
+        
+        plt.clf()
+        plt.close()
+        
     def _show_OT(
         self,
         title,
@@ -857,26 +904,25 @@ class PairwiseAnalysis:
 
         return accuracy
 
-    def procrustes(self, embedding_target, embedding_sourse, OT):
+    def procrustes(self, embedding_target, embedding_source, OT):
         """
-        Function that brings embedding_sourse closest to embedding_target by orthogonal matrix
+        Function that brings embedding_source closest to embedding_target by orthogonal matrix
 
         Args:
             embedding_target : shape (n_target, m)
-            embedding_sourse : shape (n_sourse, m)
-            OT : shape (n_sourse, n_target)
+            embedding_source : shape (n_source, m)
+            OT : shape (n_source, n_target)
                 Transportation matrix of sourse→target
 
         Returns:
-            new_embedding_sourse : shape (n_sourse, m)
+            new_embedding_source : shape (n_source, m)
         """
         # assert self.source.shuffle == False, "you cannot use procrustes method if 'shuffle' is True."
 
-        U, S, Vt = np.linalg.svd(np.matmul(embedding_sourse.T, np.matmul(OT, embedding_target)))
+        U, S, Vt = np.linalg.svd(np.matmul(embedding_source.T, np.matmul(OT, embedding_target)))
         Q = np.matmul(U, Vt)
-        new_embedding_sourse = np.matmul(embedding_sourse, Q)
-
-        return new_embedding_sourse
+        new_embedding_source = np.matmul(embedding_source, Q)
+        return new_embedding_source
 
     def wasserstein_alignment(self, metric):
         a = ot.unif(len(self.source.embedding))
@@ -897,7 +943,6 @@ class AlignRepresentations:
     This object has methods for conducting N groups level analysis and corresponding results.
     This has information of all pairs of representations.
     """
-
     def __init__(
         self,
         config: OptimizationConfig,
@@ -967,7 +1012,10 @@ class AlignRepresentations:
         """
         for representation in self.representations_list:
             representation.show_sim_mat(
-                sim_mat_format=sim_mat_format, visualization_config=visualization_config, fig_dir=fig_dir, ticks=ticks
+                sim_mat_format=sim_mat_format, 
+                visualization_config=visualization_config, 
+                fig_dir=fig_dir, 
+                ticks=ticks,
             )
 
             if show_distribution:
@@ -977,6 +1025,7 @@ class AlignRepresentations:
     def _single_computation(
         self,
         results_dir,
+        pair_eps_list=None,
         compute_OT=False,
         delete_results=False,
         return_data=False,
@@ -989,12 +1038,23 @@ class AlignRepresentations:
         filename=None,
         save_dataframe=False,
         target_device=None,
+        change_sampler_seed=False,
+        sampler_seed=42,
     ):
 
         OT_list = []
         for pairwise in self.pairwise_list:
+            if change_sampler_seed:
+                sampler_seed += 1
+            
+            if isinstance(pair_eps_list, dict):
+                eps_list = pair_eps_list.get(pairwise.pair_name, self.config.eps_list)
+            else:
+                eps_list = self.config.eps_list
+ 
             OT = pairwise.run_gw(
                 results_dir=results_dir,
+                eps_list=eps_list,
                 compute_OT=compute_OT,
                 delete_results=delete_results,
                 return_data=return_data,
@@ -1007,6 +1067,7 @@ class AlignRepresentations:
                 filename=filename,
                 save_dataframe=save_dataframe,
                 target_device=target_device,
+                sampler_seed=sampler_seed,
             )
 
             OT_list.append(OT)
@@ -1016,6 +1077,7 @@ class AlignRepresentations:
     def gw_alignment(
         self,
         results_dir,
+        pair_eps_list=None,
         compute_OT=False,
         delete_results=False,
         return_data=False,
@@ -1027,12 +1089,16 @@ class AlignRepresentations:
         ticks=None,
         filename=None,
         save_dataframe=False,
+        change_sampler_seed=False,
+        fix_sampler_seed=42,
+        parallel_method="multithread",
     ):
         """_summary_
 
         Args:
             results_dir (_type_): _description_
             compute_OT (bool, optional): _description_. Defaults to False.
+            delete_results (bool, optional): _description_. Defaults to False.
             return_data (bool, optional): _description_. Defaults to False.
             return_figure (bool, optional): _description_. Defaults to True.
             OT_format (str, optional): _description_. Defaults to "default".
@@ -1040,19 +1106,37 @@ class AlignRepresentations:
             show_log (bool, optional): _description_. Defaults to False.
             fig_dir (_type_, optional): _description_. Defaults to None.
             ticks (_type_, optional): _description_. Defaults to None.
+            filename (_type_, optional): _description_. Defaults to None.
+            save_dataframe (bool, optional): _description_. Defaults to False.
+            change_sampler_seed (bool, optional): _description_. Defaults to False.
+            fix_sampler_seed (int, optional): _description_. Defaults to 42.
+            parallel_method (str, optional): _description_. Defaults to "multithread".
 
         Raises:
+            ValueError: _description_
             ValueError: _description_
 
         Returns:
             _type_: _description_
         """
+        
+        if isinstance(fix_sampler_seed, int) and fix_sampler_seed > -1:
+            first_sampler_seed = fix_sampler_seed
+        else:
+            raise ValueError("please 'sampler_seed' = True or False or int > 0.")
 
         if self.config.n_jobs > 1:
             OT_list = []
             processes = []
-
-            with ThreadPoolExecutor(self.config.n_jobs) as pool:
+            
+            if parallel_method == "multiprocess":
+                pool = ProcessPoolExecutor(self.config.n_jobs)
+            elif parallel_method == "multithread":
+                pool = ThreadPoolExecutor(self.config.n_jobs)
+            else:
+                raise ValueError('parallel_method = "multiprocess" or "multithread".')
+        
+            with pool:
                 for pair_number in range(len(self.pairwise_list)):
 
                     if self.config.multi_gpu:
@@ -1070,10 +1154,21 @@ class AlignRepresentations:
                         if self.config.multi_gpu != False:
                             warnings.warn("numpy doesn't use GPU. Please 'multi_GPU = False'.", UserWarning)
                         target_device = self.config.device
-
+                    
+                    if change_sampler_seed:
+                        sampler_seed = first_sampler_seed + pair_number
+                    else:
+                        sampler_seed = first_sampler_seed
+                    
+                    if isinstance(pair_eps_list, dict):
+                        eps_list = pair_eps_list.get(pairwise.pair_name, self.config.eps_list)
+                    else:
+                        eps_list = self.config.eps_list
+ 
                     future = pool.submit(
                         pairwise.run_gw,
                         results_dir=results_dir,
+                        eps_list=eps_list,
                         compute_OT=compute_OT,
                         delete_results=delete_results,
                         return_data=False,
@@ -1085,7 +1180,8 @@ class AlignRepresentations:
                         ticks=None,
                         filename=filename,
                         save_dataframe=save_dataframe,
-                        target_device=target_device,   
+                        target_device=target_device,
+                        sampler_seed=sampler_seed,   
                     )
 
                     processes.append(future)
@@ -1096,6 +1192,7 @@ class AlignRepresentations:
             if return_figure or return_data:
                 OT_list = self._single_computation(
                     results_dir=results_dir,
+                    pair_eps_list=pair_eps_list,
                     compute_OT=False,
                     delete_results=False,
                     return_data=return_data,
@@ -1112,6 +1209,7 @@ class AlignRepresentations:
         if self.config.n_jobs == 1:
             OT_list = self._single_computation(
                 results_dir=results_dir,
+                pair_eps_list=pair_eps_list,
                 compute_OT=compute_OT,
                 delete_results=delete_results,
                 return_data=return_data,
@@ -1123,6 +1221,8 @@ class AlignRepresentations:
                 ticks=ticks,
                 filename=filename,
                 save_dataframe=save_dataframe,
+                change_sampler_seed=change_sampler_seed,
+                sampler_seed=first_sampler_seed,
             )
         
         if self.config.n_jobs < 1:
@@ -1294,7 +1394,13 @@ class AlignRepresentations:
             OT *= len(OT)  # normalize
             self.pairwise_list[i].OT = OT
 
-    def calc_accuracy(self, top_k_list, eval_type="ot_plan", category_mat=None, barycenter=False):
+    def calc_accuracy(
+        self, 
+        top_k_list, 
+        eval_type="ot_plan", 
+        category_mat=None, 
+        barycenter=False
+    ):
         accuracy = pd.DataFrame()
         accuracy["top_n"] = top_k_list
 
@@ -1335,7 +1441,13 @@ class AlignRepresentations:
             df = df.rename("matching rate")
         return df
 
-    def plot_accuracy(self, eval_type="ot_plan", fig_dir=None, fig_name="Accuracy_ot_plan.png", scatter=True):
+    def plot_accuracy(
+        self, 
+        eval_type="ot_plan", 
+        fig_dir=None, 
+        fig_name="Accuracy_ot_plan.png", 
+        scatter=True,
+    ):
         plt.figure(figsize=(5, 3))
 
         if scatter:
@@ -1350,7 +1462,8 @@ class AlignRepresentations:
                 plt.plot(df.index, df[group], c="blue")
 
         plt.ylim(0, 100)
-        plt.xlabel("k")
+        plt.title(eval_type)
+        plt.xlabel("top k")
         plt.ylabel("Matching rate")
         # plt.legend(loc = "best")
         plt.tick_params(axis="both", which="major")

@@ -4,31 +4,18 @@ import ot
 
 # %%
 class InitMatrix():
-    def __init__(self, matrix_size = None):
-        self.matrix_size = matrix_size
-        self.initialize = ['uniform', 'random', 'permutation', 'diag'] # 実装済みの方法の名前を入れる。
+    def __init__(self, source_size, target_size):
+        self.source_size = source_size
+        self.target_size = target_size
+        self.initialize = ['uniform', 'random', 'permutation', 'diag'] # already implemented.
 
-    def implemented_init_plans(self, init_plans_list): # リストを入力して、実行可能な方法のみをリストにして返す。
-        """
-        ここから、初期値の条件を1個または複数個選択することができる。
-        選択はself.initializeの中にあるものの中から。
-        選択したい条件が1つであっても、リストで入力をすること。
-
-        Args:
-            init_plans_list (list) : 初期値の条件を1個または複数個入れたリスト。
-
-        Raises:
-            ValueError: 選択したい条件が1つであっても、リストで入力をすること。
-
-        Returns:
-            list : 選択希望の条件のリスト。
-        """
-
-        if type(init_plans_list) != list:
-            raise ValueError('variable named "init_plans_list" is not list!')
-
-        else:
-            return [v for v in self.initialize if v in init_plans_list]
+    def set_user_define_init_mat_list(self, mat):
+        if isinstance(mat, list):
+            self.user_define_init_mat_list = mat
+        
+        elif isinstance(mat, np.ndarray):
+            self.user_define_init_mat_list = [mat]
+            
 
     def make_initial_T(self, initialize, seed = 42):
         """
@@ -52,17 +39,17 @@ class InitMatrix():
             T = self.initialize_matrix(ts=ts)
 
         elif initialize == 'uniform':
-            T = np.outer(ot.unif(self.matrix_size), ot.unif(self.matrix_size))
+            T = np.outer(ot.unif(self.source_size), ot.unif(self.target_size))
 
         elif initialize == 'diag':
-            T = np.diag(ot.unif(self.matrix_size))
+            T = np.diag(ot.unif(self.source_size))
 
         else:
             raise ValueError('Not defined initialize matrix.')
 
         return T
 
-    def randOrderedMatrix(self):
+    def randOrderedMatrix(self): #ここも間違っているかもしれないです(2023/7/6)
         """
         各行・各列に重複なしに[0,n]のindexを持つmatrixを作成
         Parameters
@@ -70,14 +57,14 @@ class InitMatrix():
         Returns
             np.ndarray 重複なしのindexを要素に持つmatrix
         """
-        matrix = np.zeros((self.matrix_size, self.matrix_size))
+        matrix = np.zeros((self.source_size, self.target_size))
         rows = np.tile(np.arange(0, self.matrix_size), 2)
 
         for i in range(self.matrix_size):
             matrix[i, :] = rows[i : i + self.matrix_size]
 
-        r = np.random.choice(self.matrix_size, self.matrix_size, replace=False)
-        c = np.random.choice(self.matrix_size, self.matrix_size, replace=False)
+        r = np.random.choice(self.source_size, self.target_size, replace=False)
+        c = np.random.choice(self.source_size, self.target_size, replace=False)
         matrix = matrix[r, :]
         matrix = matrix[:, c]
         return matrix.astype(int)
@@ -103,7 +90,7 @@ class InitMatrix():
         大泉先生が作ったもの。
         """
         # make random initial transportation plan (N x N matrix)
-        T = np.random.rand(self.matrix_size, self.matrix_size) # create a random matrix of size n x n
+        T = np.random.rand(self.source_size, self.target_size) # create a random matrix of size n x n
         rep = 100 # number of repetitions
         for _ in range(rep):
             # normalize each row so that the sum is 1
@@ -112,7 +99,7 @@ class InitMatrix():
             # normalize each column so that the sum is 1
             q = T.sum(axis=0, keepdims=True)
             T = T / q
-        T = T / self.matrix_size
+        T = T / self.source_size #ここ間違っているかもしれないです・・・ 
         return T
 
 # %%
