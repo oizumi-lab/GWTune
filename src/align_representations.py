@@ -117,6 +117,7 @@ class VisualizationConfig:
         color_hue=None,
         markers_list=None,
         marker_size=30,
+        color = 'C0',
         cmap = 'cividis',
         draw_category_line=False,
         category_line_color='C2',
@@ -143,6 +144,7 @@ class VisualizationConfig:
             'color_hue': color_hue,
             'markers_list': markers_list,
             'marker_size': marker_size,
+            'color':color,
             'cmap':cmap,
             'draw_category_line': draw_category_line,
             'category_line_color': category_line_color,
@@ -700,7 +702,7 @@ class PairwiseAnalysis:
         **kwargs,
     ):
         figsize = kwargs.get('figsize', (8,6))
-        cmap = kwargs.get('cmap', 'C0')
+        color = kwargs.get('color', 'C0')
         marker_size = kwargs.get('marker_size', 20)
         show_figure = kwargs.get('show_figure', False)
         
@@ -711,7 +713,7 @@ class PairwiseAnalysis:
         
         # figure plotting epsilon as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
-        plt.scatter(df_trial["params_eps"], df_trial["value"], color = cmap, s = marker_size)
+        plt.scatter(df_trial["params_eps"], df_trial["value"], color = color, s = marker_size)
         plt.xlabel("$\epsilon$")
         plt.ylabel("GWD")
         plt.xticks(rotation=30)
@@ -733,7 +735,7 @@ class PairwiseAnalysis:
 
         # figure plotting GWD as x-axis and accuracy as y-axis
         plt.figure(figsize=figsize)
-        plt.scatter(df_trial["user_attrs_best_acc"], df_trial["value"], color = cmap, s = marker_size)
+        plt.scatter(df_trial["user_attrs_best_acc"], df_trial["value"], color = color, s = marker_size)
         plt.xlabel("accuracy")
         plt.ylabel("GWD")
         plt.title(f"accuracy - GWD ({self.pair_name})")
@@ -1471,6 +1473,9 @@ class AlignRepresentations:
         if fig_dir is not None:
             plt.savefig(os.path.join(fig_dir, fig_name))
         plt.show()
+        
+        plt.clf()
+        plt.close()
 
     def _procrustes_to_pivot(self, pivot):
         the_others, pivot_idx_list = self._check_pairs(pivot)
