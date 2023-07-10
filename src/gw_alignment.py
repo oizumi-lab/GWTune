@@ -16,23 +16,20 @@ from tqdm.auto import tqdm
 # warnings.simplefilter("ignore")
 from .utils.backend import Backend
 from .utils.init_matrix import InitMatrix
-
 # nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
-
 
 # %%
 class GW_Alignment:
     def __init__(
         self,
-        pred_dist,
+        source_dist,
         target_dist,
-        p,
-        q,
-        save_path,
+        data_path,
         max_iter=1000,
         numItermax=1000,
-        n_iter=100,
+        n_iter=20,
         to_types="torch",
+        data_type="double",
         sinkhorn_method="sinkhorn",
     ):
         """
@@ -47,24 +44,42 @@ class GW_Alignment:
         初期値ランダムで複数: 乱数
         """
         self.to_types = to_types
+        self.data_type = data_type
         self.sinkhorn_method = sinkhorn_method
-        self.size = len(p)
 
-        self.save_path = save_path
-        if not os.path.exists(self.save_path):
-            os.makedirs(self.save_path)
+        # distribution in the source space, and target space
+        self.source_size = len(source_dist)
+        self.target_size = len(target_dist)
+
+        self.data_path = data_path
+        if not os.path.exists(self.data_path):
+            os.makedirs(self.data_path, exist_ok=True)
 
         self.n_iter = n_iter
 
         self.main_compute = MainGromovWasserstainComputation(
-            pred_dist, target_dist, p, q, self.to_types, max_iter=max_iter, numItermax=numItermax, n_iter=n_iter
+            source_dist,
+            target_dist,
+            self.to_types,
+            data_type=self.data_type,
+            max_iter=max_iter,
+            numItermax=numItermax,
+            n_iter=n_iter,
         )
 
     def define_eps_range(self, trial, eps_list, eps_log):
-        """
-        2023.3.16 佐々木 作成
+        """_summary_
 
-        epsの範囲を指定する関数。
+        Args:
+            trial (_type_): _description_
+            eps_list (_type_): _description_
+            eps_log (_type_): _description_
+
+        Raises:
+            ValueError: _description_
+
+        Returns:
+            _type_: _description_
         """
         if len(eps_list) == 2:
             ep_lower, ep_upper = eps_list
@@ -73,11 +88,11 @@ class GW_Alignment:
             ep_lower, ep_upper, ep_step = eps_list
             eps = trial.suggest_float("eps", ep_lower, ep_upper, step=ep_step)
         else:
-            raise ValueError("The eps_list doesn't match.")
+            raise ValueError("The eps_list and/or eps_log doesn't match.")
 
         return trial, eps
 
-    def __call__(self, trial, device, init_plans_list, eps_list, eps_log=True):
+    def __call__(self, trial, device, init_mat_plan, eps_list, eps_log=True):
         if self.to_types == "numpy":
             assert device == "cpu", "numpy does not run in CUDA."
 
@@ -86,22 +101,13 @@ class GW_Alignment:
         """
 
         trial, eps = self.define_eps_range(trial, eps_list, eps_log)
-
-        init_mat_plan = trial.suggest_categorical(
-            "initialize", init_plans_list
-        )  # init_matをdeviceに上げる作業はentropic_gw中で行うことにしました。(2023/3/14 阿部)
-
-        trial.set_user_attr("size", self.size)
-
-        file_path = self.save_path + "/" + init_mat_plan  # ここのパス設定はoptimizer.py側でも使う可能性があるので、変更の可能性あり。
-
-        if not os.path.exists(file_path):
-            os.makedirs(file_path, exist_ok=True)
+        trial.set_user_attr("source_size", self.source_size)
+        trial.set_user_attr("target_size", self.target_size)
 
         """
         2.  Compute GW alignment with hyperparameters defined above.
         """
-        gw, logv, gw_loss, init_mat, trial = self.main_compute.compute_GW_with_init_plans(
+        logv, init_mat, trial = self.main_compute.compute_GW_with_init_plans(
             trial,
             eps,
             init_mat_plan,
@@ -113,8 +119,9 @@ class GW_Alignment:
         3.  count the accuracy of alignment and save the results if computation was finished in the right way.
             If not, set the result of accuracy and gw_loss as float('nan'), respectively. This will be used as a handy marker as bad results to be removed in the evaluation analysis.
         """
-
-        self.main_compute.back_end.save_computed_results(gw, init_mat, file_path, trial.number)
+        gw = logv["ot"]
+        gw_loss = logv["gw_dist"]
+        self.main_compute.back_end.save_computed_results(gw, init_mat, self.data_path, trial.number)
 
         """
         4. delete unnecessary memory for next computation. If not, memory error would happen especially when using CUDA.
@@ -126,63 +133,32 @@ class GW_Alignment:
 
         return gw_loss
 
-    def load_graph(self, study):
-        best_trial = study.best_trial
-        eps = best_trial.params["eps"]
-        init_plan = best_trial.params["initialize"]
-
-        acc = best_trial.user_attrs["best_acc"]
-
-        # size = best_trial.user_attrs['size']
-        number = best_trial.number
-
-        if self.to_types == "torch":
-            gw = torch.load(self.save_path + "/" + init_plan + f"/gw_{number}.pt")
-        elif self.to_types == "numpy":
-            gw = np.load(self.save_path + "/" + init_plan + f"/gw_{number}.npy")
-
-        self.plot_coupling(gw, eps, acc)
-
-    def make_eval_graph(self, study):
-        df_test = study.trials_dataframe()
-        success_test = df_test[df_test["values_0"] != float("nan")]
-
-        plt.figure()
-        plt.title("The evaluation of GW results for random pictures")
-        plt.scatter(
-            success_test["values_1"],
-            np.log(success_test["values_0"]),
-            label="init diag plan (" + str(self.size) + ")",
-            c="C0",
-        )
-        plt.xlabel("accuracy")
-        plt.ylabel("log(GWD)")
-        plt.legend()
-        plt.show()
-
-    def plot_coupling(self, T, epsilon, acc):
-        mplstyle.use("fast")
-        N = T.shape[0]
-        plt.figure(figsize=(8, 6))
-        if self.to_types == "torch":
-            T = T.to("cpu").numpy()
-        sns.heatmap(T)
-
-        plt.title("GW results ({} pictures, eps={}, acc.= {})".format(N, round(epsilon, 6), round(acc, 4)))
-        plt.tight_layout()
-        plt.show()
-
 
 class MainGromovWasserstainComputation:
-    def __init__(self, pred_dist, target_dist, p, q, to_types, max_iter=1000, numItermax=1000, n_iter=100) -> None:
+    def __init__(
+        self,
+        source_dist,
+        target_dist,
+        to_types,
+        data_type='double',
+        max_iter=1000,
+        numItermax=1000,
+        n_iter=100
+    ) -> None:
 
         self.to_types = to_types
+        self.data_type = data_type
 
-        self.pred_dist, self.target_dist, self.p, self.q = pred_dist, target_dist, p, q
-        self.size = len(p)
+        p = ot.unif(len(source_dist))
+        q = ot.unif(len(target_dist))
+
+        self.source_dist, self.target_dist, self.p, self.q = source_dist, target_dist, p, q
+
+        self.source_size = len(source_dist)
+        self.target_size = len(target_dist)
 
         # hyperparameter
-        self.init_mat_builder = InitMatrix(matrix_size=self.size)  # 基本的に初期値はnumpyで作成するようにしておく。
+        self.init_mat_builder = InitMatrix(self.source_size, self.target_size)  # 基本的に初期値はnumpyで作成するようにしておく。
 
         # gw alignmentに関わるparameter
         self.max_iter = max_iter
@@ -193,19 +169,16 @@ class MainGromovWasserstainComputation:
         # 初期値のiteration回数, かつ hyperbandのparameter
         self.n_iter = n_iter
 
-        self.back_end = Backend("cpu", self.to_types)  # 並列計算をしない場合は、こちらにおいた方がはやい。(2023.4.19 佐々木)
+        self.back_end = Backend("cpu", self.to_types, self.data_type)  # 並列計算をしない場合は、こちらにおいた方がはやい。(2023.4.19 佐々木)
 
     def entropic_gw(
         self,
         device,
         epsilon,
         T,
-        max_iter=1000,
-        numItermax=1000,
         tol=1e-9,
         trial=None,
         sinkhorn_method="sinkhorn",
-        log=True,
         verbose=False
     ):
         """
@@ -223,24 +196,20 @@ class MainGromovWasserstainComputation:
 
         # ここで、全ての変数をto_typesのdeviceに変更している。
         self.back_end.device = device
-        C1, C2, p, q, T = self.back_end(self.pred_dist, self.target_dist, self.p, self.q, T)
+        C1, C2, p, q, T = self.back_end(self.source_dist, self.target_dist, self.p, self.q, T)
 
         constC, hC1, hC2 = ot.gromov.init_matrix(C1, C2, p, q, loss_fun="square_loss")
 
         cpt = 0
         err = 1
+        log = {"err": []}
 
-        if log:
-            log = {"err": []}
-
-        while err > tol and cpt < max_iter:
+        while err > tol and cpt < self.max_iter:
             Tprev = T
-            # compute the gradient
             tens = ot.gromov.gwggrad(constC, hC1, hC2, T)
-            T = ot.bregman.sinkhorn(p, q, tens, epsilon, method=sinkhorn_method, numItermax=numItermax)
+            T = ot.bregman.sinkhorn(p, q, tens, epsilon, method=sinkhorn_method, numItermax=self.numItermax)
 
             if cpt % 10 == 0:
-                # err_prev = copy.copy(err)　#ここは使われていないようなので、一旦コメントアウトしました (2023.3.16 佐々木)
                 err = self.back_end.nx.norm(T - Tprev)
                 if log:
                     log["err"].append(err)
@@ -250,22 +219,16 @@ class MainGromovWasserstainComputation:
                     print("{:5d}|{:8e}|".format(cpt, err))
             cpt += 1
 
-        if log:
-            log["gw_dist"] = ot.gromov.gwloss(constC, hC1, hC2, T)
-            return T, log
-
-        else:
-            return T
+        log["gw_dist"] = ot.gromov.gwloss(constC, hC1, hC2, T)
+        log["ot"] = T
+        return log
 
     def gw_alignment_computation(
         self,
-        init_mat_plan,
+        init_mat,
         eps,
-        max_iter,
-        numItermax,
         device,
         trial=None,
-        seed=42,
         sinkhorn_method="sinkhorn",
     ):
         """
@@ -274,30 +237,24 @@ class MainGromovWasserstainComputation:
         外部で、特定のhyper parametersでのgw_alignmentの計算結果だけを抽出したい時にも使えるため。
         """
 
-        init_mat = self.init_mat_builder.make_initial_T(init_mat_plan, seed)
-
-        gw, logv = self.entropic_gw(
+        logv = self.entropic_gw(
             device,
             eps,
             init_mat,
-            max_iter=max_iter,
-            numItermax=numItermax,
             trial=trial,
             sinkhorn_method=sinkhorn_method,
         )
 
-        gw_loss = logv["gw_dist"]
-
-        if (self.back_end.check_zeros(gw)) or (gw_loss < 0):
-            gw_loss = float("nan")
-            acc = float("nan")
+        if self.back_end.check_zeros(logv["ot"]):
+            logv["gw_dist"] = float("nan")
+            logv["acc"] = float("nan")
 
         else:
-            pred = self.back_end.nx.argmax(gw, 1)
-            correct = (pred == self.back_end.nx.arange(len(gw), type_as=gw)).sum()
-            acc = correct / len(gw)
+            pred = self.back_end.nx.argmax(logv["ot"], 1)
+            correct = (pred == self.back_end.nx.arange(len(logv["ot"]), type_as=logv["ot"])).sum()
+            logv["acc"] = correct / len(logv["ot"])
 
-        return gw, logv, gw_loss, acc, init_mat
+        return logv
 
     def _save_results(self, gw_loss, acc, trial, init_mat_plan, num_iter=None, seed=None):
 
@@ -327,10 +284,8 @@ class MainGromovWasserstainComputation:
             optuna.TrialPruned: _description_
         """
 
-        if init_mat_plan in ["uniform", "diag"] and math.isnan(gw_loss):  # math.isnan()を使わないとnanの判定ができない。
-            # このifブロックがなくても、diag, uniformのprunerは正しく動作する。
-            # ただ、tutorialの挙動を見ていると、これがあった方が良さそう。(2023.3.28 佐々木)
-            raise optuna.TrialPruned(f"Trial for '{init_mat_plan}' was pruned with parameters: {{'eps': {eps}}}")
+        if init_mat_plan in ["uniform", "diag"] and math.isnan(gw_loss):
+            raise optuna.TrialPruned(f"Trial for '{init_mat_plan}' was pruned with parameters: {{'eps': {eps:.5e}, 'gw_loss': '{gw_loss:.5e}'}}")
 
         if num_iter is None:  # uniform, diagにおいて、nanにならなかったがprunerが動くときのためのifブロック。
             num_iter = self.n_iter
@@ -339,8 +294,68 @@ class MainGromovWasserstainComputation:
 
         if trial.should_prune():
             raise optuna.TrialPruned(
-                f"Trial was pruned at iteration {num_iter} with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}"
+                f"Trial was pruned at iteration {num_iter} with parameters: {{'eps': {eps:.5e}, 'gw_loss': '{gw_loss:.5e}'}}"
             )
+
+    def _compute_GW_with_init_plans(
+        self,
+        trial,
+        init_mat_plan,
+        eps,
+        device,
+        sinkhorn_method,
+        num_iter=None,
+        seed=None
+    ):
+
+        if init_mat_plan == "user_define":
+            init_mat = seed
+        else:
+            init_mat = self.init_mat_builder.make_initial_T(init_mat_plan, seed)
+
+        logv = self.gw_alignment_computation(
+            init_mat,
+            eps,
+            device,
+            sinkhorn_method=sinkhorn_method,
+        )
+
+        if init_mat_plan in ["uniform", "diag"]:
+            best_flag = None
+            trial = self._save_results(
+                logv["gw_dist"],
+                logv["acc"],
+                trial,
+                init_mat_plan,
+            )
+
+        elif init_mat_plan in ["random", "permutation", "user_define"]:
+            if logv["gw_dist"] < self.best_gw_loss:
+                best_flag = True
+                self.best_gw_loss = logv["gw_dist"]
+
+                trial = self._save_results(
+                    logv["gw_dist"],
+                    logv["acc"],
+                    trial,
+                    init_mat_plan,
+                    num_iter=num_iter,
+                    seed=seed,
+                )
+
+            else:
+                best_flag = False
+
+        self._check_pruner_should_work(
+            logv["gw_dist"],
+            trial,
+            init_mat_plan,
+            eps,
+            num_iter=num_iter,
+        )
+
+        return logv, init_mat, trial, best_flag
+
 
     def compute_GW_with_init_plans(
         self,
@@ -365,99 +380,47 @@ class MainGromovWasserstainComputation:
         """
 
         if init_mat_plan in ["uniform", "diag"]:
-            gw, logv, gw_loss, acc, init_mat = self.gw_alignment_computation(
+            logv, init_mat, trial, _ = self._compute_GW_with_init_plans(
+                trial,
                 init_mat_plan,
                 eps,
-                self.max_iter,
-                self.numItermax,
                 device,
-                sinkhorn_method=sinkhorn_method,
+                sinkhorn_method,
             )
-            trial = self._save_results(gw_loss, acc, trial, init_mat_plan)
-            self._check_pruner_should_work(gw_loss, trial, init_mat_plan, eps)
-            return gw, logv, gw_loss, init_mat, trial
+            return logv, init_mat, trial
 
-        elif init_mat_plan in ["random", "permutation"]:
-            best_gw_loss = float("inf")
+        elif init_mat_plan in ["random", "permutation", "user_define"]:
+            self.best_gw_loss = float("inf")
 
-            pbar = tqdm(np.random.randint(0, 100000, self.n_iter))
-            pbar.set_description("trial number : " + str(trial.number))
+            if init_mat_plan in ["random", "permutation"]:
+                pbar = tqdm(np.random.randint(0, 100000, self.n_iter))
+
+            if init_mat_plan == "user_define":
+                pbar = tqdm(self.init_mat_builder.user_define_init_mat_list)
+
+            pbar.set_description(f"Trial No.{trial.number}, eps:{eps:.3e}")
 
             for i, seed in enumerate(pbar):
-                c_gw, c_logv, c_gw_loss, c_acc, c_init_mat = self.gw_alignment_computation(
+                logv, init_mat, trial, best_flag = self._compute_GW_with_init_plans(
+                    trial,
                     init_mat_plan,
                     eps,
-                    self.max_iter,
-                    self.numItermax,
                     device,
+                    sinkhorn_method,
+                    num_iter=i,
                     seed=seed,
-                    sinkhorn_method=sinkhorn_method,
                 )
 
-                if c_gw_loss < best_gw_loss:
-                    best_gw, best_logv, best_gw_loss, best_acc, best_init_mat = (
-                        c_gw,
-                        c_logv,
-                        c_gw_loss,
-                        c_acc,
-                        c_init_mat,
-                    )
+                if best_flag:
+                    best_logv, best_init_mat = logv, init_mat
 
-                    trial = self._save_results(best_gw_loss, best_acc, trial, init_mat_plan, num_iter=i, seed=seed)
-
-                self._check_pruner_should_work(c_gw_loss, trial, init_mat_plan, eps, num_iter=i)
-
-            if best_gw_loss == float("inf"):
+            if self.best_gw_loss == float("inf"):
                 raise optuna.TrialPruned(
                     f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}"
                 )
 
             else:
-                return best_gw, best_logv, best_gw_loss, best_init_mat, trial
+                return best_logv, best_init_mat, trial
 
         else:
             raise ValueError("Not defined initialize matrix.")
-
-
-# %%
-if __name__ == "__main__":
-
-    os.chdir(os.path.dirname(__file__))
-
-    path1 = "../data/model1.pt"
-    path2 = "../data/model2.pt"
-    unittest_save_path = "../results/unittest/gw_alignment"
-
-    model1 = torch.load(path1)
-    model2 = torch.load(path2)
-    p = ot.unif(len(model1))
-    q = ot.unif(len(model2))
-
-    init_mat_types = ["random"]
-    eps_list = [1e-3, 1e-2]
-    eps_log = True
-
-    dataset = GW_Alignment(model1, model2, p, q, max_iter=100, n_iter=4, save_path=unittest_save_path)
-
-    # %%
-    seed = 42
-    study = optuna.create_study(
-        direction="minimize",
-        study_name="test",
-        sampler=optuna.samplers.TPESampler(seed=seed),
-        pruner=optuna.pruners.MedianPruner(),
-        storage="sqlite:///" + unittest_save_path + "/" + init_mat_types[0] + ".db",
-        load_if_exists=True,
-    )
-
-    device = "cuda"
-
-    start = time.time()
-    study.optimize(lambda trial: dataset(trial, device, init_mat_types, eps_list), n_trials=20)
-    end = time.time() - start
-    print("Time", end)
-    #%%
-    df = study.trials_dataframe()
-    print(df)
-    # %%
-    df.dropna()

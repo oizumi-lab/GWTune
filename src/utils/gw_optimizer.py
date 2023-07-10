@@ -17,23 +17,23 @@ from sqlalchemy_utils import create_database, database_exists
 
 # %%
 def load_optimizer(
-    save_path,
-    n_jobs=1,
+    save_path=None,
+    filename=None,
+    storage=None,
+    init_mat_plan="random",
+    n_iter=10,
     num_trial=20,
-    to_types="torch",
+    n_jobs=1,
     method="optuna",
     sampler_name="random",
     pruner_name="median",
     pruner_params=None,
-    n_iter=10,
-    filename="test",
-    storage=None,
 ):
 
     """
     (usage example)
     >>> dataset = mydataset()
-    >>> opt = load_optimizer(save_path)
+    >>> opt = load_optimizer(filename)
     >>> study = Opt.run_study(dataset)
 
     Raises:
@@ -55,7 +55,15 @@ def load_optimizer(
 
     if method == "optuna":
         Opt = RunOptuna(
-            save_path, to_types, storage, filename, sampler_name, pruner_name, pruner_params, n_iter, n_jobs, num_trial
+            filename, 
+            storage, 
+            init_mat_plan,
+            num_trial,
+            n_iter, 
+            n_jobs, 
+            sampler_name, 
+            pruner_name, 
+            pruner_params, 
         )
     else:
         raise ValueError("no implemented method.")
@@ -66,29 +74,38 @@ def load_optimizer(
 class RunOptuna:
     def __init__(
         self,
-        save_path,
-        to_types,
-        storage,
-        filename,
-        sampler_name,
-        pruner_name,
-        pruner_params,
-        n_iter,
-        n_jobs,
+        filename, 
+        storage, 
+        init_mat_plan,
         num_trial,
+        n_iter, 
+        n_jobs, 
+        sampler_name, 
+        pruner_name, 
+        pruner_params, 
     ):
 
         # the path or file name to save the results.
-        self.save_path = save_path
-        self.to_types = to_types
-        self.storage = storage
         self.filename = filename
+        self.storage = storage
+        self.init_mat_plan = init_mat_plan
+        
+        # parameters for optuna.study
+        self.num_trial = num_trial
+        self.n_iter = n_iter
+        self.n_jobs = n_jobs
 
         # setting of optuna
         self.sampler_name = sampler_name
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
 
+
+        # parameters for optuna.study
+        self.n_jobs = n_jobs
+        self.num_trial = num_trial
+
+        
         # parameters for optuna.study
         self.n_jobs = n_jobs
         self.num_trial = num_trial
@@ -100,7 +117,6 @@ class RunOptuna:
         # HyperbandPruner
         self.min_resource = 5
         self.reduction_factor = 2
-        self.n_iter = n_iter
 
         if pruner_params is not None:
             self._set_params(pruner_params)
@@ -118,7 +134,7 @@ class RunOptuna:
     def create_study(self, direction="minimize"):
         study = optuna.create_study(
             direction=direction,
-            study_name=self.filename,
+            study_name=self.filename + "_" + self.init_mat_plan,
             storage=self.storage,
             load_if_exists=True,
         )
@@ -133,7 +149,7 @@ class RunOptuna:
             _type_: _description_
         """
         study = optuna.load_study(
-            study_name=self.filename,
+            study_name=self.filename + "_" + self.init_mat_plan,
             sampler=self.choose_sampler(seed=seed),
             pruner=self.choose_pruner(),
             storage=self.storage,
@@ -162,7 +178,7 @@ class RunOptuna:
         try:
             study = self.load_study(seed=seed)
         except KeyError:
-            print("Study for " + self.filename + " was not found, creating a new one...")
+            print("Study for " + self.filename + "_" + self.init_mat_plan + " was not found, creating a new one...")
             self.create_study()
             study = self.load_study(seed=seed)
         
@@ -171,7 +187,7 @@ class RunOptuna:
         if self.n_jobs > 1:
             warnings.filterwarnings("always")
             warnings.warn(
-                "UserWarning : The parallel computation is done by the functions implemented in Optuna.\n \
+                "The parallel computation is done by the functions implemented in Optuna.\n \
                 This doesn't always provide a benefit to speed up or to get a better results.",
                 UserWarning,
             )
@@ -212,11 +228,14 @@ class RunOptuna:
         """
         if self.pruner_name == "median":
             pruner = optuna.pruners.MedianPruner(
-                n_startup_trials=self.n_startup_trials, n_warmup_steps=self.n_warmup_steps
+                n_startup_trials=self.n_startup_trials, 
+                n_warmup_steps=self.n_warmup_steps
             )
         elif self.pruner_name.lower() == "hyperband":
             pruner = optuna.pruners.HyperbandPruner(
-                min_resource=self.min_resource, max_resource=self.n_iter, reduction_factor=self.reduction_factor
+                min_resource=self.min_resource, 
+                max_resource=self.n_iter, 
+                reduction_factor=self.reduction_factor
             )
         elif self.pruner_name.lower() == "nop":
             pruner = optuna.pruners.NopPruner()
