@@ -1,54 +1,39 @@
-# GW_methods
+# Toolbox for Gromov-Wasserstein Optimal Transport (GWOT)
+This toolbox supports an easy-to-use hyperparameter tuning of GWOT and the evaluation of unsupervised alignment based on GWOT.  
+To find good local minima in GWOT, hyperparameter tuning is important.  
+This toolbox uses [Optuna](https://optuna.org/) for hyperparameter tuning and [POT](https://pythonot.github.io/) for GWOT optimization.  
 
-## Folder structure of this repository
+## Tutorials
+To use our toolbox, please run `tutorial.ipynb` in the `scripts` folder.  
+You can learn how to use this toolbox on two types of sample data.  
+By replacing the tutorial data with your data, you will be able to easily test GWOT for your data!  
 
-~~~markdown
-|-- data  
-|-- scripts
-|-- src
-|   -- utils
- -- .gitignore  
- -- pyproject.toml  
- -- README.md  
-~~~
+## Requirements
+Please see `pyproject.toml` for required libraries.  
+If you are using poetry, please run `poetry install` first and then, install `torch`, `torchvision`, `torchaudio` that are compatible with your environment.  
+For compatibility information, see the [official pytorch page](https://pytorch.org/get-started/locally/). 
 
-## Roles of the folders
+## Folders in this repository  
 
-**data**: Where you put "minimal" data for tutorials. Do not put a large size data.  
-**scripts**: Where you put scripts for various types of GW alignment tutorials.  
-**src**: Where you put "core" modules for this project such as GW alignment with hyperparameter optimization or GW barycenter alignment.  
-**utils**: Where you put utility modules that are not specific to GW alignment but are useful for general purposes.  
+`data`: Dataset for tutorials.  
+`scripts`: Scripts for the GWOT optimization tutorials.  
+`src`: Core modules for GWOT hyperparameter optimization.  
+`src/utils`: Utility modules that are not specific for GWOT optimization but are useful for general purposes.  
+`experiment`: Folder for development and testing. 
 
-## Core modules in src
+## Core modules in src  
 
-### Basic GW alignment (now mainly Sasaki & Abe)
-
-GW alignment with the hyperparameter optimization of epsilon and initial transportation plans
-
-0. util function for selecting CPU and GPU, changing variable types  
-
-1. optimization for epsilon  
-  a. grid search  
-  b. Optuna  (Bayes)
-2. optimization for initial transportation plans  
-  a. diagonal  
-  b. uniform (default option for POT)  
-  c. random matrix  
-3. evaluation function for unsupervised alignment  
-
-### GWD + procrustes
-
-Procrustes alignment after GW alignment (this should be easy to implement. it may be included in Basic GW class?)
-
-### GWD + Wasserstein barycenter alignment
-
-## Tutorials in scripts
-
-1. Barycenter alignment using simulation data and human color similarity judgement data
-2. histogram alignment using ANN natural objects similarity data  
+`gw_alignment.py`  
+`align_representations.py`  
 
 ## Data for tutorials
 
-1. Human color similarity judgement data (Tsuchiya Lab)  <- Oizumi  
-2. ANN natural objects similarity data (Alexnet and VGG?) <- Sasaki san  
-3. THINGS data (THINGS team)  <- Takeda san  
+1. Human color similarity judgment data (from Tsuchiya Lab)  
+2. [THINGS data](https://things-initiative.org/)  
+
+## References
+If you are interested in details of data in tutorials or GWOT, please refer to the paper below.  
+
+Is my "red" your "red"?: Unsupervised alignment of qualia structures via optimal transport.  
+Genji Kawakita, Ariel Zeleznikow-Johnston, Ken Takeda, Naotsugu Tsuchiya, Masafumi Oizumi  
+PsyArxiv: https://psyarxiv.com/h3pqm/

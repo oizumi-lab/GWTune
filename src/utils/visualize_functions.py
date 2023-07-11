@@ -88,8 +88,7 @@ def get_color_labels_for_category(n_category_list, min_saturation, show_labels =
 def show_heatmap(
     matrix, 
     title, 
-    save_file_name, 
-    draw_category_line = True, 
+    save_file_name = None,
     ticks = None, 
     category_name_list = None, 
     num_category_list = None, 
@@ -108,9 +107,12 @@ def show_heatmap(
     ylabel_size = kwargs.get('ylabel_size', 40)
     
     cmap = kwargs.get('cmap', 'cividis')
+    draw_category_line  = kwargs.get('draw_category_line', False) 
     category_line_alpha = kwargs.get('category_line_alpha', 0.2)
     category_line_style = kwargs.get('category_line_style', 'dashed')
     category_line_color = kwargs.get('category_line_color', 'C2')
+    
+    show_figure = kwargs.get('show_figure', True)
 
     fig, ax = plt.subplots(figsize = figsize)
     
@@ -156,12 +158,15 @@ def show_heatmap(
   
     plt.xlabel(xlabel, size = xlabel_size)
     plt.ylabel(ylabel, size = ylabel_size)
-    
+    plt.tight_layout()
     
     if save_file_name is not None:
         plt.savefig(save_file_name)
-   
-    plt.show()
+    
+    if show_figure:
+        plt.show()
+    
+    plt.clf()
     plt.close()
 
 

@@ -12,29 +12,28 @@ import matplotlib.pyplot as plt
 import matplotlib.style as mplstyle
 import numpy as np
 import optuna
-
+from sqlalchemy_utils import create_database, database_exists
 
 
 # %%
 def load_optimizer(
-    save_path,
-    n_jobs=1,
+    save_path=None,
+    filename=None,
+    storage=None,
+    init_mat_plan="random",
+    n_iter=10,
     num_trial=20,
-    to_types="torch",
+    n_jobs=1,
     method="optuna",
     sampler_name="random",
     pruner_name="median",
     pruner_params=None,
-    n_iter=10,
-    filename="test",
-    storage=None,
-    delete_study=False,
 ):
 
     """
     (usage example)
     >>> dataset = mydataset()
-    >>> opt = load_optimizer(save_path)
+    >>> opt = load_optimizer(filename)
     >>> study = Opt.run_study(dataset)
 
     Raises:
@@ -50,19 +49,21 @@ def load_optimizer(
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
+    # create a database from the URL
+    if not database_exists(storage):
+        create_database(storage)
+
     if method == "optuna":
         Opt = RunOptuna(
-            save_path,
-            to_types,
-            storage,
-            filename,
-            sampler_name,
-            pruner_name,
-            pruner_params,
-            n_iter,
-            n_jobs,
+            filename, 
+            storage, 
+            init_mat_plan,
             num_trial,
-            delete_study,
+            n_iter, 
+            n_jobs, 
+            sampler_name, 
+            pruner_name, 
+            pruner_params, 
         )
     else:
         raise ValueError("no implemented method.")
@@ -73,34 +74,41 @@ def load_optimizer(
 class RunOptuna:
     def __init__(
         self,
-        save_path,
-        to_types,
-        storage,
-        filename,
-        sampler_name,
-        pruner_name,
-        pruner_params,
-        n_iter,
-        n_jobs,  
+        filename, 
+        storage, 
+        init_mat_plan,
         num_trial,
-        delete_study,
+        n_iter, 
+        n_jobs, 
+        sampler_name, 
+        pruner_name, 
+        pruner_params, 
     ):
 
         # the path or file name to save the results.
-        self.save_path = save_path
-        self.to_types = to_types
-        self.storage = storage
         self.filename = filename
+        self.storage = storage
+        self.init_mat_plan = init_mat_plan
+        
+        # parameters for optuna.study
+        self.num_trial = num_trial
+        self.n_iter = n_iter
+        self.n_jobs = n_jobs
 
         # setting of optuna
         self.sampler_name = sampler_name
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
 
+
         # parameters for optuna.study
         self.n_jobs = n_jobs
         self.num_trial = num_trial
-        self.delete_study = delete_study
+
+        
+        # parameters for optuna.study
+        self.n_jobs = n_jobs
+        self.num_trial = num_trial
 
         # MedianPruner
         self.n_startup_trials = 5
@@ -109,7 +117,6 @@ class RunOptuna:
         # HyperbandPruner
         self.min_resource = 5
         self.reduction_factor = 2
-        self.n_iter = n_iter
 
         if pruner_params is not None:
             self._set_params(pruner_params)
@@ -124,29 +131,11 @@ class RunOptuna:
             else:
                 print(f"{key} is not a parameter of the pruner.")
 
-    def _confirm_delete(self) -> None:
-        while True:
-            confirmation = input(
-                f"This code will delete the study named '{self.filename}'.\nDo you want to execute the code? (y/n)"
-            )
-            if confirmation == "y":
-                try:
-                    optuna.delete_study(storage=self.storage, study_name=self.filename)
-                    print(f"delete the study '{self.filename}'!")
-                    break
-                except:
-                    print(f"study '{self.filename}' does not exist.")
-                    break
-            elif confirmation == "n":
-                raise ValueError("If you don't want to delete study, use 'delete_study = False'.")
-            else:
-                print("Invalid input. Please enter again.")
-
     def create_study(self, direction="minimize"):
         study = optuna.create_study(
-            direction=direction, 
-            study_name=self.filename, 
-            storage=self.storage, 
+            direction=direction,
+            study_name=self.filename + "_" + self.init_mat_plan,
+            storage=self.storage,
             load_if_exists=True,
         )
         return study
@@ -160,20 +149,14 @@ class RunOptuna:
             _type_: _description_
         """
         study = optuna.load_study(
-            study_name=self.filename,
+            study_name=self.filename + "_" + self.init_mat_plan,
             sampler=self.choose_sampler(seed=seed),
             pruner=self.choose_pruner(),
             storage=self.storage,
         )
         return study
 
-    def run_study(
-        self, 
-        objective, 
-        device, 
-        seed=42,
-        **kwargs
-    ):
+    def run_study(self, objective, device, seed=42, **kwargs):
         """
         2023.3.29 佐々木
         """
@@ -185,35 +168,33 @@ class RunOptuna:
         else:
             if kwargs.get("search_space") is not None:
                 warnings.warn("except for grid search, search space is ignored.", UserWarning)
-                del kwargs["search_space"]
+            del kwargs["search_space"]
 
         objective = functools.partial(objective, **kwargs)
 
         # If there is no db file, multi_run will not work properly if you don't let it load here.
         # PyMySQL implementation will be here if necessary.
-        if  "sqlite" in self.storage and not os.path.exists(self.save_path + "/" + self.filename + ".db"):
-            self.create_study()
-        
-        if self.delete_study:
-            self._confirm_delete()
-        
-        objective_device = functools.partial(objective, device=device)
-        
+
         try:
             study = self.load_study(seed=seed)
         except KeyError:
-            print("Study not found, creating a new one.")
+            print("Study for " + self.filename + "_" + self.init_mat_plan + " was not found, creating a new one...")
             self.create_study()
             study = self.load_study(seed=seed)
         
+        objective_device = functools.partial(objective, device=device)
+
         if self.n_jobs > 1:
-            warnings.filterwarnings("always")  
+            warnings.filterwarnings("always")
             warnings.warn(
-                "UserWarning : The parallel computation is done by the functions implemented in Optuna.\n \
-                This doesn't always provide a benefit to speed up or to get a better results.", UserWarning)
-        
+                "The parallel computation is done by the functions implemented in Optuna.\n \
+                This doesn't always provide a benefit to speed up or to get a better results.",
+                UserWarning,
+            )
+            warnings.filterwarnings("ignore")
+
         study.optimize(objective_device, self.num_trial, n_jobs=self.n_jobs)
-        
+
         return study
 
     def choose_sampler(self, seed=42, constant_liar=False, multivariate=False):
@@ -229,10 +210,10 @@ class RunOptuna:
 
         elif self.sampler_name.lower() == "tpe":
             sampler = optuna.samplers.TPESampler(
-                constant_liar=constant_liar, # I heard it is better to set to True for distributed optimization (Abe)
-                multivariate=multivariate, 
-                seed=seed
-            )  
+                constant_liar=constant_liar,  # I heard it is better to set to True for distributed optimization (Abe)
+                multivariate=multivariate,
+                seed=seed,
+            )
 
         else:
             raise ValueError("not implemented sampler yet.")
@@ -270,11 +251,7 @@ class RunOptuna:
         if len(eps_list) == 2:
             ep_lower, ep_upper = eps_list
             if eps_log:
-                eps_space = np.logspace(
-                    np.log10(ep_lower), 
-                    np.log10(ep_upper),
-                    num=num_trial
-                )
+                eps_space = np.logspace(np.log10(ep_lower), np.log10(ep_upper), num=num_trial)
             else:
                 eps_space = np.linspace(ep_lower, ep_upper, num=num_trial)
 

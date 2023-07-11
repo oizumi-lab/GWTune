@@ -4,10 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"
-packages = [
-  {include = "src"}
-]
-
+packages = [{include = "src"}]
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.11"
@@ -34,8 +31,8 @@ rsatoolbox = "^0.1.2"
 cryptography = "^40.0.1"
 sqlalchemy = "^2.0.9"
 django = "^4.2"
-ipykernel = "^6.23.2"
-ipython = "^8.14.0"
+sqlalchemy-utils = "^0.41.1"
+torch = "^2.0.1"
 
 [poetry.group.dev.dependencies]
 autopep8 = "^2.0.1"
