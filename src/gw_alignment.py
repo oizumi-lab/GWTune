@@ -294,7 +294,7 @@ class MainGromovWasserstainComputation:
 
         if trial.should_prune():
             raise optuna.TrialPruned(
-                f"Trial was pruned at iteration {num_iter} with parameters: {{'eps': {eps:.5e}, 'gw_loss': '{gw_loss:.5e}'}}"
+                f"Trial for '{init_mat_plan}' was pruned at iteration {num_iter} with parameters: {{'eps': {eps:.5e}, 'gw_loss': '{gw_loss:.5e}'}}"
             )
 
     def _compute_GW_with_init_plans(
