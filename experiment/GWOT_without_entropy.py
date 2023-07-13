@@ -340,7 +340,7 @@ align_representation.RSA_get_corr(metric = "pearson", method = 'all')
 # %%
 # If the computation has been completed and there is no need to recompute, set "compute_OT" to False. In this case, the previously calculated OT plans will be loaded.
 # If users want to compare both numpy and torch, "compute_OT" needs to be True (e.g. an expected case is that users wants to change the "to_types" once after the computation is finished)
-compute_OT = False
+compute_OT = True
 
 ### If the previous optimization data exists, you can delete it.
 # If you are attempting the same optimization with a different epsilon search space (eps_list), it is recommended to delete the previous results.
@@ -544,8 +544,6 @@ if data_select == 'color':
 # # GWOT without entropy
 # By using optimal transportation plan obtained with entropic GW as an initial transportation matrix, we run the optimization of GWOT without entropy.  
 # This procedure further minimizes GWD and enables us to fairly compare GWD values obtained with different entropy regularization values.  
-
-# %%
 import glob
 import torch
 import matplotlib.pyplot as plt
@@ -610,28 +608,33 @@ def plot_GWD_optimization(top_k_trials, GWD0_list, pair_name):
     plt.clf()
     plt.close()
 
-# %%
+def run_optimization(pairwise_list, number_of_besttrials):
+    pairwise_after_list = list()
+    for pairwise in pairwise_list:
+        study = pairwise._run_optimization(compute_OT)
+        top_k_trials = get_top_k_trials(study, number_of_besttrials)
+        GWD0_list, OT0_list = calculate_GWD(pairwise, top_k_trials)
+        # create new instance for after optimization
+        pairwise_after = copy.deepcopy(pairwise)
+        pairwise_after.OT = OT0_list[np.argmin(GWD0_list)]
+        pairwise_after_list.append(pairwise_after)
+
+    return pairwise_after_list, top_k_trials, OT0_list, GWD0_list
+
+def plot_results(pairwise_list, pairwise_after_list, top_k_trials, OT0_list, GWD0_list):
+    # plot results
+    for pairwise, pairwise_after in zip(pairwise_list, pairwise_after_list):
+        plot_OT(pairwise, pairwise_after, OT0_list, GWD0_list)
+        evaluate_accuracy_and_plot(pairwise, pairwise_after, 'ot_plan')
+        evaluate_accuracy_and_plot(pairwise, pairwise_after, 'k_nearest')
+        plot_GWD_optimization(top_k_trials, GWD0_list, pairwise.pair_name)        
+
+#%%
 pairwise_list = align_representation.pairwise_list
-pairwise_after_list = list()
+# This variable determines the number of best trials to select for further GWOT optimization without entropy.
 number_of_besttrials = 10
-
-# run GWOT without entropy regularization with optimized OTs obtained by entropic GWOT as initial values
-for pairwise in pairwise_list:
-    study = pairwise._run_optimization(compute_OT)
-    top_k_trials = get_top_k_trials(study, number_of_besttrials)
-    GWD0_list, OT0_list = calculate_GWD(pairwise, top_k_trials)
-    # create new instance for after optimization
-    pairwise_after = copy.deepcopy(pairwise)
-    pairwise_after.OT = OT0_list[np.argmin(GWD0_list)]
-    pairwise_after_list.append(pairwise_after)
-    
-# plot results
-for pairwise, pairwise_after in zip(pairwise_list, pairwise_after_list):
-    plot_OT(pairwise, pairwise_after, OT0_list, GWD0_list)
-    evaluate_accuracy_and_plot(pairwise, pairwise_after, 'ot_plan')
-    evaluate_accuracy_and_plot(pairwise, pairwise_after, 'k_nearest')
-    plot_GWD_optimization(top_k_trials, GWD0_list, pairwise.pair_name)
-
+pairwise_after_list, top_k_trials, OT0_list, GWD0_list = run_optimization(pairwise_list, number_of_besttrials)
+plot_results(pairwise_list, pairwise_after_list, top_k_trials, OT0_list, GWD0_list)
 # %%
 
 
