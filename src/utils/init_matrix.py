@@ -4,10 +4,9 @@ import ot
 
 # %%
 class InitMatrix():
-    def __init__(self, source_size, target_size):
+    def __init__(self, source_size:int, target_size:int):
         self.source_size = source_size
         self.target_size = target_size
-        self.initialize = ['uniform', 'random', 'permutation', 'diag'] # already implemented.
 
     def set_user_define_init_mat_list(self, mat):
         if isinstance(mat, list):
@@ -17,26 +16,41 @@ class InitMatrix():
             self.user_define_init_mat_list = [mat]
             
 
-    def make_initial_T(self, initialize, seed = 42):
+    def make_initial_T(self, initialize:str, seed:int = 42):
         """
-        To do : 説明を書く
+        define the initial matrix for GW alignment.
+        Users can choose the condition of it from "random", "uniform", "diag" or "user_define".
+
+        Args:
+            initialize (str): _description_
+            seed (int, optional): _description_. Defaults to 42.
+
+        
+        Raises:
+            ValueError: _description_
+
+        Returns:
+            _type_: _description_
         """
-        np.random.seed(seed) # numpyの乱数を固定する。seed値の変更も可能。
+        
+
+        np.random.seed(seed) # fix the seed of numpy.random, seed can be changed by user.
+        
         if initialize == 'random':
             T = self.make_random_init_plan()
 
-        elif initialize == 'permutation':
-            ts = np.zeros(self.matrix_size)
-            ts[0] = 1 / self.matrix_size
-            T = self.initialize_matrix(ts=ts)
+        # elif initialize == 'permutation':
+        #     ts = np.zeros(self.matrix_size)
+        #     ts[0] = 1 / self.matrix_size
+        #     T = self.initialize_matrix(ts=ts)
 
-        elif initialize == 'any_permutation':
-            T = self.initialize_matrix()
+        # elif initialize == 'any_permutation':
+        #     T = self.initialize_matrix()
 
-        elif initialize == 'beta':
-            ts = np.random.beta(2, 5, self.matrix_size)
-            ts = ts / (self.matrix_size * np.sum(ts))
-            T = self.initialize_matrix(ts=ts)
+        # elif initialize == 'beta':
+        #     ts = np.random.beta(2, 5, self.matrix_size)
+        #     ts = ts / (self.matrix_size * np.sum(ts))
+        #     T = self.initialize_matrix(ts=ts)
 
         elif initialize == 'uniform':
             T = np.outer(ot.unif(self.source_size), ot.unif(self.target_size))
@@ -70,13 +84,6 @@ class InitMatrix():
         return matrix.astype(int)
 
     def initialize_matrix(self, ts=None):
-        """
-        gw alignmentのための行列初期化
-        Parameters
-            n : int 行列のサイズ
-        Returns
-            np.ndarray 初期値
-        """
         matrix = self.randOrderedMatrix()
         if ts is None:
             ts = np.random.uniform(0, 1, self.matrix_size)
@@ -87,10 +94,9 @@ class InitMatrix():
 
     def make_random_init_plan(self):
         """
-        大泉先生が作ったもの。
+        make random initial matrix.
         """
-        # make random initial transportation plan (N x N matrix)
-        T = np.random.rand(self.source_size, self.target_size) # create a random matrix of size n x n
+        T = np.random.rand(self.source_size, self.target_size) # create a random matrix
         rep = 100 # number of repetitions
         for _ in range(rep):
             # normalize each row so that the sum is 1

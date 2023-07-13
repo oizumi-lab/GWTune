@@ -528,7 +528,6 @@ class PairwiseAnalysis:
             self.storage = "sqlite:///" + self.save_path + "/" + filename + "_" + self.config.init_mat_plan + ".db"
         else:
             # self.storage = URL.create(database=filename, **self.config.db_params).render_as_string(hide_password=False)
-            # MySQL用の修正案です。使いやすいようにしてもらえたらと思います。
             self.storage = URL.create(
                 database=filename + "_" + self.config.init_mat_plan, 
                 **self.config.db_params).render_as_string(hide_password=False)
