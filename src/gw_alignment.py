@@ -283,18 +283,18 @@ class MainGromovWasserstainComputation:
         Raises:
             optuna.TrialPruned: _description_
         """
-
-        if init_mat_plan in ["uniform", "diag"] and math.isnan(gw_loss):
-            raise optuna.TrialPruned(f"Trial for '{init_mat_plan}' was pruned with parameters: {{'eps': {eps:.5e}, 'gw_loss': '{gw_loss:.5e}'}}")
-
+        
         if num_iter is None:  # uniform, diagにおいて、nanにならなかったがprunerが動くときのためのifブロック。
             num_iter = self.n_iter
+
+        if math.isinf(gw_loss) or gw_loss <= 0.0:
+            raise optuna.TrialPruned(f"Trial for '{init_mat_plan}' was pruned with parameters: {{'eps': {eps:.5e}, 'gw_loss': '{gw_loss:.5e}'}}")
 
         trial.report(gw_loss, num_iter)
 
         if trial.should_prune():
             raise optuna.TrialPruned(
-                f"Trial was pruned at iteration {num_iter} with parameters: {{'eps': {eps:.5e}, 'gw_loss': '{gw_loss:.5e}'}}"
+                f"Trial for '{init_mat_plan}' was pruned at iteration {num_iter} with parameters: {{'eps': {eps:.5e}, 'gw_loss': '{gw_loss:.5e}'}}"
             )
 
     def _compute_GW_with_init_plans(
