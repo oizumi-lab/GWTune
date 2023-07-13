@@ -728,14 +728,14 @@ class PairwiseAnalysis:
         
         # figure plotting epsilon as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
-        plt.scatter(df_trial["params_eps"], df_trial["value"], c = df_trial["user_attrs_best_acc"], s = marker_size)
+        plt.scatter(df_trial["params_eps"], df_trial["value"], c = 100 * df_trial["user_attrs_best_acc"], s = marker_size)
         plt.xlabel("$\epsilon$")
         plt.ylabel("GWD")
         plt.xticks(rotation=30)
         plt.title(f"$\epsilon$ - GWD ({self.pair_name})")
         plt.grid(True)
         plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
-        plt.colorbar(label='accuracy')
+        plt.colorbar(label='accuracy (%)')
         
         if plot_eps_log:
             plt.xscale('log')
@@ -753,9 +753,9 @@ class PairwiseAnalysis:
         plt.close()
         
         plt.figure(figsize=figsize)
-        plt.scatter(df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"])
+        plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"])
         plt.title(self.pair_name)
-        plt.xlabel("accuracy")
+        plt.xlabel("accuracy (%)")
         plt.ylabel("GWD")
         plt.colorbar(label='eps')
         plt.grid(True)
@@ -1455,7 +1455,7 @@ class AlignRepresentations:
             df = self._get_dataframe(eval_type, concat=True)
             sns.set_style("darkgrid")
             sns.set_palette("pastel")
-            sns.swarmplot(data=pd.DataFrame(df), x="top_n", y="matching rate", size=5, dodge=True)
+            sns.swarmplot(data=pd.DataFrame(df), x="top_n", y="matching rate (%)", size=5, dodge=True)
 
         else:
             df = self._get_dataframe(eval_type, concat=False)
@@ -1465,7 +1465,7 @@ class AlignRepresentations:
         plt.ylim(0, 100)
         plt.title(eval_type)
         plt.xlabel("top k")
-        plt.ylabel("Matching rate")
+        plt.ylabel("Matching rate (%)")
         # plt.legend(loc = "best")
         plt.tick_params(axis="both", which="major")
         plt.subplots_adjust(left=0.2, right=0.9, bottom=0.2)
