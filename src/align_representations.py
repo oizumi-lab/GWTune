@@ -794,7 +794,11 @@ class PairwiseAnalysis:
 
             if OT_format == "default" or OT_format == "both":
                 visualize_functions.show_heatmap(
-                    self.OT, title=title, save_file_name=fig_path, **visualization_config()
+                    self.OT,
+                    title=title, 
+                    save_file_name=fig_path,
+                    object_labels = self.source.object_labels,
+                    **visualization_config(),
                 )
 
             elif OT_format == "sorted" or OT_format == "both":

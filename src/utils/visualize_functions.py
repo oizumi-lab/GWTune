@@ -148,6 +148,9 @@ def show_heatmap(
         if ticks == "numbers":
             plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = ticks_size, rotation = xticks_rotation)
             plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = ticks_size, rotation = yticks_rotation)
+        elif object_labels is not None:
+            plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = object_labels, size = ticks_size, rotation = xticks_rotation)
+            plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = object_labels, size = ticks_size, rotation = yticks_rotation)
         else:
             plt.xticks([])
             plt.yticks([])
