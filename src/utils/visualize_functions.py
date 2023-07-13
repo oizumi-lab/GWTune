@@ -96,15 +96,19 @@ def show_heatmap(
     **kwargs
 ):
     figsize = kwargs.get('figsize', (8, 6))
-    cbar_ticks_size = kwargs.get("cbar_ticks_size", 20)
-    ticks_size = kwargs.get('ticks_size', 20)
+    title_size = kwargs.get('title_size', 60)
+    
+    xlabel = kwargs.get('xlabel', None)
+    ylabel = kwargs.get('ylabel', None)
+    
+    xlabel_size = kwargs.get('xlabel_size', 40)
+    ylabel_size = kwargs.get('ylabel_size', 40)
+    
     xticks_rotation = kwargs.get('xticks_rotation', 90)
     yticks_rotation = kwargs.get('yticks_rotation', 0)
-    title_size = kwargs.get('title_size', 60)
-    xlabel = kwargs.get('xlabel', None)
-    xlabel_size = kwargs.get('xlabel_size', 40)
-    ylabel = kwargs.get('ylabel', None)
-    ylabel_size = kwargs.get('ylabel_size', 40)
+    
+    cbar_ticks_size = kwargs.get("cbar_ticks_size", 20)
+    ticks_size = kwargs.get('ticks_size', 20)
     
     cmap = kwargs.get('cmap', 'cividis')
     draw_category_line  = kwargs.get('draw_category_line', False) 
@@ -152,7 +156,7 @@ def show_heatmap(
     divider = make_axes_locatable(ax) 
     cax = divider.append_axes("right", size="5%", pad=0.1)
 
-    cbar = fig.colorbar(aximg, cax=cax)
+    cbar = fig.colorbar(aximg, cax=cax, format = "%.2e")
     
     cbar.ax.tick_params(axis='y', labelsize = cbar_ticks_size)
   

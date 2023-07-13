@@ -119,6 +119,7 @@ class VisualizationConfig:
         marker_size=30,
         color = 'C0',
         cmap = 'cividis',
+        plot_eps_log=False,
         draw_category_line=False,
         category_line_color='C2',
         category_line_alpha=0.2,
@@ -146,6 +147,7 @@ class VisualizationConfig:
             'marker_size': marker_size,
             'color':color,
             'cmap':cmap,
+            'plot_eps_log':plot_eps_log,
             'draw_category_line': draw_category_line,
             'category_line_color': category_line_color,
             'category_line_alpha': category_line_alpha,
@@ -155,6 +157,11 @@ class VisualizationConfig:
 
     def __call__(self):
         return self.visualization_params
+
+    def set_params(self, **kwargs):
+        for key, item in kwargs.items():
+            self.visualization_params[key] = item
+
 
 class Representation:
     """
@@ -253,7 +260,10 @@ class Representation:
 
         if sim_mat_format == "default" or sim_mat_format == "both":
             visualize_functions.show_heatmap(
-                self.sim_mat, title=self.name, save_file_name=fig_path, **visualization_config()
+                self.sim_mat, 
+                title=self.name, 
+                save_file_name=fig_path, 
+                **visualization_config(),
             )
 
         elif sim_mat_format == "sorted" or sim_mat_format == "both":
@@ -498,7 +508,12 @@ class PairwiseAnalysis:
         )
 
         if show_log:
-            self.get_optimization_log(results_dir, df_trial=df_trial, fig_dir=fig_dir)
+            self.get_optimization_log(
+                results_dir, 
+                df_trial=df_trial, 
+                fig_dir=fig_dir,
+                **visualization_config(),
+            )
         
         if save_dataframe:
             df_trial.to_csv(self.save_path + '/' + self.filename + '.csv')
@@ -704,6 +719,7 @@ class PairwiseAnalysis:
         color = kwargs.get('color', 'C0')
         marker_size = kwargs.get('marker_size', 20)
         show_figure = kwargs.get('show_figure', False)
+        plot_eps_log = kwargs.get('plot_eps_log', False)
         
         if df_trial is None:
             self._save_path_checker(results_dir, filename, compute_OT=False, delete_results=False)
@@ -712,13 +728,17 @@ class PairwiseAnalysis:
         
         # figure plotting epsilon as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
-        plt.scatter(df_trial["params_eps"], df_trial["value"], color = color, s = marker_size)
+        plt.scatter(df_trial["params_eps"], df_trial["value"], c = df_trial["user_attrs_best_acc"], s = marker_size)
         plt.xlabel("$\epsilon$")
         plt.ylabel("GWD")
         plt.xticks(rotation=30)
         plt.title(f"$\epsilon$ - GWD ({self.pair_name})")
         plt.grid(True)
         plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
+        plt.colorbar(label='accuracy')
+        
+        if plot_eps_log:
+            plt.xscale('log')
         plt.tight_layout()
         
         if fig_dir is None:
@@ -731,39 +751,15 @@ class PairwiseAnalysis:
         
         plt.clf()
         plt.close()
-
-        # figure plotting GWD as x-axis and accuracy as y-axis
+        
         plt.figure(figsize=figsize)
-        plt.scatter(df_trial["user_attrs_best_acc"], df_trial["value"], color = color, s = marker_size)
-        plt.xlabel("accuracy")
-        plt.ylabel("GWD")
-        plt.title(f"accuracy - GWD ({self.pair_name})")
-        plt.grid(True)
-        plt.tight_layout()
-
-
-        if fig_dir is None:
-            fig_dir = self.figure_path
-            
-        plt.savefig(os.path.join(fig_dir, f"Optim_log_acc_GWD_{self.pair_name}.png"))
-        
-        if show_figure:
-            plt.show()
-        
-        plt.clf()
-        plt.close()
-        
-        plt.figure(figsize=(8, 6))
         plt.scatter(df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"])
-        
-        # plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
-        # plt.xticks(rotation=45)
         plt.title(self.pair_name)
         plt.xlabel("accuracy")
         plt.ylabel("GWD")
         plt.colorbar(label='eps')
         plt.grid(True)
-        # plt.tight_layout()
+        plt.tight_layout()
         # plt.gca().images[-1].colorbar.set_major_formatter(plt.FormatStrFormatter('%.1e'))
         
         plt.savefig(os.path.join(fig_dir, f"acc_gwd_eps({self.pair_name}).png"))
