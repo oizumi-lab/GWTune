@@ -88,10 +88,10 @@ class OptimizationConfig:
         self.init_mat_plan = init_mat_plan
         self.n_iter = n_iter
         self.max_iter = max_iter
-        
+
         self.sampler_name = sampler_name
         self.user_define_init_mat_list = user_define_init_mat_list
-        
+
         self.data_name = data_name
 
         self.pruner_name = pruner_name
@@ -348,7 +348,7 @@ class PairwiseAnalysis:
         self.config = config
 
         self.pair_name = f"{source.name}_vs_{target.name}"
-        
+
         # assert self.source.sim_mat.shape == self.target.sim_mat.shape, "the shape of sim_mat is not the same."
 
         assert np.array_equal(
@@ -467,25 +467,25 @@ class PairwiseAnalysis:
             _type_: _description_
         """
         self._save_path_checker(
-            results_dir, 
-            filename, 
-            compute_OT, 
-            delete_results=delete_results,    
+            results_dir,
+            filename,
+            compute_OT,
+            delete_results=delete_results,
         )
-        
+
         self.OT, df_trial = self._gw_alignment(
             eps_list,
-            compute_OT, 
-            target_device=target_device, 
+            compute_OT,
+            target_device=target_device,
             sampler_seed=sampler_seed,
         )
 
         if fig_dir is None:
             fig_dir = self.figure_path
-            
+
             if not os.path.exists(fig_dir):
                 os.makedirs(fig_dir, exist_ok=True)
-        
+
 
         OT = self._show_OT(
             title=f"$\Gamma$ ({self.pair_name})",
@@ -499,30 +499,30 @@ class PairwiseAnalysis:
 
         if show_log:
             self.get_optimization_log(results_dir, df_trial=df_trial, fig_dir=fig_dir)
-        
+
         if save_dataframe:
             df_trial.to_csv(self.save_path + '/' + self.filename + '.csv')
 
         return OT
-    
+
     def _save_path_checker(
-        self, 
-        results_dir, 
-        filename, 
-        compute_OT, 
+        self,
+        results_dir,
+        filename,
+        compute_OT,
         delete_results=False,
     ):
         if filename is None:
             filename = self.config.data_name + "_" + self.pair_name
-        
+
         self.filename = filename
-        
+
         self.save_path = os.path.join(results_dir, self.config.data_name, filename, self.config.init_mat_plan)
-        
+
         self.figure_path = os.path.join(self.save_path, 'figure')
-        
+
         self.data_path = os.path.join(self.save_path, 'data')
-        
+
         # Generate the URL for the database. Syntax differs for SQLite and others.
         if self.config.db_params["drivername"] == "sqlite":
             self.storage = "sqlite:///" + self.save_path + "/" + filename + "_" + self.config.init_mat_plan + ".db"
@@ -530,7 +530,7 @@ class PairwiseAnalysis:
             # self.storage = URL.create(database=filename, **self.config.db_params).render_as_string(hide_password=False)
             # MySQL用の修正案です。使いやすいようにしてもらえたらと思います。
             self.storage = URL.create(
-                database=filename + "_" + self.config.init_mat_plan, 
+                database=filename + "_" + self.config.init_mat_plan,
                 **self.config.db_params).render_as_string(hide_password=False)
 
         # Delete the previous results if the flag is True.
@@ -539,7 +539,7 @@ class PairwiseAnalysis:
                 self._confirm_delete()
             else:
                 self.delete_prev_results()
-                
+
     def _confirm_delete(self) -> None:
         while True:
             confirmation = input(
@@ -553,7 +553,7 @@ class PairwiseAnalysis:
                 break
             else:
                 print("Invalid input. Please enter again.")
-            
+
     def delete_prev_results(self):
         # drop database
         if database_exists(self.storage):
@@ -582,7 +582,7 @@ class PairwiseAnalysis:
         Returns:
             _type_: _description_
         """
-        
+
         if not os.path.exists(self.save_path):
             if compute_OT == False:
                 warnings.simplefilter("always")
@@ -595,15 +595,15 @@ class PairwiseAnalysis:
             compute_OT = True
 
         study = self._run_optimization(
-            eps_list = eps_list, 
-            compute_OT = compute_OT, 
-            target_device = target_device, 
+            eps_list = eps_list,
+            compute_OT = compute_OT,
+            target_device = target_device,
             sampler_seed = sampler_seed,
         )
-        
+
         best_trial = study.best_trial
         df_trial = study.trials_dataframe()
-                
+
         ot_path = glob.glob(self.data_path + f"/gw_{best_trial.number}.*")[0]
 
         if '.npy' in ot_path:
@@ -615,7 +615,7 @@ class PairwiseAnalysis:
         return OT, df_trial
 
     def _run_optimization(
-        self, 
+        self,
         eps_list=None,
         compute_OT=False,
         target_device = None,
@@ -663,7 +663,7 @@ class PairwiseAnalysis:
             # setting for optimization
             if self.config.init_mat_plan == "user_define":
                 gw.main_compute.init_mat_builder.set_user_define_init_mat_list(self.config.user_define_init_mat_list)
-                
+
             if eps_list is None:
                 eps_list = self.config.eps_list
 
@@ -705,12 +705,12 @@ class PairwiseAnalysis:
         color = kwargs.get('color', 'C0')
         marker_size = kwargs.get('marker_size', 20)
         show_figure = kwargs.get('show_figure', False)
-        
+
         if df_trial is None:
             self._save_path_checker(results_dir, filename, compute_OT=False, delete_results=False)
             study = self._run_optimization(compute_OT = False)
             df_trial = study.trials_dataframe()
-        
+
         # figure plotting epsilon as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
         plt.scatter(df_trial["params_eps"], df_trial["value"], color = color, s = marker_size)
@@ -721,15 +721,15 @@ class PairwiseAnalysis:
         plt.grid(True)
         plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
         plt.tight_layout()
-        
+
         if fig_dir is None:
             fig_dir = self.figure_path
-            
+
         plt.savefig(os.path.join(fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png"))
-        
+
         if show_figure:
             plt.show()
-        
+
         plt.clf()
         plt.close()
 
@@ -745,18 +745,18 @@ class PairwiseAnalysis:
 
         if fig_dir is None:
             fig_dir = self.figure_path
-            
+
         plt.savefig(os.path.join(fig_dir, f"Optim_log_acc_GWD_{self.pair_name}.png"))
-        
+
         if show_figure:
             plt.show()
-        
+
         plt.clf()
         plt.close()
-        
+
         plt.figure(figsize=(8, 6))
         plt.scatter(df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"])
-        
+
         # plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
         # plt.xticks(rotation=45)
         plt.title(self.pair_name)
@@ -766,15 +766,15 @@ class PairwiseAnalysis:
         plt.grid(True)
         # plt.tight_layout()
         # plt.gca().images[-1].colorbar.set_major_formatter(plt.FormatStrFormatter('%.1e'))
-        
+
         plt.savefig(os.path.join(fig_dir, f"acc_gwd_eps({self.pair_name}).png"))
-        
+
         if show_figure:
             plt.show()
-        
+
         plt.clf()
         plt.close()
-        
+
     def _show_OT(
         self,
         title,
@@ -879,7 +879,7 @@ class PairwiseAnalysis:
             diagonal = np.diag(matrix)
         else:
             category_mat = category_mat.values
-            
+
             diagonal = []
             for i in range(matrix.shape[0]):
                 category = category_mat[i]
@@ -1014,9 +1014,9 @@ class AlignRepresentations:
         """
         for representation in self.representations_list:
             representation.show_sim_mat(
-                sim_mat_format=sim_mat_format, 
-                visualization_config=visualization_config, 
-                fig_dir=fig_dir, 
+                sim_mat_format=sim_mat_format,
+                visualization_config=visualization_config,
+                fig_dir=fig_dir,
                 ticks=ticks,
             )
 
@@ -1048,12 +1048,12 @@ class AlignRepresentations:
         for pairwise in self.pairwise_list:
             if change_sampler_seed:
                 sampler_seed += 1
-            
+
             if isinstance(pair_eps_list, dict):
                 eps_list = pair_eps_list.get(pairwise.pair_name, self.config.eps_list)
             else:
                 eps_list = self.config.eps_list
- 
+
             OT = pairwise.run_gw(
                 results_dir=results_dir,
                 eps_list=eps_list,
@@ -1121,7 +1121,7 @@ class AlignRepresentations:
         Returns:
             _type_: _description_
         """
-        
+
         if isinstance(fix_sampler_seed, int) and fix_sampler_seed > -1:
             first_sampler_seed = fix_sampler_seed
         else:
@@ -1130,14 +1130,14 @@ class AlignRepresentations:
         if self.config.n_jobs > 1:
             OT_list = []
             processes = []
-            
+
             if parallel_method == "multiprocess":
                 pool = ProcessPoolExecutor(self.config.n_jobs)
             elif parallel_method == "multithread":
                 pool = ThreadPoolExecutor(self.config.n_jobs)
             else:
                 raise ValueError('parallel_method = "multiprocess" or "multithread".')
-        
+
             with pool:
                 for pair_number in range(len(self.pairwise_list)):
 
@@ -1156,17 +1156,17 @@ class AlignRepresentations:
                         if self.config.multi_gpu != False:
                             warnings.warn("numpy doesn't use GPU. Please 'multi_GPU = False'.", UserWarning)
                         target_device = self.config.device
-                    
+
                     if change_sampler_seed:
                         sampler_seed = first_sampler_seed + pair_number
                     else:
                         sampler_seed = first_sampler_seed
-                    
+
                     if isinstance(pair_eps_list, dict):
                         eps_list = pair_eps_list.get(pairwise.pair_name, self.config.eps_list)
                     else:
                         eps_list = self.config.eps_list
- 
+
                     future = pool.submit(
                         pairwise.run_gw,
                         results_dir=results_dir,
@@ -1183,7 +1183,7 @@ class AlignRepresentations:
                         filename=filename,
                         save_dataframe=save_dataframe,
                         target_device=target_device,
-                        sampler_seed=sampler_seed,   
+                        sampler_seed=sampler_seed,
                     )
 
                     processes.append(future)
@@ -1226,10 +1226,10 @@ class AlignRepresentations:
                 change_sampler_seed=change_sampler_seed,
                 sampler_seed=first_sampler_seed,
             )
-        
+
         if self.config.n_jobs < 1:
             raise ValueError("n_jobs > 0 is required in this toolbox.")
-            
+
 
         if return_data:
             return OT_list
@@ -1397,10 +1397,10 @@ class AlignRepresentations:
             self.pairwise_list[i].OT = OT
 
     def calc_accuracy(
-        self, 
-        top_k_list, 
-        eval_type="ot_plan", 
-        category_mat=None, 
+        self,
+        top_k_list,
+        eval_type="ot_plan",
+        category_mat=None,
         barycenter=False
     ):
         accuracy = pd.DataFrame()
@@ -1444,10 +1444,10 @@ class AlignRepresentations:
         return df
 
     def plot_accuracy(
-        self, 
-        eval_type="ot_plan", 
-        fig_dir=None, 
-        fig_name="Accuracy_ot_plan.png", 
+        self,
+        eval_type="ot_plan",
+        fig_dir=None,
+        fig_name="Accuracy_ot_plan.png",
         scatter=True,
     ):
         plt.figure(figsize=(5, 3))
@@ -1473,44 +1473,44 @@ class AlignRepresentations:
         if fig_dir is not None:
             plt.savefig(os.path.join(fig_dir, fig_name))
         plt.show()
-        
+
         plt.clf()
         plt.close()
 
     def _procrustes_to_pivot(self, pivot):
         the_others, pivot_idx_list = self._check_pairs(pivot)
-        
+
         # check whether 'pair_number_list' includes all pairs between the pivot and the other Representations
         assert len(the_others) == len(self.representations_list)-1, "'pair_number_list' must include all pairs between the pivot and the other Representations."
-        
+
         for pair_idx, pivot_idx in pivot_idx_list:
             pairwise = self.pairwise_list[pair_idx]
-            
+
             if pivot_idx == 0: # when the pivot is the source of the pairwise
                 source_idx = 1
                 OT = pairwise.OT.T
-                
+
             elif pivot_idx == 1:# when the pivot is the target of the pairwise
-                source_idx = 0 
+                source_idx = 0
                 OT = pairwise.OT
-                
+
             pivot = (pairwise.source, pairwise.target)[pivot_idx]
             source = (pairwise.source, pairwise.target)[source_idx]
 
             source.embedding = pairwise.procrustes(pivot.embedding, source.embedding, OT)
-    
+
     def _check_pairs(self, pivot):
         the_others = set()
         pivot_idx_list = [] # [pair_idx, paivot_idx]
         for i, pair in enumerate(self.pair_number_list):
             if pivot in pair:
                 the_others.add(filter(lambda x: x != pivot, pair))
-                
+
                 pivot_idx = pair.index(pivot)
                 pivot_idx_list.append([i, pivot_idx])
-        
+
         return the_others, pivot_idx_list
-    
+
     def visualize_embedding(
         self,
         dim,
@@ -1522,6 +1522,8 @@ class AlignRepresentations:
         category_idx_list=None,
         title=None,
         legend=True,
+        colorbar_label=None,
+        colorbar_range=[0, 1],
         fig_dir=None,
         fig_name="Aligned_embedding.png",
     ):
@@ -1580,7 +1582,7 @@ class AlignRepresentations:
             )
 
             visualize_embedding.plot_embedding(
-                name_list=name_list, title=title, legend=legend, save_dir=fig_path, **visualization_config()
+                name_list=name_list, title=title, legend=legend, colorbar_label=colorbar_label, colorbar_range=colorbar_range, save_dir=fig_path, **visualization_config()
             )
 
         elif returned == "row_data":
