@@ -113,6 +113,9 @@ class VisualizationConfig:
         ylabel_size=15,
         zlabel=None,
         zlabel_size=15,
+        lim_eps=None,
+        lim_gwd=None,
+        lim_acc=None,
         color_labels=None,
         color_hue=None,
         markers_list=None,
@@ -120,6 +123,8 @@ class VisualizationConfig:
         color = 'C0',
         cmap = 'cividis',
         plot_eps_log=False,
+        ot_object_tick=False,
+        ot_category_tick=False,
         draw_category_line=False,
         category_line_color='C2',
         category_line_alpha=0.2,
@@ -141,6 +146,9 @@ class VisualizationConfig:
             'ylabel_size': ylabel_size,
             'zlabel': zlabel,
             'zlabel_size': zlabel_size,
+            'lim_eps':lim_eps,
+            'lim_ged':lim_gwd,
+            'lim_acc':lim_acc,
             'color_labels': color_labels,
             'color_hue': color_hue,
             'markers_list': markers_list,
@@ -148,6 +156,8 @@ class VisualizationConfig:
             'color':color,
             'cmap':cmap,
             'plot_eps_log':plot_eps_log,
+            'ot_object_tick': ot_object_tick,
+            'ot_category_tick': ot_category_tick,
             'draw_category_line': draw_category_line,
             'category_line_color': category_line_color,
             'category_line_alpha': category_line_alpha,
@@ -346,7 +356,12 @@ class PairwiseAnalysis:
     This object has information of a pair of Representations.
     """
 
-    def __init__(self, config: OptimizationConfig, source: Representation, target: Representation) -> None:
+    def __init__(
+        self, 
+        config: OptimizationConfig, 
+        source: Representation, 
+        target: Representation,
+    ) -> None:
         """
         Args:
             config (Optimization_Config) : instance of Optimization_Config
@@ -498,7 +513,7 @@ class PairwiseAnalysis:
         
 
         OT = self._show_OT(
-            title=f"$\Gamma$ ({self.pair_name})",
+            title=f"$\Gamma$ ({self.pair_name.replace('_', ' ')})",
             return_data=return_data,
             return_figure=return_figure,
             OT_format=OT_format,
@@ -716,10 +731,14 @@ class PairwiseAnalysis:
         **kwargs,
     ):
         figsize = kwargs.get('figsize', (8,6))
-        color = kwargs.get('color', 'C0')
         marker_size = kwargs.get('marker_size', 20)
         show_figure = kwargs.get('show_figure', False)
         plot_eps_log = kwargs.get('plot_eps_log', False)
+        cmap = kwargs.get("cmap", 'viridis')
+        
+        lim_eps = kwargs.get("lim_eps", None)
+        lim_gwd = kwargs.get("lim_gwd", None)
+        lim_acc = kwargs.get("lim_acc", None)
         
         if df_trial is None:
             self._save_path_checker(results_dir, filename, compute_OT=False, delete_results=False)
@@ -728,17 +747,26 @@ class PairwiseAnalysis:
         
         # figure plotting epsilon as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
-        plt.scatter(df_trial["params_eps"], df_trial["value"], c = 100 * df_trial["user_attrs_best_acc"], s = marker_size)
+        plt.scatter(df_trial["params_eps"], df_trial["value"], c = 100 * df_trial["user_attrs_best_acc"], s = marker_size, cmap=cmap)
         plt.xlabel("$\epsilon$")
         plt.ylabel("GWD")
-        plt.xticks(rotation=30)
-        plt.title(f"$\epsilon$ - GWD ({self.pair_name})")
-        plt.grid(True)
-        plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
-        plt.colorbar(label='accuracy (%)')
         
+        if lim_eps is not None:
+            plt.xlim(lim_eps)
+        
+        if lim_gwd is not None:
+            plt.ylim(lim_gwd)
+            
         if plot_eps_log:
             plt.xscale('log')
+        
+        plt.title(f"$\epsilon$ - GWD ({self.pair_name.replace('_', ' ')})")
+        plt.grid(True, which = 'both')
+        
+        plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
+        plt.tick_params(axis = 'x', rotation = 30,  which="both")
+        plt.colorbar(label='accuracy (%)')
+        
         plt.tight_layout()
         
         if fig_dir is None:
@@ -753,15 +781,21 @@ class PairwiseAnalysis:
         plt.close()
         
         plt.figure(figsize=figsize)
-        plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"])
-        plt.title(self.pair_name)
+        plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap)
+        plt.title(self.pair_name.replace('_', ' '))
         plt.xlabel("accuracy (%)")
         plt.ylabel("GWD")
-        plt.colorbar(label='eps')
+        plt.colorbar(label='eps', format = "%.2e")
         plt.grid(True)
-        plt.tight_layout()
-        # plt.gca().images[-1].colorbar.set_major_formatter(plt.FormatStrFormatter('%.1e'))
         
+        if lim_acc is not None:
+            plt.xlim(lim_acc)
+        
+        if lim_gwd is not None:
+            plt.ylim(lim_gwd)
+                
+        plt.tight_layout()
+    
         plt.savefig(os.path.join(fig_dir, f"acc_gwd_eps({self.pair_name}).png"))
         
         if show_figure:
@@ -1455,7 +1489,7 @@ class AlignRepresentations:
             df = self._get_dataframe(eval_type, concat=True)
             sns.set_style("darkgrid")
             sns.set_palette("pastel")
-            sns.swarmplot(data=pd.DataFrame(df), x="top_n", y="matching rate (%)", size=5, dodge=True)
+            sns.swarmplot(data=pd.DataFrame(df), x="top_n", y="matching rate", size=5, dodge=True)
 
         else:
             df = self._get_dataframe(eval_type, concat=False)

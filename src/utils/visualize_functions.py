@@ -109,8 +109,11 @@ def show_heatmap(
     
     cbar_ticks_size = kwargs.get("cbar_ticks_size", 20)
     ticks_size = kwargs.get('ticks_size', 20)
-    
     cmap = kwargs.get('cmap', 'cividis')
+    
+    ot_object_tick = kwargs.get("ot_object_tick", False)
+    ot_category_tick = kwargs.get("ot_category_tick", False)
+    
     draw_category_line  = kwargs.get('draw_category_line', False) 
     category_line_alpha = kwargs.get('category_line_alpha', 0.2)
     category_line_style = kwargs.get('category_line_style', 'dashed')
@@ -125,8 +128,13 @@ def show_heatmap(
         
     aximg = ax.imshow(matrix, cmap=cmap, aspect='equal')
     
-    if category_name_list is not None:
+    if ot_object_tick and ot_category_tick:
+        raise(ValueError, "please turn off either 'ot_category_tick' or 'ot_object_tick'.")
+    
+    if  not ot_object_tick and ot_category_tick:
+        assert category_name_list is not None
         assert num_category_list is not None
+        
         if ticks == "objects":
             plt.xticks(np.arange(sum(num_category_list)) + 0.5, labels = object_labels, rotation = xticks_rotation, size = ticks_size)
             plt.yticks(np.arange(sum(num_category_list)) + 0.5, labels = object_labels, rotation = yticks_rotation, size = ticks_size)
@@ -139,30 +147,31 @@ def show_heatmap(
             if draw_category_line:
                 for pos in label_pos:
                     plt.axhline(pos, alpha = category_line_alpha, linestyle = category_line_style, color = category_line_color)
-                    plt.axvline(pos, alpha = category_line_alpha, linestyle = category_line_style, color = category_line_color)
-        
-        else:
-            plt.xticks([])
-            plt.yticks([])
-    else:
+                    plt.axvline(pos, alpha = category_line_alpha, linestyle = category_line_style, color = category_line_color)    
+
+    
+    if ot_object_tick and not ot_category_tick:
         if ticks == "numbers":
             plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = ticks_size, rotation = xticks_rotation)
             plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = ticks_size, rotation = yticks_rotation)
-        elif object_labels is not None:
+        elif ticks == "objects":
+            assert object_labels is not None
             plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = object_labels, size = ticks_size, rotation = xticks_rotation)
             plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = object_labels, size = ticks_size, rotation = yticks_rotation)
-        else:
-            plt.xticks([])
-            plt.yticks([])
+        elif ticks == "category":
+            raise(ValueError, "please use 'ot_category_tick = True'.")
     
-    
+    if not ot_object_tick and not ot_category_tick:
+        plt.xticks([])
+        plt.yticks([])
+
     divider = make_axes_locatable(ax) 
     cax = divider.append_axes("right", size="5%", pad=0.1)
 
     cbar = fig.colorbar(aximg, cax=cax, format = "%.2e")
     
     cbar.ax.tick_params(axis='y', labelsize = cbar_ticks_size)
-  
+    
     plt.xlabel(xlabel, size = xlabel_size)
     plt.ylabel(ylabel, size = ylabel_size)
     plt.tight_layout()
