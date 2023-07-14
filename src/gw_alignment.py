@@ -109,7 +109,7 @@ class GW_Alignment:
         """
         2.  Compute GW alignment with hyperparameters defined above.
         """
-        logv, init_mat, trial = self.main_compute.compute_GW_with_init_plans(
+        logv, trial = self.main_compute.compute_GW_with_init_plans(
             trial,
             eps,
             init_mat_plan,
@@ -123,7 +123,7 @@ class GW_Alignment:
         """
         gw = logv["ot"]
         gw_loss = logv["gw_dist"]
-        self.main_compute.back_end.save_computed_results(gw, init_mat, self.data_path, trial.number)
+        self.main_compute.back_end.save_computed_results(gw, self.data_path, trial.number)
 
         """
         4. delete unnecessary memory for next computation. If not, memory error would happen especially when using CUDA.
@@ -367,7 +367,7 @@ class MainGromovWasserstainComputation:
             num_iter=num_iter,
         )
         
-        return logv, init_mat, trial, best_flag
+        return logv, trial, best_flag
     
     
     def compute_GW_with_init_plans(
@@ -398,14 +398,14 @@ class MainGromovWasserstainComputation:
         """
         
         if init_mat_plan in ["uniform", "diag"]:
-            logv, init_mat, trial, _ = self._compute_GW_with_init_plans(
+            logv, trial, _ = self._compute_GW_with_init_plans(
                 trial, 
                 init_mat_plan, 
                 eps, 
                 device, 
                 sinkhorn_method,
             )
-            return logv, init_mat, trial
+            return logv, trial
 
         elif init_mat_plan in ["random", "permutation", "user_define"]:
             self.best_gw_loss = float("inf")
@@ -419,7 +419,7 @@ class MainGromovWasserstainComputation:
             pbar.set_description(f"Trial No.{trial.number}, eps:{eps:.3e}")
 
             for i, seed in enumerate(pbar):
-                logv, init_mat, trial, best_flag = self._compute_GW_with_init_plans(
+                logv, trial, best_flag = self._compute_GW_with_init_plans(
                     trial, 
                     init_mat_plan, 
                     eps, 
@@ -430,7 +430,7 @@ class MainGromovWasserstainComputation:
                 )
 
                 if best_flag:
-                    best_logv, best_init_mat = logv, init_mat
+                    best_logv = logv
                     
             if self.best_gw_loss == float("inf"):
                 raise optuna.TrialPruned(
@@ -438,7 +438,7 @@ class MainGromovWasserstainComputation:
                 )
 
             else:
-                return best_logv, best_init_mat, trial
+                return best_logv, trial
 
         else:
             raise ValueError("Not defined initialize matrix.")

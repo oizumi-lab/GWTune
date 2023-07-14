@@ -14,7 +14,7 @@ class InitMatrix():
         
         elif isinstance(mat, np.ndarray):
             self.user_define_init_mat_list = [mat]
-            
+           
 
     def make_initial_T(self, initialize:str, seed:int = 42):
         """
@@ -25,12 +25,8 @@ class InitMatrix():
             initialize (str): _description_
             seed (int, optional): _description_. Defaults to 42.
 
-        
-        Raises:
-            ValueError: _description_
-
         Returns:
-            _type_: _description_
+            initial OT plans (np.ndarray)
         """
 
         np.random.seed(seed) # fix the seed of numpy.random, seed can be changed by user.

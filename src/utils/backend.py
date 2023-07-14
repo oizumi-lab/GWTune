@@ -113,15 +113,12 @@ class Backend():
 
         return  l
 
-    def save_computed_results(self, gw, init_mat, file_path, number):
+    def save_computed_results(self, gw, file_path, number):
         # save data
         if self.to_types == 'torch':
             torch.save(gw, file_path + f'/gw_{number}.pt')
-            torch.save(init_mat, file_path + f'/init_mat_{number}.pt')
-
         elif self.to_types == 'numpy':
             np.save(file_path + f'/gw_{number}', gw)
-            np.save(file_path + f'/init_mat_{number}', init_mat)
 
 
     def check_zeros(self, args):
