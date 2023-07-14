@@ -16,7 +16,7 @@ from tqdm.auto import tqdm
 # warnings.simplefilter("ignore")
 from .utils.backend import Backend
 from .utils.init_matrix import InitMatrix
-# nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv 
+# nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
 
 # %%
 class GW_Alignment:
@@ -48,7 +48,7 @@ class GW_Alignment:
         self.to_types = to_types
         self.data_type = data_type
         self.sinkhorn_method = sinkhorn_method
-        
+
         # distribution in the source space, and target space
         self.source_size = len(source_dist)
         self.target_size = len(target_dist)
@@ -60,12 +60,12 @@ class GW_Alignment:
         self.n_iter = n_iter
 
         self.main_compute = MainGromovWasserstainComputation(
-            source_dist, 
-            target_dist, 
-            self.to_types, 
+            source_dist,
+            target_dist,
+            self.to_types,
             data_type=self.data_type,
-            max_iter=max_iter, 
-            numItermax=numItermax, 
+            max_iter=max_iter,
+            numItermax=numItermax,
             n_iter=n_iter,
         )
 
@@ -138,24 +138,24 @@ class GW_Alignment:
 
 class MainGromovWasserstainComputation:
     def __init__(
-        self, 
-        source_dist, 
-        target_dist, 
-        to_types, 
-        data_type='double', 
-        max_iter=1000, 
-        numItermax=1000, 
+        self,
+        source_dist,
+        target_dist,
+        to_types,
+        data_type='double',
+        max_iter=1000,
+        numItermax=1000,
         n_iter=100
     ) -> None:
 
         self.to_types = to_types
         self.data_type = data_type
-        
+
         p = ot.unif(len(source_dist))
         q = ot.unif(len(target_dist))
 
         self.source_dist, self.target_dist, self.p, self.q = source_dist, target_dist, p, q
-        
+
         self.source_size = len(source_dist)
         self.target_size = len(target_dist)
 
@@ -247,7 +247,7 @@ class MainGromovWasserstainComputation:
         Returns:
             _type_: _description_
         """
-    
+
         logv = self.entropic_gw(
             device,
             eps,
@@ -311,58 +311,58 @@ class MainGromovWasserstainComputation:
                 
 
     def _compute_GW_with_init_plans(
-        self, 
-        trial, 
-        init_mat_plan, 
-        eps, 
-        device, 
-        sinkhorn_method, 
-        num_iter=None, 
+        self,
+        trial,
+        init_mat_plan,
+        eps,
+        device,
+        sinkhorn_method,
+        num_iter=None,
         seed=None
     ):
-        
+
         if init_mat_plan == "user_define":
             init_mat = seed
         else:
             init_mat = self.init_mat_builder.make_initial_T(init_mat_plan, seed)
-        
+
         logv = self.gw_alignment_computation(
             init_mat,
             eps,
             device,
             sinkhorn_method=sinkhorn_method,
         )
-        
+
         if init_mat_plan in ["uniform", "diag"]:
             best_flag = None
             trial = self._save_results(
-                logv["gw_dist"], 
-                logv["acc"], 
-                trial, 
+                logv["gw_dist"],
+                logv["acc"],
+                trial,
                 init_mat_plan,
             )
-            
+
         elif init_mat_plan in ["random", "permutation", "user_define"]:
             if logv["gw_dist"] < self.best_gw_loss:
                 best_flag = True
                 self.best_gw_loss = logv["gw_dist"]
-    
+
                 trial = self._save_results(
-                    logv["gw_dist"], 
-                    logv["acc"], 
-                    trial, 
-                    init_mat_plan, 
-                    num_iter=num_iter, 
+                    logv["gw_dist"],
+                    logv["acc"],
+                    trial,
+                    init_mat_plan,
+                    num_iter=num_iter,
                     seed=seed,
                 )
-                
+
             else:
                 best_flag = False
-    
+
         self._check_pruner_should_work(
-            logv["gw_dist"], 
-            trial, 
-            init_mat_plan, 
+            logv["gw_dist"],
+            trial,
+            init_mat_plan,
             eps,
             num_iter=num_iter,
         )
@@ -396,7 +396,7 @@ class MainGromovWasserstainComputation:
         Returns:
             _type_: _description_
         """
-        
+
         if init_mat_plan in ["uniform", "diag"]:
             logv, trial, _ = self._compute_GW_with_init_plans(
                 trial, 
@@ -409,29 +409,29 @@ class MainGromovWasserstainComputation:
 
         elif init_mat_plan in ["random", "permutation", "user_define"]:
             self.best_gw_loss = float("inf")
-            
+
             if init_mat_plan in ["random", "permutation"]:
                 pbar = tqdm(np.random.randint(0, 100000, self.n_iter))
-                            
+
             if init_mat_plan == "user_define":
                 pbar = tqdm(self.init_mat_builder.user_define_init_mat_list)
-            
+
             pbar.set_description(f"Trial No.{trial.number}, eps:{eps:.3e}")
 
             for i, seed in enumerate(pbar):
                 logv, trial, best_flag = self._compute_GW_with_init_plans(
-                    trial, 
-                    init_mat_plan, 
-                    eps, 
-                    device, 
-                    sinkhorn_method, 
-                    num_iter=i, 
+                    trial,
+                    init_mat_plan,
+                    eps,
+                    device,
+                    sinkhorn_method,
+                    num_iter=i,
                     seed=seed,
                 )
 
                 if best_flag:
                     best_logv = logv
-                    
+
             if self.best_gw_loss == float("inf"):
                 raise optuna.TrialPruned(
                     f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}"

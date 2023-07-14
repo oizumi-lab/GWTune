@@ -4,7 +4,7 @@ import os
 import numpy as np
 import scipy as sp
 
-#%%    
+#%%
 class SimpleHistogramMatching():
     def __init__(self, source:np.ndarray, target:np.ndarray) -> None:
         """
@@ -17,7 +17,7 @@ class SimpleHistogramMatching():
         self.source = source
         self.target = target
         pass
-    
+
     def _sort_for_scaling(self, X):
         x = X.flatten()
         x_sorted = np.sort(x)
@@ -32,15 +32,15 @@ class SimpleHistogramMatching():
         y_t = x_sorted[y_inverse_idx]
         Y_t = y_t.reshape(Y.shape)  # transformed matrix
         return Y_t
-    
+
     def simple_histogram_matching(self, method = 'target'):
         if method == 'target':
             new_emb = self._simple_histogram_matching(self.source, self.target)
-        
+
         elif method == 'source':
             new_emb = self._simple_histogram_matching(self.target, self.source)
-        
+
         else:
             raise ValueError('method should be source or target only.')
-        
+
         return new_emb
