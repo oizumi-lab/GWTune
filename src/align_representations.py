@@ -299,13 +299,13 @@ class Representation:
         title_size = kwargs.get("title_size", 60)
         xlabel_size = kwargs.get("xlabel_size", 40)
         ylabel_size = kwargs.get("ylabel_size", 40)
-        cmap = kwargs.get("cmap", "C0")
+        color = kwargs.get("color", "C0")
 
         lower_triangular = np.tril(self.sim_mat)
         lower_triangular = lower_triangular.flatten()
 
         plt.figure()
-        plt.hist(lower_triangular, bins=100, color=cmap)
+        plt.hist(lower_triangular, bins=100, color=color)
         plt.title(f"Distribution of RDM ({self.name})", fontsize=title_size)
         plt.xlabel("RDM value")
         plt.ylabel("Count")
