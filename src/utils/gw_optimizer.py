@@ -29,22 +29,28 @@ def load_optimizer(
     pruner_name="median",
     pruner_params=None,
 ):
-
-    """
+    """    
     (usage example)
     >>> dataset = mydataset()
     >>> opt = load_optimizer(filename)
     >>> study = Opt.run_study(dataset)
 
-    Raises:
-        ValueError: _description_
-        ValueError: _description_
-        ValueError: _description_
+    Args:
+        save_path:
+        filename (_type_): _description_
+        storage (_type_): _description_
+        init_mat_plan (_type_): _description_
+        num_trial (_type_): _description_
+        n_iter (_type_): _description_
+        n_jobs (_type_): _description_
+        sampler_name (_type_): _description_
+        pruner_name (_type_): _description_
+        pruner_params (_type_): _description_
 
     Returns:
-        _type_: _description_
+        opt : instance of optimzer.
     """
-
+    
     # make file_path
     if not os.path.exists(save_path):
         os.makedirs(save_path)
@@ -122,8 +128,10 @@ class RunOptuna:
             self._set_params(pruner_params)
 
     def _set_params(self, vars_dic: dict) -> None:
-        """
-        2023/3/14 阿部
+        """_summary_
+
+        Args:
+            vars_dic (dict): _description_
         """
         for key, value in vars_dic.items():
             if hasattr(self, key):
@@ -132,6 +140,14 @@ class RunOptuna:
                 print(f"{key} is not a parameter of the pruner.")
 
     def create_study(self, direction="minimize"):
+        """_summary_
+
+        Args:
+            direction (str, optional): _description_. Defaults to "minimize".
+
+        Returns:
+            _type_: _description_
+        """
         study = optuna.create_study(
             direction=direction,
             study_name=self.filename + "_" + self.init_mat_plan,
@@ -142,8 +158,11 @@ class RunOptuna:
 
     def load_study(self, seed=42):
         """
-        2023.4.3 佐々木
-        studyファイルの作成を行う関数。
+        
+        load the study from database if exists.
+
+        Args:
+            seed (int, optional): _description_. Defaults to 42.
 
         Returns:
             _type_: _description_
@@ -157,10 +176,6 @@ class RunOptuna:
         return study
 
     def run_study(self, objective, device, seed=42, **kwargs):
-        """
-        2023.3.29 佐々木
-        """
-
         if self.sampler_name == "grid":
             assert kwargs.get("search_space") != None, "please define search space for grid search."
             self.search_space = kwargs.pop("search_space")
@@ -171,11 +186,9 @@ class RunOptuna:
             del kwargs["search_space"]
 
         objective = functools.partial(objective, **kwargs)
-
-        # If there is no db file, multi_run will not work properly if you don't let it load here.
-        # PyMySQL implementation will be here if necessary.
-
+        
         try:
+            # If there is no .db file or database of MySQL, multi_run will not work properly if you don't let it load here.
             study = self.load_study(seed=seed)
         except KeyError:
             print("Study for " + self.filename + "_" + self.init_mat_plan + " was not found, creating a new one...")
