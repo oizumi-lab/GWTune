@@ -431,6 +431,7 @@ class PairwiseAnalysis:
     def run_gw(
         self,
         results_dir,
+        save_path: Optional[str] = None,
         eps_list=None,
         compute_OT=False,
         delete_results=False,
@@ -470,6 +471,7 @@ class PairwiseAnalysis:
             results_dir,
             filename,
             compute_OT,
+            save_path=save_path,
             delete_results=delete_results,
         )
 
@@ -510,6 +512,7 @@ class PairwiseAnalysis:
         results_dir,
         filename,
         compute_OT,
+        save_path: Optional[str] = None,
         delete_results=False,
     ):
         if filename is None:
@@ -517,7 +520,8 @@ class PairwiseAnalysis:
 
         self.filename = filename
 
-        self.save_path = os.path.join(results_dir, self.config.data_name, filename, self.config.init_mat_plan)
+        if save_path is None:
+            self.save_path = os.path.join(results_dir, self.config.data_name, filename, self.config.init_mat_plan)
 
         self.figure_path = os.path.join(self.save_path, 'figure')
 
@@ -699,6 +703,7 @@ class PairwiseAnalysis:
         df_trial=None,
         filename=None,
         fig_dir=None,
+        save_path=None,
         **kwargs,
     ):
         figsize = kwargs.get('figsize', (8,6))
@@ -707,7 +712,7 @@ class PairwiseAnalysis:
         show_figure = kwargs.get('show_figure', False)
 
         if df_trial is None:
-            self._save_path_checker(results_dir, filename, compute_OT=False, delete_results=False)
+            self._save_path_checker(results_dir, filename, save_path=save_path, compute_OT=False, delete_results=False)
             study = self._run_optimization(compute_OT = False)
             df_trial = study.trials_dataframe()
 
@@ -1027,6 +1032,7 @@ class AlignRepresentations:
     def _single_computation(
         self,
         results_dir,
+        save_path: Optiona[str] = None,
         pair_eps_list=None,
         compute_OT=False,
         delete_results=False,
@@ -1056,6 +1062,7 @@ class AlignRepresentations:
 
             OT = pairwise.run_gw(
                 results_dir=results_dir,
+                save_path=save_path,
                 eps_list=eps_list,
                 compute_OT=compute_OT,
                 delete_results=delete_results,
@@ -1079,6 +1086,7 @@ class AlignRepresentations:
     def gw_alignment(
         self,
         results_dir,
+        save_path: Optional[str] = None,
         pair_eps_list=None,
         compute_OT=False,
         delete_results=False,
@@ -1170,6 +1178,7 @@ class AlignRepresentations:
                     future = pool.submit(
                         pairwise.run_gw,
                         results_dir=results_dir,
+                        save_path=save_path,
                         eps_list=eps_list,
                         compute_OT=compute_OT,
                         delete_results=delete_results,
@@ -1194,6 +1203,7 @@ class AlignRepresentations:
             if return_figure or return_data:
                 OT_list = self._single_computation(
                     results_dir=results_dir,
+                    save_path=save_path,
                     pair_eps_list=pair_eps_list,
                     compute_OT=False,
                     delete_results=False,
@@ -1211,6 +1221,7 @@ class AlignRepresentations:
         if self.config.n_jobs == 1:
             OT_list = self._single_computation(
                 results_dir=results_dir,
+                save_path=save_path,
                 pair_eps_list=pair_eps_list,
                 compute_OT=compute_OT,
                 delete_results=delete_results,
