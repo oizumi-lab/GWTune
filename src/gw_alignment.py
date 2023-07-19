@@ -160,7 +160,7 @@ class MainGromovWasserstainComputation:
         self.target_size = len(target_dist)
 
         # init matrix
-        self.init_mat_builder = InitMatrix(self.source_size, self.target_size)  
+        self.init_mat_builder = InitMatrix(self.source_size, self.target_size)
 
         # parameter for entropic gw alignment by POT
         self.max_iter = max_iter
@@ -197,7 +197,7 @@ class MainGromovWasserstainComputation:
         Returns:
             _type_: _description_
         """
-        
+
         # all the variable are placed on "device" here.
         self.back_end.device = device
         C1, C2, p, q, T = self.back_end(self.source_dist, self.target_dist, self.p, self.q, T)
@@ -293,7 +293,7 @@ class MainGromovWasserstainComputation:
         Raises:
             optuna.TrialPruned: _description_
         """
-        
+
         if math.isinf(gw_loss) or gw_loss <= 0.0:
             raise optuna.TrialPruned(f"Trial for '{init_mat_plan}' was pruned with parameters: {{'eps': {eps:.5e}, 'gw_loss': '{gw_loss:.5e}'}}")
 
@@ -308,7 +308,7 @@ class MainGromovWasserstainComputation:
                 raise optuna.TrialPruned(
                     f"Trial for '{init_mat_plan}' was pruned at iteration {num_iter} with parameters: {{'eps': {eps:.5e}, 'gw_loss': '{gw_loss:.5e}'}}"
                 )
-                
+
 
     def _compute_GW_with_init_plans(
         self,
@@ -359,6 +359,10 @@ class MainGromovWasserstainComputation:
             else:
                 best_flag = False
 
+        # 後で修正する
+        if num_iter is None:
+            num_iter = 10
+
         self._check_pruner_should_work(
             logv["gw_dist"],
             trial,
@@ -366,10 +370,10 @@ class MainGromovWasserstainComputation:
             eps,
             num_iter=num_iter,
         )
-        
+
         return logv, trial, best_flag
-    
-    
+
+
     def compute_GW_with_init_plans(
         self,
         trial,
@@ -379,7 +383,7 @@ class MainGromovWasserstainComputation:
         sinkhorn_method = "sinkhorn"
     ):
         """
-        
+
         calculate GW alignment with parameters given by user.
 
         Args:
@@ -399,10 +403,10 @@ class MainGromovWasserstainComputation:
 
         if init_mat_plan in ["uniform", "diag"]:
             logv, trial, _ = self._compute_GW_with_init_plans(
-                trial, 
-                init_mat_plan, 
-                eps, 
-                device, 
+                trial,
+                init_mat_plan,
+                eps,
+                device,
                 sinkhorn_method,
             )
             return logv, trial

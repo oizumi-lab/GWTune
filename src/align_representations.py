@@ -270,9 +270,9 @@ class Representation:
 
         if sim_mat_format == "default" or sim_mat_format == "both":
             visualize_functions.show_heatmap(
-                self.sim_mat, 
-                title=self.name, 
-                save_file_name=fig_path, 
+                self.sim_mat,
+                title=self.name,
+                save_file_name=fig_path,
                 **visualization_config(),
             )
 
@@ -357,9 +357,9 @@ class PairwiseAnalysis:
     """
 
     def __init__(
-        self, 
-        config: OptimizationConfig, 
-        source: Representation, 
+        self,
+        config: OptimizationConfig,
+        source: Representation,
         target: Representation,
     ) -> None:
         """
@@ -513,7 +513,7 @@ class PairwiseAnalysis:
             if not os.path.exists(fig_dir):
                 os.makedirs(fig_dir, exist_ok=True)
 
-
+        Path(fig_dir).mkdir(exist_ok=True, parents=True)
         OT = self._show_OT(
             title=f"$\Gamma$ ({self.pair_name.replace('_', ' ')})",
             return_data=return_data,
@@ -526,12 +526,12 @@ class PairwiseAnalysis:
 
         if show_log:
             self.get_optimization_log(
-                results_dir, 
-                df_trial=df_trial, 
+                results_dir,
+                df_trial=df_trial,
                 fig_dir=fig_dir,
                 **visualization_config(),
             )
-        
+
         if save_dataframe:
             df_trial.to_csv(self.save_path + '/' + self.filename + '.csv')
 
@@ -552,6 +552,8 @@ class PairwiseAnalysis:
 
         if save_path is None:
             self.save_path = os.path.join(results_dir, self.config.data_name, filename, self.config.init_mat_plan)
+        else:
+            self.save_path = save_path
 
         self.figure_path = os.path.join(self.save_path, 'figure')
 
@@ -740,11 +742,11 @@ class PairwiseAnalysis:
         show_figure = kwargs.get('show_figure', False)
         plot_eps_log = kwargs.get('plot_eps_log', False)
         cmap = kwargs.get("cmap", 'viridis')
-        
+
         lim_eps = kwargs.get("lim_eps", None)
         lim_gwd = kwargs.get("lim_gwd", None)
         lim_acc = kwargs.get("lim_acc", None)
-        
+
         if df_trial is None:
             self._save_path_checker(results_dir, filename, save_path=save_path, compute_OT=False, delete_results=False)
             study = self._run_optimization(compute_OT = False)
@@ -755,23 +757,23 @@ class PairwiseAnalysis:
         plt.scatter(df_trial["params_eps"], df_trial["value"], c = 100 * df_trial["user_attrs_best_acc"], s = marker_size, cmap=cmap)
         plt.xlabel("$\epsilon$")
         plt.ylabel("GWD")
-        
+
         if lim_eps is not None:
             plt.xlim(lim_eps)
-        
+
         if lim_gwd is not None:
             plt.ylim(lim_gwd)
-            
+
         if plot_eps_log:
             plt.xscale('log')
-        
+
         plt.title(f"$\epsilon$ - GWD ({self.pair_name.replace('_', ' ')})")
         plt.grid(True, which = 'both')
-        
+
         plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
         plt.tick_params(axis = 'x', rotation = 30,  which="both")
         plt.colorbar(label='accuracy (%)')
-        
+
         plt.tight_layout()
 
         if fig_dir is None:
@@ -784,7 +786,7 @@ class PairwiseAnalysis:
 
         plt.clf()
         plt.close()
-        
+
         plt.figure(figsize=figsize)
         plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap)
         plt.title(self.pair_name.replace('_', ' '))
@@ -792,15 +794,15 @@ class PairwiseAnalysis:
         plt.ylabel("GWD")
         plt.colorbar(label='eps', format = "%.2e")
         plt.grid(True)
-        
+
         if lim_acc is not None:
             plt.xlim(lim_acc)
-        
+
         if lim_gwd is not None:
             plt.ylim(lim_gwd)
-                
+
         plt.tight_layout()
-    
+
         plt.savefig(os.path.join(fig_dir, f"acc_gwd_eps({self.pair_name}).png"))
 
         if show_figure:
@@ -834,7 +836,7 @@ class PairwiseAnalysis:
             if OT_format == "default" or OT_format == "both":
                 visualize_functions.show_heatmap(
                     self.OT,
-                    title=title, 
+                    title=title,
                     save_file_name=fig_path,
                     object_labels = self.source.object_labels,
                     **visualization_config(),
@@ -1065,7 +1067,7 @@ class AlignRepresentations:
     def _single_computation(
         self,
         results_dir,
-        save_path: Optiona[str] = None,
+        save_path: Optional[str] = None,
         pair_eps_list=None,
         compute_OT=False,
         delete_results=False,
