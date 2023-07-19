@@ -254,6 +254,8 @@ class VisualizeEmbedding():
         legend_size = kwargs.get('legend_size')
         color_labels = kwargs.get('color_labels', None)
         color_hue = kwargs.get("color_hue", None)
+        colorbar_label = kwargs.get("colorbar_label", None)
+        colorbar_range = kwargs.get("colorbar_range", [0, 1])
         markers_list = kwargs.get('markers_list', None)
         marker_size = kwargs.get('marker_size', 30)
         cmap = kwargs.get('cmap', "viridis")
@@ -267,7 +269,7 @@ class VisualizeEmbedding():
         if markers_list is None:
             markers = ['o', 'x', '^', 's', 'v', '<', '>', 'p', '*', 'h', 'H', '+', 'D', 'd', '.', ',', '1', '2', '3', '4', '_', '|'][:len(self.embedding_list)]
 
-
+        plt.style.use("default")
         plt.rcParams["grid.color"] = "black"
         fig = plt.figure(figsize = figsize)
 
