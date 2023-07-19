@@ -116,6 +116,8 @@ class VisualizationConfig:
         zlabel_size=15,
         color_labels=None,
         color_hue=None,
+        colorbar_label=None,
+        colorbar_range=[0, 1],
         markers_list=None,
         marker_size=30,
         color = 'C0',
@@ -149,6 +151,8 @@ class VisualizationConfig:
             'zlabel_size': zlabel_size,
             'color_labels': color_labels,
             'color_hue': color_hue,
+            'colorbar_label': colorbar_label,
+            'colorbar_range': colorbar_range,
             'markers_list': markers_list,
             'marker_size': marker_size,
             'color':color,
@@ -1555,8 +1559,6 @@ class AlignRepresentations:
         category_idx_list=None,
         title=None,
         legend=True,
-        colorbar_label=None,
-        colorbar_range=[0, 1],
         fig_dir=None,
         fig_name="Aligned_embedding.png",
     ):
@@ -1615,7 +1617,7 @@ class AlignRepresentations:
             )
 
             visualize_embedding.plot_embedding(
-                name_list=name_list, title=title, legend=legend, colorbar_label=colorbar_label, colorbar_range=colorbar_range, save_dir=fig_path, **visualization_config()
+                name_list=name_list, title=title, legend=legend, save_dir=fig_path, **visualization_config()
             )
 
         elif returned == "row_data":
