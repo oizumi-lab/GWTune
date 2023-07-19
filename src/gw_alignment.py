@@ -32,16 +32,18 @@ class GW_Alignment:
         data_type="double",
         sinkhorn_method="sinkhorn",
     ):
-        """
-        2023/3/6 大泉先生
+        """_summary_
 
-        1. epsilonに関して
-        epsilon: １つ
-        epsilonの範囲を決める：サーチ方法 optuna, 単純なgrid (samplerの種類, optuna)
-
-        2. 初期値に関して
-        初期値1つ固定: diagonal, uniform outer(p,q), 乱数
-        初期値ランダムで複数: 乱数
+        Args:
+            source_dist (_type_): _description_
+            target_dist (_type_): _description_
+            data_path (_type_): _description_
+            max_iter (int, optional): _description_. Defaults to 1000.
+            numItermax (int, optional): _description_. Defaults to 1000.
+            n_iter (int, optional): _description_. Defaults to 20.
+            to_types (str, optional): _description_. Defaults to "torch".
+            data_type (str, optional): _description_. Defaults to "double".
+            sinkhorn_method (str, optional): _description_. Defaults to "sinkhorn".
         """
         self.to_types = to_types
         self.data_type = data_type
@@ -107,7 +109,7 @@ class GW_Alignment:
         """
         2.  Compute GW alignment with hyperparameters defined above.
         """
-        logv, init_mat, trial = self.main_compute.compute_GW_with_init_plans(
+        logv, trial = self.main_compute.compute_GW_with_init_plans(
             trial,
             eps,
             init_mat_plan,
@@ -121,7 +123,7 @@ class GW_Alignment:
         """
         gw = logv["ot"]
         gw_loss = logv["gw_dist"]
-        self.main_compute.back_end.save_computed_results(gw, init_mat, self.data_path, trial.number)
+        self.main_compute.back_end.save_computed_results(gw, self.data_path, trial.number)
 
         """
         4. delete unnecessary memory for next computation. If not, memory error would happen especially when using CUDA.
@@ -157,19 +159,19 @@ class MainGromovWasserstainComputation:
         self.source_size = len(source_dist)
         self.target_size = len(target_dist)
 
-        # hyperparameter
-        self.init_mat_builder = InitMatrix(self.source_size, self.target_size)  # 基本的に初期値はnumpyで作成するようにしておく。
+        # init matrix
+        self.init_mat_builder = InitMatrix(self.source_size, self.target_size)  
 
-        # gw alignmentに関わるparameter
+        # parameter for entropic gw alignment by POT
         self.max_iter = max_iter
 
-        # sinkhornに関わるparameter
+        # parameter for sinkhorn
         self.numItermax = numItermax
 
-        # 初期値のiteration回数, かつ hyperbandのparameter
+        # the number of iteration mainly used for random init matrix.
         self.n_iter = n_iter
 
-        self.back_end = Backend("cpu", self.to_types, self.data_type)  # 並列計算をしない場合は、こちらにおいた方がはやい。(2023.4.19 佐々木)
+        self.back_end = Backend("cpu", self.to_types, self.data_type)
 
     def entropic_gw(
         self,
@@ -181,20 +183,22 @@ class MainGromovWasserstainComputation:
         sinkhorn_method="sinkhorn",
         verbose=False
     ):
+        """_summary_
+
+        Args:
+            device (_type_): _description_
+            epsilon (_type_): _description_
+            T (_type_): _description_
+            tol (_type_, optional): _description_. Defaults to 1e-9.
+            trial (_type_, optional): _description_. Defaults to None.
+            sinkhorn_method (str, optional): _description_. Defaults to "sinkhorn".
+            verbose (bool, optional): _description_. Defaults to False.
+
+        Returns:
+            _type_: _description_
         """
-        2023.3.16 佐々木
-        backendに実装した "change_device" で、全型を想定した変数のdevice切り替えを行う。
-        numpyに関しては、CPUの指定をしていないとエラーが返ってくるようにしているだけ。
-        torch, jaxに関しては、GPUボードの番号指定が、これでできる。
-
-        2023.4.11 佐々木
-        multiprocessingで動かすために、backendでdeviceの変更を行うのを、このmethod内のみにした。
-
-        multiprocessingが動かなかった原因は、各変数をGPUに上げる作業(args.to("cuda")が、一回の計算につき
-        一回しかできないのに、途中で(安全のため、同じものであっても)何回もdeviceの切り替えを行っていたことが原因だった。
-        """
-
-        # ここで、全ての変数をto_typesのdeviceに変更している。
+        
+        # all the variable are placed on "device" here.
         self.back_end.device = device
         C1, C2, p, q, T = self.back_end(self.source_dist, self.target_dist, self.p, self.q, T)
 
@@ -231,10 +235,17 @@ class MainGromovWasserstainComputation:
         trial=None,
         sinkhorn_method="sinkhorn",
     ):
-        """
-        2023.3.17 佐々木
-        gw_alignmentの計算を行う。ここのメソッドは変更しない方がいいと思う。
-        外部で、特定のhyper parametersでのgw_alignmentの計算結果だけを抽出したい時にも使えるため。
+        """_summary_
+
+        Args:
+            init_mat (_type_): _description_
+            eps (_type_): _description_
+            device (_type_): _description_
+            trial (_type_, optional): _description_. Defaults to None.
+            sinkhorn_method (str, optional): _description_. Defaults to "sinkhorn".
+
+        Returns:
+            _type_: _description_
         """
 
         logv = self.entropic_gw(
@@ -263,14 +274,13 @@ class MainGromovWasserstainComputation:
         trial.set_user_attr("best_acc", acc)
         if init_mat_plan in ["random", "permutation"]:
             trial.set_user_attr("best_iter", num_iter)
-            trial.set_user_attr("best_seed", int(seed))  # ここはint型に変換しないと、謎のエラーが出る (2023.3.18 佐々木)。
+            trial.set_user_attr("best_seed", int(seed))
 
         return trial
 
     def _check_pruner_should_work(self, gw_loss, trial, init_mat_plan, eps, num_iter=None):
         """
-        2023.3.28 佐々木
-        全条件において、prunerを動かすメソッド。
+        pruner will work here.
 
         Args:
             gw_loss (_type_): _description_
@@ -284,18 +294,21 @@ class MainGromovWasserstainComputation:
             optuna.TrialPruned: _description_
         """
         
-        if num_iter is None:  # uniform, diagにおいて、nanにならなかったがprunerが動くときのためのifブロック。
-            num_iter = self.n_iter
-
         if math.isinf(gw_loss) or gw_loss <= 0.0:
             raise optuna.TrialPruned(f"Trial for '{init_mat_plan}' was pruned with parameters: {{'eps': {eps:.5e}, 'gw_loss': '{gw_loss:.5e}'}}")
 
         trial.report(gw_loss, num_iter)
 
         if trial.should_prune():
-            raise optuna.TrialPruned(
-                f"Trial for '{init_mat_plan}' was pruned at iteration {num_iter} with parameters: {{'eps': {eps:.5e}, 'gw_loss': '{gw_loss:.5e}'}}"
-            )
+            if num_iter is None:
+                raise optuna.TrialPruned(
+                    f"Trial for '{init_mat_plan}' was pruned with parameters: {{'eps': {eps:.5e}, 'gw_loss': '{gw_loss:.5e}'}}"
+                )
+            else:
+                raise optuna.TrialPruned(
+                    f"Trial for '{init_mat_plan}' was pruned at iteration {num_iter} with parameters: {{'eps': {eps:.5e}, 'gw_loss': '{gw_loss:.5e}'}}"
+                )
+                
 
     def _compute_GW_with_init_plans(
         self,
@@ -353,10 +366,10 @@ class MainGromovWasserstainComputation:
             eps,
             num_iter=num_iter,
         )
-
-        return logv, init_mat, trial, best_flag
-
-
+        
+        return logv, trial, best_flag
+    
+    
     def compute_GW_with_init_plans(
         self,
         trial,
@@ -366,28 +379,33 @@ class MainGromovWasserstainComputation:
         sinkhorn_method = "sinkhorn"
     ):
         """
-        2023.3.17 佐々木
-        uniform, diagでも、prunerを使うこともできるが、いまのところはコメントアウトしている。
-        どちらにも使えるようにする場合は、ある程度の手直しが必要。
+        
+        calculate GW alignment with parameters given by user.
 
-        2023.3.28 佐々木
-        全条件において、正しくprunerを動かすメソッドを作成。
-        各条件ごとへの拡張性を考慮すると、prunerの挙動は一本化しておく方が絶対にいい。
+        Args:
+            trial (_type_): _description_
+            eps (_type_): _description_
+            init_mat_plan (_type_): _description_
+            device (_type_): _description_
+            sinkhorn_method (str, optional): _description_. Defaults to "sinkhorn".
 
-        2023.4.18 佐々木
-        並行・並列計算による高速化は、Numpy環境だと全く意味がない。
-        CUDAであっても、高速化は高々20%弱しか速くならず、よくわからないエラーも出るので、中止にします。
+        Raises:
+            optuna.TrialPruned: _description_
+            ValueError: _description_
+
+        Returns:
+            _type_: _description_
         """
 
         if init_mat_plan in ["uniform", "diag"]:
-            logv, init_mat, trial, _ = self._compute_GW_with_init_plans(
-                trial,
-                init_mat_plan,
-                eps,
-                device,
+            logv, trial, _ = self._compute_GW_with_init_plans(
+                trial, 
+                init_mat_plan, 
+                eps, 
+                device, 
                 sinkhorn_method,
             )
-            return logv, init_mat, trial
+            return logv, trial
 
         elif init_mat_plan in ["random", "permutation", "user_define"]:
             self.best_gw_loss = float("inf")
@@ -401,7 +419,7 @@ class MainGromovWasserstainComputation:
             pbar.set_description(f"Trial No.{trial.number}, eps:{eps:.3e}")
 
             for i, seed in enumerate(pbar):
-                logv, init_mat, trial, best_flag = self._compute_GW_with_init_plans(
+                logv, trial, best_flag = self._compute_GW_with_init_plans(
                     trial,
                     init_mat_plan,
                     eps,
@@ -412,7 +430,7 @@ class MainGromovWasserstainComputation:
                 )
 
                 if best_flag:
-                    best_logv, best_init_mat = logv, init_mat
+                    best_logv = logv
 
             if self.best_gw_loss == float("inf"):
                 raise optuna.TrialPruned(
@@ -420,7 +438,7 @@ class MainGromovWasserstainComputation:
                 )
 
             else:
-                return best_logv, best_init_mat, trial
+                return best_logv, trial
 
         else:
             raise ValueError("Not defined initialize matrix.")

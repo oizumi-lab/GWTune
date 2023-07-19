@@ -1,25 +1,20 @@
 # %%
-import os, re
 import numpy as np
 import torch
-import random
 import ot
-import warnings
-# %%
-# JAXの環境変数。
-# import jax
-# import jax.numpy as jnp
-# os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = 'false'
-# jax.config.update("jax_enable_x64", True)
 
 #%%
-str_type_error = "All array should be from the same type/backend. Current types are : {}"
-
 class Backend():
     def __init__(self, device = 'cpu', to_types = 'torch', data_type = 'double'):
         """
-        入力された変数の型を揃えてあげる。バラバラな場合でも、単一の型に変換できるはず。
-        基本的には3つ(numpy, torch, jax)の型のみ受付られる。
+        all the variable for GW alignment will be placed on the device, data type and numpy or torch defined by user.
+        
+        This instance will assist some functions implemented in python file under "src" directory.
+
+        Args:
+            device (str, optional): _description_. Defaults to 'cpu'.
+            to_types (str, optional): _description_. Defaults to 'torch'.
+            data_type (str, optional): _description_. Defaults to 'double'.
         """
         self.device = device
         self.to_types = to_types
@@ -27,13 +22,6 @@ class Backend():
         pass
 
     def __call__(self, *args):
-        """
-        3つのデータ型(numpy, torch, jax)を変換したい型にして、変換後にCPUかGPUかの選択ができる(当然numpyはcpuのみ。jitとかで高速化できるけど)。
-        Input :
-            *args : 変換したい変数を全て受け取る。詳しくは可変型変数を調べてください。
-        Returns:
-            output : 変換したい変数のリスト
-        """
         output = []
         for a in args:
             a = self._change_types(a)
@@ -54,29 +42,13 @@ class Backend():
         raise NotImplementedError()
 
     def _change_types(self, args):
-        '''
-        ここで、任意の3type(numpy, torch, jax)を変換したいtypeに変換する。
-        変換後、CPU or GPUの選択ができる。
-
-        おそらく、今後、拡張が必要な気がする。GPUの番号指定を行えるようにする必要がある。
-        Args:
-            to_types (_type_):
-        Returns:
-            args :
-        '''
-        
-
         if self.to_types == 'torch':
             if 'gpu' in self.device:
                 raise ValueError('torch uses "cuda" instead of "gpu".')
 
             if isinstance(args, np.ndarray):
-                return torch.from_numpy(args)#.double()#.float()
-
-            # elif isinstance(args, jax.numpy.ndarray):
-            #     args = np.array(args)
-            #     return torch.from_numpy(args)#.double()#.float()
-
+                return torch.from_numpy(args)
+            
             else:
                 return args
 
@@ -87,24 +59,14 @@ class Backend():
             if isinstance(args, torch.Tensor):
                 return args.to('cpu').numpy()
 
-            # elif isinstance(args, jax.numpy.ndarray):
-            #     return np.array(args)
-
             else:
                 return args
-            
-        # elif self.to_types == 'jax':
-        #     if isinstance(args, torch.Tensor):
-        #         return jnp.asarray(args.to('cpu'))
-
-        #     if isinstance(args, np.ndarray):
-        #         return jnp.asarray(args)
 
         else:
             raise ValueError("Unknown type of non implemented here.")
 
     def change_device(self, device, *args):
-        device_list = ('cpu', 'cuda')#, 'gpu')
+        device_list = ('cpu', 'cuda')
 
         if not device.startswith(device_list):
             raise ValueError('no device is assigned to change')
@@ -121,8 +83,6 @@ class Backend():
         return output
 
     def _change_device(self, args, device = 'cpu'):
-        """変数のGPUやCPUを指定したdeviceに変更する。"""
-
         if isinstance(args, np.ndarray):
             if device == 'cpu':
                 if self.data_type == 'double' or self.data_type == 'float64':
@@ -131,37 +91,20 @@ class Backend():
                     return args.astype(np.float32)
             else:
                 raise ValueError('Numpy only accepts CPU!!')
-
-        # elif isinstance(args, jax.numpy.ndarray):
-        #     if 'cuda' in device or 'gpu' in device:
-        #         digits = re.sub('[^0-9]', '', device)
-
-        #         if digits == '':
-        #             digits = 0
-        #         else:
-        #             digits = int(digits)
-
-        #         gpus = jax.devices("gpu")
-        #         return jax.device_put(args, gpus[digits])
-
-        #     else:
-        #         cpus = jax.devices("cpu")
-        #         return jax.device_put(args, cpus[0])
-
+    
         elif isinstance(args, torch.Tensor):
             if self.data_type == 'double' or self.data_type == 'float64':
                 return args.to(device).double()
             elif self.data_type == 'float' or self.data_type == 'float32':
                 return args.to(device).float()
             
-
         else:
             raise ValueError("Unknown type of non implemented here.")
 
     def get_item_from_torch_or_jax(self, *args):
         l = []
         for v in args:
-            if isinstance(v, torch.Tensor): #or isinstance(args, jax.numpy.ndarray):
+            if isinstance(v, torch.Tensor):
                 v = v.item()
             l.append(v)
 
@@ -170,19 +113,13 @@ class Backend():
 
         return  l
 
-    def save_computed_results(self, gw, init_mat, file_path, number):
+    def save_computed_results(self, gw, file_path, number):
         # save data
         if self.to_types == 'torch':
             torch.save(gw, file_path + f'/gw_{number}.pt')
-            torch.save(init_mat, file_path + f'/init_mat_{number}.pt')
-
         elif self.to_types == 'numpy':
             np.save(file_path + f'/gw_{number}', gw)
-            np.save(file_path + f'/init_mat_{number}', init_mat)
 
-        # elif self.to_types == 'jax':
-        #     # jaxの保存方法を作成してください
-        #     pass
 
     def check_zeros(self, args):
         if isinstance(args, torch.Tensor):
@@ -193,15 +130,6 @@ class Backend():
 
         elif isinstance(args, np.ndarray):
             flag = self.nx.array_equal(args, self.nx.zeros(args.shape))
-
-        # elif isinstance(args, jax.numpy.ndarray):
-        #     pass
-            # まだよくわからない・・・(2023/3/17 佐々木)
-            # device_id = jax.devices(args.sharding)#[0].device_id
-            # check_data = self.nx.zeros(args.shape)
-            # check_data = jax.device_get(check_data, device_id)
-            # flag = self.nx.array_equal(args, check_data)
-
 
         return flag
 
