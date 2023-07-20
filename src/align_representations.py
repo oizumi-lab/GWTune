@@ -44,7 +44,6 @@ class OptimizationConfig:
         user_define_init_mat_list = None,
         n_iter=1,
         max_iter=200,
-        data_name="THINGS",
         sampler_name="tpe",
         pruner_name="hyperband",
         pruner_params={"n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3},
@@ -91,9 +90,7 @@ class OptimizationConfig:
 
         self.sampler_name = sampler_name
         self.user_define_init_mat_list = user_define_init_mat_list
-
-        self.data_name = data_name
-
+        
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
 
@@ -361,18 +358,35 @@ class PairwiseAnalysis:
         config: OptimizationConfig, 
         source: Representation, 
         target: Representation,
+        pair_name=None,
+        data_name=None,
+        filename=None,
     ) -> None:
-        """
+        """_summary_
+
         Args:
-            config (Optimization_Config) : instance of Optimization_Config
-            source (Representation): instance of Representation
-            target (Representation): instance of Representation
+            config (OptimizationConfig): _description_
+            source (Representation): _description_
+            target (Representation): _description_
+            pair_name (_type_, optional): _description_. Defaults to None.
+            data_name (_type_, optional): _description_. Defaults to None.
+            filename (_type_, optional): _description_. Defaults to None.
         """
         self.source = source
         self.target = target
         self.config = config
 
-        self.pair_name = f"{source.name}_vs_{target.name}"
+        if pair_name is None:
+            self.pair_name = f"{source.name}_vs_{target.name}"
+        else:
+            self.pair_name = pair_name
+        
+        self.data_name = data_name
+        
+        if filename is None:
+            self.filename = self.data_name + "_" + self.pair_name
+        else:
+            self.filename = filename
 
         # assert self.source.sim_mat.shape == self.target.sim_mat.shape, "the shape of sim_mat is not the same."
 
@@ -383,6 +397,22 @@ class PairwiseAnalysis:
         assert np.array_equal(
             self.source.object_labels, self.target.object_labels
         ), "the label information doesn't seem to be the same."
+    
+    def set_save_and_figure_path(self, results_dir):
+        self.save_path = os.path.join(results_dir, self.data_name, self.filename, self.config.init_mat_plan)
+
+        self.figure_path = os.path.join(self.save_path, 'figure')
+
+        self.data_path = os.path.join(self.save_path, 'data')
+
+        # Generate the URL for the database. Syntax differs for SQLite and others.
+        if self.config.db_params["drivername"] == "sqlite":
+            self.storage = "sqlite:///" + self.save_path + "/" + self.filename + "_" + self.config.init_mat_plan + ".db"
+        else:
+            # self.storage = URL.create(database=filename, **self.config.db_params).render_as_string(hide_password=False)
+            self.storage = URL.create(
+                database=self.filename + "_" + self.config.init_mat_plan,
+                **self.config.db_params).render_as_string(hide_password=False)
 
     def show_both_sim_mats(self):
 
@@ -466,7 +496,6 @@ class PairwiseAnalysis:
         show_log=False,
         fig_dir=None,
         ticks=None,
-        filename=None,
         save_dataframe=False,
         target_device=None,
         sampler_seed=42,
@@ -491,13 +520,13 @@ class PairwiseAnalysis:
         Returns:
             _type_: _description_
         """
-        self._save_path_checker(
-            results_dir,
-            filename,
-            compute_OT,
-            delete_results=delete_results,
-        )
-
+        
+        self.set_save_and_figure_path(results_dir)
+        
+        # Delete the previous results if the flag is True.
+        if delete_results:
+            self.delete_prev_results()
+            
         self.OT, df_trial = self._gw_alignment(
             eps_list,
             compute_OT,
@@ -535,71 +564,20 @@ class PairwiseAnalysis:
 
         return OT
 
-    def _save_path_checker(
-        self,
-        results_dir,
-        filename,
-        compute_OT,
-        delete_results=False,
-    ):
-        if filename is None:
-            filename = self.config.data_name + "_" + self.pair_name
-
-        self.filename = filename
-
-        self.save_path = os.path.join(results_dir, self.config.data_name, filename, self.config.init_mat_plan)
-
-        self.figure_path = os.path.join(self.save_path, 'figure')
-
-        self.data_path = os.path.join(self.save_path, 'data')
-
-        # Generate the URL for the database. Syntax differs for SQLite and others.
-        if self.config.db_params["drivername"] == "sqlite":
-            self.storage = "sqlite:///" + self.save_path + "/" + filename + "_" + self.config.init_mat_plan + ".db"
-        else:
-            # self.storage = URL.create(database=filename, **self.config.db_params).render_as_string(hide_password=False)
-            self.storage = URL.create(
-                database=filename + "_" + self.config.init_mat_plan,
-                **self.config.db_params).render_as_string(hide_password=False)
-
-        # Delete the previous results if the flag is True.
-        if delete_results:
-            if not compute_OT and os.path.exists(self.save_path) and self.config.n_jobs == 1:
-                self._confirm_delete()
-            else:
-                self.delete_prev_results()
-
-    def _confirm_delete(self) -> None:
-        while True:
-            confirmation = input(
-                f"The study, result folder, and database named '{self.filename}' existed in your environment will be deleted.\n \
-                 Do you want to execute it? (Y/n)"
-            )
-            if confirmation == "Y":
-               self.delete_prev_results()
-            elif confirmation == "n":
-                print(f"The study, result folder, and database named '{self.filename}' existed in your environment weren't deleted.")
-                break
-            else:
-                print("Invalid input. Please enter again.")
-
     def delete_prev_results(self):
         # drop database
         if database_exists(self.storage):
             drop_database(self.storage)
         # delete directory
         if os.path.exists(self.save_path):
-            self._delete_directory(self.save_path)
-
-    def _delete_directory(self, save_path):
-        for root, dirs, files in os.walk(save_path, topdown=False):
-            for name in files:
-                file_path = os.path.join(root, name)
-                os.remove(file_path)
-            for name in dirs:
-                dir_path = os.path.join(root, name)
-                os.rmdir(dir_path)
-        shutil.rmtree(save_path)
+            for root, dirs, files in os.walk(self.save_path, topdown=False):
+                for name in files:
+                    file_path = os.path.join(root, name)
+                    os.remove(file_path)
+                for name in dirs:
+                    dir_path = os.path.join(root, name)
+                    os.rmdir(dir_path)
+            shutil.rmtree(self.save_path)
 
     def _gw_alignment(self, eps_list, compute_OT, target_device=None, sampler_seed=42):
         """_summary_
@@ -641,8 +619,8 @@ class PairwiseAnalysis:
         elif '.pt' in ot_path:
             OT = torch.load(ot_path).to("cpu").numpy()
             
-        GWD0_list, OT0_list = self.simulated_annealing(study, k = 1)
-        new_OT = OT0_list[np.argmin(GWD0_list)]
+        # GWD0_list, OT0_list = self.simulated_annealing(study, k = 1)
+        # new_OT = OT0_list[np.argmin(GWD0_list)]
 
         return OT, df_trial
 
@@ -766,7 +744,6 @@ class PairwiseAnalysis:
         self,
         results_dir,
         df_trial=None,
-        filename=None,
         fig_dir=None,
         **kwargs,
     ):
@@ -781,7 +758,7 @@ class PairwiseAnalysis:
         lim_acc = kwargs.get("lim_acc", None)
         
         if df_trial is None:
-            self._save_path_checker(results_dir, filename, compute_OT=False, delete_results=False)
+            self.set_save_and_figure_path(results_dir)
             study = self._run_optimization(compute_OT = False)
             df_trial = study.trials_dataframe()
 
@@ -860,7 +837,7 @@ class PairwiseAnalysis:
             OT_sorted = self.source.func_for_sort_sim_mat(self.OT, category_idx_list=self.source.category_idx_list)
 
         if return_figure:
-            save_file = self.config.data_name + "_" + self.pair_name
+            save_file = self.data_name + "_" + self.pair_name
             if fig_dir is not None:
                 fig_path = os.path.join(fig_dir, f"{save_file}.png")
             else:
@@ -1022,6 +999,7 @@ class AlignRepresentations:
         self,
         config: OptimizationConfig,
         representations_list: List[Representation],
+        data_name = None,
         histogram_matching=False,
         pair_number_list: Union[str, List[List[int]]] = "all",
         metric="cosine",
@@ -1031,7 +1009,7 @@ class AlignRepresentations:
             representations_list (list): a list of Representations
         """
         self.config = config
-
+        self.data_name = data_name
         self.metric = metric
         self.representations_list = representations_list
         self.histogram_matching = histogram_matching
@@ -1050,7 +1028,7 @@ class AlignRepresentations:
             s = self.representations_list[pair[0]]
             t = self.representations_list[pair[1]]
 
-            pairwise = PairwiseAnalysis(config=self.config, source=s, target=t)
+            pairwise = PairwiseAnalysis(config=self.config, source=s, target=t, data_name=self.data_name)
 
             if self.histogram_matching:
                 pairwise.match_sim_mat_distribution()
