@@ -1088,7 +1088,6 @@ class AlignRepresentations:
         show_log=False,
         fig_dir=None,
         ticks=None,
-        filename=None,
         save_dataframe=False,
         target_device=None,
         change_sampler_seed=False,
@@ -1117,7 +1116,6 @@ class AlignRepresentations:
                 show_log=show_log,
                 fig_dir=fig_dir,
                 ticks=ticks,
-                filename=filename,
                 save_dataframe=save_dataframe,
                 target_device=target_device,
                 sampler_seed=sampler_seed,
@@ -1140,7 +1138,6 @@ class AlignRepresentations:
         show_log=False,
         fig_dir=None,
         ticks=None,
-        filename=None,
         save_dataframe=False,
         change_sampler_seed=False,
         fix_sampler_seed=42,
@@ -1231,7 +1228,6 @@ class AlignRepresentations:
                         show_log=False,
                         fig_dir=None,
                         ticks=None,
-                        filename=filename,
                         save_dataframe=save_dataframe,
                         target_device=target_device,
                         sampler_seed=sampler_seed,
@@ -1255,7 +1251,6 @@ class AlignRepresentations:
                     show_log=show_log,
                     fig_dir=fig_dir,
                     ticks=ticks,
-                    filename=filename,
                     save_dataframe=save_dataframe,
                 )
 
@@ -1272,7 +1267,6 @@ class AlignRepresentations:
                 show_log=show_log,
                 fig_dir=fig_dir,
                 ticks=ticks,
-                filename=filename,
                 save_dataframe=save_dataframe,
                 change_sampler_seed=change_sampler_seed,
                 sampler_seed=first_sampler_seed,
@@ -1306,14 +1300,12 @@ class AlignRepresentations:
     def show_optimization_log(
         self,
         results_dir,
-        filename=None,
         fig_dir=None,
         visualization_config=VisualizationConfig(),
     ):
         for pairwise in self.pairwise_list:
             pairwise.get_optimization_log(
                 results_dir=results_dir,
-                filename=filename,
                 fig_dir=fig_dir,
                 **visualization_config(),
             )
