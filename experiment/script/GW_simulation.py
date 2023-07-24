@@ -35,6 +35,31 @@ def add_random_offset(points, max_offset, seed=0):
     
     return points
 
+def add_independent_noise(points, max_noise, seed=0):
+    np.random.seed(seed)
+    noise_x = np.random.uniform(-max_noise, max_noise, size=points.shape[0])
+    noise_y = np.random.uniform(-max_noise, max_noise, size=points.shape[0])
+    
+    points_with_noise = points + np.column_stack((noise_x, noise_y))
+    
+    return points_with_noise
+
+def rotate_points_around_center(points, max_offset, start=0, seed=0):
+    np.random.seed(seed)
+    center = np.mean(points, axis=0)
+    num_points = len(points)
+    angles = np.random.uniform(-max_offset, max_offset, num_points)
+    
+    rotated_points = []
+    for i in range(num_points):
+        idx = (i + start)%num_points
+        angle = angles[idx]
+        rotation_matrix = np.array([[np.cos(angle), -np.sin(angle)],
+                                    [np.sin(angle), np.cos(angle)]])
+        rotated_points.append(np.dot(points[i] - center, rotation_matrix.T) + center)
+    
+    return np.array(rotated_points)
+
 def shuffle_matrix(matrix, N_divide):
     lower_triangle_elements = _extract_lower_triangle(matrix)
     for i in range(N_divide):
@@ -78,21 +103,23 @@ def _rearrange_and_shuffle(original_array, N, m, seed=0):
 N_points = 50
 # get matrices
 circle = create_circle(N=N_points)
-embedding = add_random_offset(circle, max_offset=10)
-sim_mat_1 = distance.cdist(embedding, embedding, "euclidean")
-sim_mat_2 = shuffle_matrix(sim_mat_1, N_divide=500)
+circle = rotate_points_around_center(circle, max_offset=0.8)
+embedding_1 = add_random_offset(circle, max_offset=3)
+embedding_2 = add_independent_noise(embedding_1, max_noise=3)
+#sim_mat_1 = distance.cdist(embedding, embedding, "euclidean")
+#sim_mat_2 = shuffle_matrix(sim_mat_1, N_divide=500)
 
 Group1 = Representation(
     name="Group1",
     metric="euclidean",
-    sim_mat=sim_mat_1,
-    get_embedding=True)
+    embedding=embedding_1,
+    )
 
 Group2 = Representation(
     name="Group2",
     metric="euclidean",
-    sim_mat=sim_mat_2,
-    get_embedding=True
+    embedding=embedding_2,
+    
 )
 
 config = OptimizationConfig(
@@ -104,7 +131,16 @@ config = OptimizationConfig(
 )
 
 vis_config = VisualizationConfig(
-    
+    figsize=(8, 6), 
+    title_size = 15, 
+    cmap = "rocket",
+    cbar_ticks_size=20,
+)
+
+vis_emb = VisualizationConfig(
+    figsize=(8, 8), 
+    legend_size=12,
+    marker_size=60
 )
 
 alignment = AlignRepresentations(
@@ -121,8 +157,8 @@ alignment.show_sim_mat(
 alignment.RSA_get_corr()
 
 # show embeddings
-Group1.show_embedding(dim=2, fig_dir="../results/Simulation_1", fig_name="Group1")
-Group2.show_embedding(dim=2, fig_dir="../results/Simulation_1", fig_name="Group2")
+Group1.show_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_1", fig_name="Group1")
+Group2.show_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_1", fig_name="Group2")
 # %%
 # GW
 alignment.gw_alignment(
@@ -132,7 +168,7 @@ alignment.gw_alignment(
     visualization_config=vis_config
     )
 
-alignment.visualize_embedding(dim=2, fig_dir="../results/Simulation_1")
+alignment.visualize_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_1")
 
 #%%
 
@@ -214,7 +250,10 @@ config = OptimizationConfig(
 )
 
 vis_config = VisualizationConfig(
-    
+    figsize=(8, 6), 
+    title_size = 15, 
+    cmap = "rocket",
+    cbar_ticks_size=20,
 )
 
 alignment = AlignRepresentations(
@@ -231,8 +270,8 @@ alignment.show_sim_mat(
 alignment.RSA_get_corr()
 
 # show embeddings
-Group1.show_embedding(dim=2, fig_dir="../results/Simulation_2", fig_name="Group1")
-Group2.show_embedding(dim=2, fig_dir="../results/Simulation_2", fig_name="Group2")
+Group1.show_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_2", fig_name="Group1")
+Group2.show_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_2", fig_name="Group2")
 # %%
 # GW
 alignment.gw_alignment(
@@ -242,56 +281,32 @@ alignment.gw_alignment(
     visualization_config=vis_config
     )
 
-alignment.visualize_embedding(dim=2, fig_dir="../results/Simulation_2")
+alignment.visualize_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_2")
 # %%
 
 ### Pattern 3
-def add_independent_noise(points, max_noise, seed=0):
-    np.random.seed(seed)
-    noise_x = np.random.uniform(-max_noise, max_noise, size=points.shape[0])
-    noise_y = np.random.uniform(-max_noise, max_noise, size=points.shape[0])
-    
-    points_with_noise = points + np.column_stack((noise_x, noise_y))
-    
-    return points_with_noise
 
-def rotate_point(point, angle_degrees, center=[0, 0]):
-    angle_radians = np.radians(angle_degrees)
-
-    cos_theta = np.cos(angle_radians)
-    sin_theta = np.sin(angle_radians)
-    rotation_matrix = np.array([[cos_theta, -sin_theta], [sin_theta, cos_theta]])
-
-    translated_point = np.array(point) - np.array(center)
-
-    rotated_point = np.dot(translated_point, rotation_matrix)
-
-    result_point = rotated_point + np.array(center)
-
-    return result_point
-
-def generate_cardioid_points_with_start(N, t_start=0):
-    t_values = np.linspace(t_start, t_start + 2*np.pi, N, endpoint=False)
-    x_values = (1 - np.cos(t_values)) * np.cos(t_values)
-    y_values = (1 - np.cos(t_values)) * np.sin(t_values)
-    points = np.column_stack((x_values, y_values))
-    return points
-
-def rotate_points_around_center(points, max_offset, start=0, seed=0):
-    np.random.seed(seed)
-    center = np.mean(points, axis=0)
-    num_points = len(points)
-    angles = np.random.uniform(-max_offset, max_offset, num_points)
-    
-    rotated_points = []
-    for i in range(num_points):
-        idx = (i + start)%num_points
-        angle = angles[idx]
-        rotation_matrix = np.array([[np.cos(angle), -np.sin(angle)],
-                                    [np.sin(angle), np.cos(angle)]])
-        rotated_points.append(np.dot(points[i] - center, rotation_matrix.T) + center)
-    
-    return np.array(rotated_points)
+#def rotate_point(point, angle_degrees, center=[0, 0]):
+#    angle_radians = np.radians(angle_degrees)
+#
+#    cos_theta = np.cos(angle_radians)
+#    sin_theta = np.sin(angle_radians)
+#    rotation_matrix = np.array([[cos_theta, -sin_theta], [sin_theta, cos_theta]])
+#
+#    translated_point = np.array(point) - np.array(center)
+#
+#    rotated_point = np.dot(translated_point, rotation_matrix)
+#
+#    result_point = rotated_point + np.array(center)
+#
+#    return result_point
+#
+#def generate_cardioid_points_with_start(N, t_start=0):
+#    t_values = np.linspace(t_start, t_start + 2*np.pi, N, endpoint=False)
+#    x_values = (1 - np.cos(t_values)) * np.cos(t_values)
+#    y_values = (1 - np.cos(t_values)) * np.sin(t_values)
+#    points = np.column_stack((x_values, y_values))
+#    return points
 
 #%%
 N_points = 50
@@ -332,7 +347,10 @@ alignment = AlignRepresentations(
 )
 
 vis_config = VisualizationConfig(
-    
+    figsize=(8, 6), 
+    title_size = 15, 
+    cmap = "rocket",
+    cbar_ticks_size=20,
 )
 
 # RSA
@@ -344,8 +362,8 @@ alignment.show_sim_mat(
 alignment.RSA_get_corr()
 
 # show embeddings
-Group1.show_embedding(dim=2, fig_dir="../results/Simulation_3", fig_name="Group1")
-Group2.show_embedding(dim=2, fig_dir="../results/Simulation_3", fig_name="Group2")
+Group1.show_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_3", fig_name="Group1")
+Group2.show_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_3", fig_name="Group2")
 
 # %%
 # GW
@@ -356,6 +374,6 @@ alignment.gw_alignment(
     visualization_config=vis_config
     )
 
-alignment.visualize_embedding(dim=2, fig_dir="../results/Simulation_3")
+alignment.visualize_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_3")
 
 # %%
