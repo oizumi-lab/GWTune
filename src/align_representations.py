@@ -1503,6 +1503,9 @@ class AlignRepresentations:
         fig_name="Accuracy_ot_plan.png",
         scatter=True,
     ):
+        # default setting
+        plt.rcParams.update(plt.rcParamsDefault)
+        plt.style.use("seaborn-darkgrid")
         plt.figure(figsize=(5, 3))
 
         if scatter:
