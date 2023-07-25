@@ -97,6 +97,7 @@ class OptimizationConfig:
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
 
+
 class VisualizationConfig:
     def __init__(
         self,
@@ -118,6 +119,7 @@ class VisualizationConfig:
         color_hue=None,
         colorbar_label=None,
         colorbar_range=[0, 1],
+        colorbar_shrink=1,
         markers_list=None,
         marker_size=30,
         color = 'C0',
@@ -153,6 +155,7 @@ class VisualizationConfig:
             'color_hue': color_hue,
             'colorbar_label': colorbar_label,
             'colorbar_range': colorbar_range,
+            'colorbar_shrink': colorbar_shrink,
             'markers_list': markers_list,
             'marker_size': marker_size,
             'color':color,
@@ -274,9 +277,9 @@ class Representation:
 
         if sim_mat_format == "default" or sim_mat_format == "both":
             visualize_functions.show_heatmap(
-                self.sim_mat, 
-                title=self.name, 
-                save_file_name=fig_path, 
+                self.sim_mat,
+                title=self.name,
+                save_file_name=fig_path,
                 **visualization_config(),
             )
 
@@ -361,9 +364,9 @@ class PairwiseAnalysis:
     """
 
     def __init__(
-        self, 
-        config: OptimizationConfig, 
-        source: Representation, 
+        self,
+        config: OptimizationConfig,
+        source: Representation,
         target: Representation,
     ) -> None:
         """
@@ -460,6 +463,7 @@ class PairwiseAnalysis:
     def run_gw(
         self,
         results_dir,
+        save_path: Optional[str] = None,
         eps_list=None,
         compute_OT=False,
         delete_results=False,
@@ -499,6 +503,7 @@ class PairwiseAnalysis:
             results_dir,
             filename,
             compute_OT,
+            save_path=save_path,
             delete_results=delete_results,
         )
 
@@ -515,7 +520,7 @@ class PairwiseAnalysis:
             if not os.path.exists(fig_dir):
                 os.makedirs(fig_dir, exist_ok=True)
 
-
+        Path(fig_dir).mkdir(exist_ok=True, parents=True)
         OT = self._show_OT(
             title=f"$\Gamma$ ({self.pair_name.replace('_', ' ')})",
             return_data=return_data,
@@ -528,12 +533,12 @@ class PairwiseAnalysis:
 
         if show_log:
             self.get_optimization_log(
-                results_dir, 
-                df_trial=df_trial, 
+                results_dir,
+                df_trial=df_trial,
                 fig_dir=fig_dir,
                 **visualization_config(),
             )
-        
+
         if save_dataframe:
             df_trial.to_csv(self.save_path + '/' + self.filename + '.csv')
 
@@ -544,6 +549,7 @@ class PairwiseAnalysis:
         results_dir,
         filename,
         compute_OT,
+        save_path: Optional[str] = None,
         delete_results=False,
     ):
         if filename is None:
@@ -551,7 +557,10 @@ class PairwiseAnalysis:
 
         self.filename = filename
 
-        self.save_path = os.path.join(results_dir, self.config.data_name, filename, self.config.init_mat_plan)
+        if save_path is None:
+            self.save_path = os.path.join(results_dir, self.config.data_name, filename, self.config.init_mat_plan)
+        else:
+            self.save_path = save_path
 
         self.figure_path = os.path.join(self.save_path, 'figure')
 
@@ -732,6 +741,7 @@ class PairwiseAnalysis:
         df_trial=None,
         filename=None,
         fig_dir=None,
+        save_path=None,
         **kwargs,
     ):
         figsize = kwargs.get('figsize', (8,6))
@@ -739,13 +749,13 @@ class PairwiseAnalysis:
         show_figure = kwargs.get('show_figure', False)
         plot_eps_log = kwargs.get('plot_eps_log', False)
         cmap = kwargs.get("cmap", 'viridis')
-        
+
         lim_eps = kwargs.get("lim_eps", None)
         lim_gwd = kwargs.get("lim_gwd", None)
         lim_acc = kwargs.get("lim_acc", None)
-        
+
         if df_trial is None:
-            self._save_path_checker(results_dir, filename, compute_OT=False, delete_results=False)
+            self._save_path_checker(results_dir, filename, save_path=save_path, compute_OT=False, delete_results=False)
             study = self._run_optimization(compute_OT = False)
             df_trial = study.trials_dataframe()
 
@@ -754,23 +764,23 @@ class PairwiseAnalysis:
         plt.scatter(df_trial["params_eps"], df_trial["value"], c = 100 * df_trial["user_attrs_best_acc"], s = marker_size, cmap=cmap)
         plt.xlabel("$\epsilon$")
         plt.ylabel("GWD")
-        
+
         if lim_eps is not None:
             plt.xlim(lim_eps)
-        
+
         if lim_gwd is not None:
             plt.ylim(lim_gwd)
-            
+
         if plot_eps_log:
             plt.xscale('log')
-        
+
         plt.title(f"$\epsilon$ - GWD ({self.pair_name.replace('_', ' ')})")
         plt.grid(True, which = 'both')
-        
+
         plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
         plt.tick_params(axis = 'x', rotation = 30,  which="both")
         plt.colorbar(label='accuracy (%)')
-        
+
         plt.tight_layout()
 
         if fig_dir is None:
@@ -783,7 +793,7 @@ class PairwiseAnalysis:
 
         plt.clf()
         plt.close()
-        
+
         plt.figure(figsize=figsize)
         plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap)
         plt.title(self.pair_name.replace('_', ' '))
@@ -791,15 +801,15 @@ class PairwiseAnalysis:
         plt.ylabel("GWD")
         plt.colorbar(label='eps', format = "%.2e")
         plt.grid(True)
-        
+
         if lim_acc is not None:
             plt.xlim(lim_acc)
-        
+
         if lim_gwd is not None:
             plt.ylim(lim_gwd)
-                
+
         plt.tight_layout()
-    
+
         plt.savefig(os.path.join(fig_dir, f"acc_gwd_eps({self.pair_name}).png"))
 
         if show_figure:
@@ -833,7 +843,7 @@ class PairwiseAnalysis:
             if OT_format == "default" or OT_format == "both":
                 visualize_functions.show_heatmap(
                     self.OT,
-                    title=title, 
+                    title=title,
                     save_file_name=fig_path,
                     object_labels = self.source.object_labels,
                     **visualization_config(),
@@ -1064,6 +1074,7 @@ class AlignRepresentations:
     def _single_computation(
         self,
         results_dir,
+        save_path: Optional[str] = None,
         pair_eps_list=None,
         compute_OT=False,
         delete_results=False,
@@ -1093,6 +1104,7 @@ class AlignRepresentations:
 
             OT = pairwise.run_gw(
                 results_dir=results_dir,
+                save_path=save_path,
                 eps_list=eps_list,
                 compute_OT=compute_OT,
                 delete_results=delete_results,
@@ -1116,6 +1128,7 @@ class AlignRepresentations:
     def gw_alignment(
         self,
         results_dir,
+        save_path: Optional[str] = None,
         pair_eps_list=None,
         compute_OT=False,
         delete_results=False,
@@ -1207,6 +1220,7 @@ class AlignRepresentations:
                     future = pool.submit(
                         pairwise.run_gw,
                         results_dir=results_dir,
+                        save_path=save_path,
                         eps_list=eps_list,
                         compute_OT=compute_OT,
                         delete_results=delete_results,
@@ -1231,6 +1245,7 @@ class AlignRepresentations:
             if return_figure or return_data:
                 OT_list = self._single_computation(
                     results_dir=results_dir,
+                    save_path=save_path,
                     pair_eps_list=pair_eps_list,
                     compute_OT=False,
                     delete_results=False,
@@ -1248,6 +1263,7 @@ class AlignRepresentations:
         if self.config.n_jobs == 1:
             OT_list = self._single_computation(
                 results_dir=results_dir,
+                save_path=save_path,
                 pair_eps_list=pair_eps_list,
                 compute_OT=compute_OT,
                 delete_results=delete_results,
@@ -1296,6 +1312,10 @@ class AlignRepresentations:
         fig_dir=None,
         visualization_config=VisualizationConfig(),
     ):
+        # default setting
+        plt.rcParams.update(plt.rcParamsDefault)
+        plt.style.use("seaborn-darkgrid")
+
         for pairwise in self.pairwise_list:
             pairwise.get_optimization_log(
                 results_dir=results_dir,
@@ -1487,6 +1507,9 @@ class AlignRepresentations:
         fig_name="Accuracy_ot_plan.png",
         scatter=True,
     ):
+        # default setting
+        plt.rcParams.update(plt.rcParamsDefault)
+        plt.style.use("seaborn-darkgrid")
         plt.figure(figsize=(5, 3))
 
         if scatter:
