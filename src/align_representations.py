@@ -1312,6 +1312,10 @@ class AlignRepresentations:
         fig_dir=None,
         visualization_config=VisualizationConfig(),
     ):
+        # default setting
+        plt.rcParams.update(plt.rcParamsDefault)
+        plt.style.use("seaborn-darkgrid")
+
         for pairwise in self.pairwise_list:
             pairwise.get_optimization_log(
                 results_dir=results_dir,
