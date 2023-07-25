@@ -97,6 +97,7 @@ class OptimizationConfig:
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
 
+
 class VisualizationConfig:
     def __init__(
         self,
@@ -118,6 +119,7 @@ class VisualizationConfig:
         color_hue=None,
         colorbar_label=None,
         colorbar_range=[0, 1],
+        colorbar_shrink=1,
         markers_list=None,
         marker_size=30,
         color = 'C0',
@@ -153,6 +155,7 @@ class VisualizationConfig:
             'color_hue': color_hue,
             'colorbar_label': colorbar_label,
             'colorbar_range': colorbar_range,
+            'colorbar_shrink': colorbar_shrink,
             'markers_list': markers_list,
             'marker_size': marker_size,
             'color':color,
