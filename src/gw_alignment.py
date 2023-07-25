@@ -294,7 +294,7 @@ class MainGromovWasserstainComputation:
             optuna.TrialPruned: _description_
         """
 
-        if math.isinf(gw_loss) or gw_loss <= 0.0:
+        if math.isinf(gw_loss) or gw_loss <= 0.0 or math.isnan(gw_loss):
             raise optuna.TrialPruned(f"Trial for '{init_mat_plan}' was pruned with parameters: {{'eps': {eps:.5e}, 'gw_loss': '{gw_loss:.5e}'}}")
 
         if num_iter is None:
@@ -362,10 +362,6 @@ class MainGromovWasserstainComputation:
             else:
                 best_flag = False
 
-        # 後で修正する
-        if num_iter is None:
-            num_iter = 10
-
         self._check_pruner_should_work(
             logv["gw_dist"],
             trial,
@@ -375,7 +371,6 @@ class MainGromovWasserstainComputation:
         )
 
         return logv, trial, best_flag
-
 
     def compute_GW_with_init_plans(
         self,

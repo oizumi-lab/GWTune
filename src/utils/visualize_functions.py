@@ -248,7 +248,6 @@ class VisualizeEmbedding():
         legend = True,
         title = None,
         save_dir = None,
-        shrink = 0.8,
         **kwargs
     ):
         figsize = kwargs.get('figsize', (15, 15))
@@ -307,7 +306,6 @@ class VisualizeEmbedding():
 
         else:
             raise ValueError("'dim' is either 2 or 3")
-
         ax.grid(True)
         ax.xaxis.set_ticklabels([])
         ax.yaxis.set_ticklabels([])
@@ -334,6 +332,7 @@ class VisualizeEmbedding():
 
                 else:
                     ax.scatter(x = [], y = [], marker = "o", color = main_colors[i], s = marker_size, alpha = 1, label = category)
+        ax.set_axisbelow(True)
 
         if legend:
             ax.legend(fontsize = legend_size, loc = "best")
