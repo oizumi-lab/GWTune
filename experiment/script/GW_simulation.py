@@ -60,44 +60,44 @@ def rotate_points_around_center(points, max_offset, start=0, seed=0):
     
     return np.array(rotated_points)
 
-def shuffle_matrix(matrix, N_divide):
-    lower_triangle_elements = _extract_lower_triangle(matrix)
-    for i in range(N_divide):
-        lower_triangle_elements = _rearrange_and_shuffle(lower_triangle_elements, N=N_divide, m=i)
-    shuffled_matrix = _create_symmetric_matrix(lower_triangle_elements, size=matrix.shape[0])
-    return shuffled_matrix
-    
-def _extract_lower_triangle(matrix):
-    lower_triangle_idx = np.tril_indices(matrix.shape[0], k=-1)
-    return matrix[lower_triangle_idx].flatten()
-
-def _create_symmetric_matrix(lower_triangle_array, size):
-    lower_triangle = np.zeros((size, size))
-    lower_triangle[np.tril_indices(size, k=-1)] = lower_triangle_array
-    symmetric_matrix = lower_triangle + lower_triangle.T
-    return symmetric_matrix
-
-
-def _rearrange_and_shuffle(original_array, N, m, seed=0):
-    sorted_array = np.sort(original_array)[::-1]
-
-    array_length = len(sorted_array)
-    segment_length = array_length // N
-
-    start_index = m * segment_length
-    end_index = (m + 1) * segment_length if m < N - 1 else array_length
-    extracted_segment = sorted_array[start_index:end_index]
-
-    np.random.seed(seed)
-    np.random.shuffle(extracted_segment)
-
-    shuffled_array = np.copy(sorted_array)
-    shuffled_array[start_index:end_index] = extracted_segment
-
-    original_order_indices = np.argsort(original_array)[::-1]
-    final_array = shuffled_array[original_order_indices]
-
-    return final_array
+#def shuffle_matrix(matrix, N_divide):
+#    lower_triangle_elements = _extract_lower_triangle(matrix)
+#    for i in range(N_divide):
+#        lower_triangle_elements = _rearrange_and_shuffle(lower_triangle_elements, N=N_divide, m=i)
+#    shuffled_matrix = _create_symmetric_matrix(lower_triangle_elements, size=matrix.shape[0])
+#    return shuffled_matrix
+#    
+#def _extract_lower_triangle(matrix):
+#    lower_triangle_idx = np.tril_indices(matrix.shape[0], k=-1)
+#    return matrix[lower_triangle_idx].flatten()
+#
+#def _create_symmetric_matrix(lower_triangle_array, size):
+#    lower_triangle = np.zeros((size, size))
+#    lower_triangle[np.tril_indices(size, k=-1)] = lower_triangle_array
+#    symmetric_matrix = lower_triangle + lower_triangle.T
+#    return symmetric_matrix
+#
+#
+#def _rearrange_and_shuffle(original_array, N, m, seed=0):
+#    sorted_array = np.sort(original_array)[::-1]
+#
+#    array_length = len(sorted_array)
+#    segment_length = array_length // N
+#
+#    start_index = m * segment_length
+#    end_index = (m + 1) * segment_length if m < N - 1 else array_length
+#    extracted_segment = sorted_array[start_index:end_index]
+#
+#    np.random.seed(seed)
+#    np.random.shuffle(extracted_segment)
+#
+#    shuffled_array = np.copy(sorted_array)
+#    shuffled_array[start_index:end_index] = extracted_segment
+#
+#    original_order_indices = np.argsort(original_array)[::-1]
+#    final_array = shuffled_array[original_order_indices]
+#
+#    return final_array
 
 #%%
 N_points = 50
@@ -134,7 +134,7 @@ vis_config = VisualizationConfig(
     figsize=(8, 6), 
     title_size = 15, 
     cmap = "rocket",
-    cbar_ticks_size=20,
+    cbar_ticks_size=10,
 )
 
 vis_emb = VisualizationConfig(
@@ -253,7 +253,7 @@ vis_config = VisualizationConfig(
     figsize=(8, 6), 
     title_size = 15, 
     cmap = "rocket",
-    cbar_ticks_size=20,
+    cbar_ticks_size=10,
 )
 
 alignment = AlignRepresentations(
@@ -350,7 +350,7 @@ vis_config = VisualizationConfig(
     figsize=(8, 6), 
     title_size = 15, 
     cmap = "rocket",
-    cbar_ticks_size=20,
+    cbar_ticks_size=10,
 )
 
 # RSA
