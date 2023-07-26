@@ -169,7 +169,6 @@ class VisualizationConfig:
         for key, item in kwargs.items():
             self.visualization_params[key] = item
 
-
 class Representation:
     """
     A class object that has information of a representation, such as embeddings and similarity matrices
@@ -355,6 +354,7 @@ class PairwiseAnalysis:
 
     def __init__(
         self, 
+        results_dir:str,
         config: OptimizationConfig, 
         source: Representation, 
         target: Representation,
@@ -365,6 +365,7 @@ class PairwiseAnalysis:
         """_summary_
 
         Args:
+            results_dir (str): _description_
             config (OptimizationConfig): _description_
             source (Representation): _description_
             target (Representation): _description_
@@ -372,6 +373,7 @@ class PairwiseAnalysis:
             data_name (_type_, optional): _description_. Defaults to None.
             filename (_type_, optional): _description_. Defaults to None.
         """
+        
         self.source = source
         self.target = target
         self.config = config
@@ -387,8 +389,11 @@ class PairwiseAnalysis:
             self.filename = self.data_name + "_" + self.pair_name
         else:
             self.filename = filename
-
-        # assert self.source.sim_mat.shape == self.target.sim_mat.shape, "the shape of sim_mat is not the same."
+        
+        self.results_dir = results_dir
+        self.save_path = os.path.join(results_dir, self.data_name, self.filename, self.config.init_mat_plan)
+        self.figure_path = os.path.join(self.save_path, 'figure')
+        self.data_path = os.path.join(self.save_path, 'data')
 
         assert np.array_equal(
             self.source.num_category_list, self.target.num_category_list
@@ -397,19 +402,11 @@ class PairwiseAnalysis:
         assert np.array_equal(
             self.source.object_labels, self.target.object_labels
         ), "the label information doesn't seem to be the same."
-    
-    def set_save_and_figure_path(self, results_dir):
-        self.save_path = os.path.join(results_dir, self.data_name, self.filename, self.config.init_mat_plan)
-
-        self.figure_path = os.path.join(self.save_path, 'figure')
-
-        self.data_path = os.path.join(self.save_path, 'data')
-
+        
         # Generate the URL for the database. Syntax differs for SQLite and others.
         if self.config.db_params["drivername"] == "sqlite":
             self.storage = "sqlite:///" + self.save_path + "/" + self.filename + "_" + self.config.init_mat_plan + ".db"
         else:
-            # self.storage = URL.create(database=filename, **self.config.db_params).render_as_string(hide_password=False)
             self.storage = URL.create(
                 database=self.filename + "_" + self.config.init_mat_plan,
                 **self.config.db_params).render_as_string(hide_password=False)
@@ -485,7 +482,6 @@ class PairwiseAnalysis:
 
     def run_gw(
         self,
-        results_dir,
         eps_list=None,
         compute_OT=False,
         delete_results=False,
@@ -521,8 +517,6 @@ class PairwiseAnalysis:
             _type_: _description_
         """
         
-        self.set_save_and_figure_path(results_dir)
-        
         # Delete the previous results if the flag is True.
         if delete_results:
             self.delete_prev_results()
@@ -553,8 +547,6 @@ class PairwiseAnalysis:
 
         if show_log:
             self.get_optimization_log(
-                results_dir, 
-                df_trial=df_trial, 
                 fig_dir=fig_dir,
                 **visualization_config(),
             )
@@ -742,8 +734,6 @@ class PairwiseAnalysis:
 
     def get_optimization_log(
         self,
-        results_dir,
-        df_trial=None,
         fig_dir=None,
         **kwargs,
     ):
@@ -756,11 +746,9 @@ class PairwiseAnalysis:
         lim_eps = kwargs.get("lim_eps", None)
         lim_gwd = kwargs.get("lim_gwd", None)
         lim_acc = kwargs.get("lim_acc", None)
-        
-        if df_trial is None:
-            self.set_save_and_figure_path(results_dir)
-            study = self._run_optimization(compute_OT = False)
-            df_trial = study.trials_dataframe()
+       
+        study = self._run_optimization(compute_OT = False)
+        df_trial = study.trials_dataframe()
 
         # figure plotting epsilon as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
@@ -999,20 +987,43 @@ class AlignRepresentations:
         self,
         config: OptimizationConfig,
         representations_list: List[Representation],
-        data_name = None,
         histogram_matching=False,
-        pair_number_list: Union[str, List[List[int]]] = "all",
         metric="cosine",
+        pair_number_list: Union[str, List[List[int]]] = "all",
+        main_results_dir:str = None,
+        data_name:str = None,
+        results_dir_list:List = None,
+        pair_name_list:List = None,
+        file_name_list:List = None,
     ) -> None:
-        """
+        """_summary_
+
         Args:
-            representations_list (list): a list of Representations
+            config (OptimizationConfig): _description_
+            representations_list (List[Representation]): _description_
+            histogram_matching (bool, optional): _description_. Defaults to False.
+            metric (str, optional): _description_. Defaults to "cosine".
+            pair_number_list (Union[str, List[List[int]]], optional): _description_. Defaults to "all".
+            main_results_dir (str, optional): _description_. Defaults to None.
+            data_name (str, optional): _description_. Defaults to None.
+            results_dir_list (List, optional): _description_. Defaults to None.
+            pair_name_list (List, optional): _description_. Defaults to None.
+            file_name_list (List, optional): _description_. Defaults to None.
         """
+        
         self.config = config
         self.data_name = data_name
         self.metric = metric
         self.representations_list = representations_list
         self.histogram_matching = histogram_matching
+        
+        self.results_dir_list = results_dir_list
+        self.pair_name_list = pair_name_list
+        self.file_name_list = file_name_list
+        
+        self.main_results_dir = main_results_dir
+        self.main_pair_name = None
+        self.main_file_name = None
 
         self.pairwise_list = self._get_pairwise_list(pair_number_list)
         self.RSA_corr = dict()
@@ -1024,11 +1035,41 @@ class AlignRepresentations:
             self.pair_number_list = pair_number_list
 
         pairwise_list = []
+        
         for i, pair in enumerate(self.pair_number_list):
             s = self.representations_list[pair[0]]
             t = self.representations_list[pair[1]]
+            
+            if self.results_dir_list is None:
+                results_dir = self.main_results_dir
+            elif isinstance(self.results_dir_list, list):
+                results_dir = self.results_dir_list[i]
+            else:
+                raise ValueError("result_dir_list needs to be list of str.")
+            
+            if self.pair_name_list is None:
+                pair_name = self.main_pair_name
+            elif isinstance(self.pair_name_list, list):
+                pair_name = self.pair_name_list[i]
+            else:
+                raise ValueError("pair_name_list needs to be list of str.")
+            
+            if self.file_name_list is None:
+                filename = self.main_file_name
+            elif isinstance(self.file_name_list, list):
+                filename = self.file_name_list[i]
+            else:
+                raise ValueError("pair_name_list needs to be list of str.")
 
-            pairwise = PairwiseAnalysis(config=self.config, source=s, target=t, data_name=self.data_name)
+            pairwise = PairwiseAnalysis(
+                results_dir=results_dir, 
+                config=self.config, 
+                source=s, 
+                target=t, 
+                data_name=self.data_name,
+                pair_name=pair_name,
+                filename=filename,
+            )
 
             if self.histogram_matching:
                 pairwise.match_sim_mat_distribution()
@@ -1077,7 +1118,6 @@ class AlignRepresentations:
 
     def _single_computation(
         self,
-        results_dir,
         pair_eps_list=None,
         compute_OT=False,
         delete_results=False,
@@ -1105,7 +1145,6 @@ class AlignRepresentations:
                 eps_list = self.config.eps_list
 
             OT = pairwise.run_gw(
-                results_dir=results_dir,
                 eps_list=eps_list,
                 compute_OT=compute_OT,
                 delete_results=delete_results,
@@ -1127,7 +1166,6 @@ class AlignRepresentations:
 
     def gw_alignment(
         self,
-        results_dir,
         pair_eps_list=None,
         compute_OT=False,
         delete_results=False,
@@ -1217,7 +1255,6 @@ class AlignRepresentations:
 
                     future = pool.submit(
                         pairwise.run_gw,
-                        results_dir=results_dir,
                         eps_list=eps_list,
                         compute_OT=compute_OT,
                         delete_results=delete_results,
@@ -1240,7 +1277,6 @@ class AlignRepresentations:
 
             if return_figure or return_data:
                 OT_list = self._single_computation(
-                    results_dir=results_dir,
                     pair_eps_list=pair_eps_list,
                     compute_OT=False,
                     delete_results=False,
@@ -1256,7 +1292,6 @@ class AlignRepresentations:
 
         if self.config.n_jobs == 1:
             OT_list = self._single_computation(
-                results_dir=results_dir,
                 pair_eps_list=pair_eps_list,
                 compute_OT=compute_OT,
                 delete_results=delete_results,
@@ -1299,13 +1334,11 @@ class AlignRepresentations:
 
     def show_optimization_log(
         self,
-        results_dir,
         fig_dir=None,
         visualization_config=VisualizationConfig(),
     ):
         for pairwise in self.pairwise_list:
             pairwise.get_optimization_log(
-                results_dir=results_dir,
                 fig_dir=fig_dir,
                 **visualization_config(),
             )
@@ -1332,7 +1365,6 @@ class AlignRepresentations:
         self,
         pivot,
         n_iter,
-        results_dir,
         compute_OT=False,
         delete_results=False,
         return_data=False,
@@ -1353,10 +1385,17 @@ class AlignRepresentations:
         # GW alignment to the pivot
         # ここの部分はあとでself.gw_alignmentの中に組み込む
         for representation in others_representaions:
-            pairwise = PairwiseAnalysis(config=self.config, source=representation, target=pivot_representation)
+            pairwise = PairwiseAnalysis(
+                results_dir=self.main_results_dir,
+                config=self.config, 
+                source=representation, 
+                target=pivot_representation,
+                data_name=self.data_name,
+                pair_name=self.main_pair_name,
+                filename=self.main_file_name,
+            )
 
             pairwise.run_gw(
-                results_dir=results_dir,
                 compute_OT=compute_OT,
                 delete_results=delete_results,
                 return_data=return_data,
@@ -1382,7 +1421,15 @@ class AlignRepresentations:
         # Set pairwises whose target is the barycenter
         pairwise_barycenters = []
         for representation in self.representations_list:
-            pairwise = PairwiseAnalysis(config=self.config, source=representation, target=self.barycenter)
+            pairwise = PairwiseAnalysis(
+                results_dir=self.main_results_dir,
+                config=self.config, 
+                source=representation, 
+                target=self.barycenter,
+                data_name=self.data_name,
+                pair_name=self.main_pair_name,
+                filename=self.main_file_name,
+            )
             pairwise_barycenters.append(pairwise)
 
         # Barycenter alignment
