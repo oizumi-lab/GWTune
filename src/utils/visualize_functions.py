@@ -267,7 +267,7 @@ class VisualizeEmbedding():
                 color_labels, main_colors = get_color_labels_for_category(self.num_category_list, min_saturation = 1, show_labels = False)
 
         if markers_list is None:
-            markers = ['o', 'x', '^', 's', 'v', '<', '>', 'p', '*', 'h', 'H', '+', 'D', 'd', '.', ',', '1', '2', '3', '4', '_', '|'][:len(self.embedding_list)]
+            markers_list = ['o', 'x', '^', 's', 'v', '<', '>', 'p', '*', 'h', 'H', '+', 'D', 'd', '.', ',', '1', '2', '3', '4', '_', '|'][:len(self.embedding_list)]
 
         plt.style.use("default")
         plt.rcParams["grid.color"] = "black"
@@ -309,13 +309,13 @@ class VisualizeEmbedding():
             coords_i = self.embedding_list[i]
             if self.dim == 3:
                 im = ax.scatter(xs = coords_i[:, 0], ys = coords_i[:, 1], zs = coords_i[:, 2],
-                           marker = markers[i], color = color_labels, s = marker_size, alpha = 1, cmap=cmap)
-                ax.scatter([], [], [], marker = markers[i], color = "black", s = marker_size, alpha = 1, label = name_list[i])
+                           marker = markers_list[i], color = color_labels, s = marker_size, alpha = 1, cmap=cmap)
+                ax.scatter([], [], [], marker = markers_list[i], color = "black", s = marker_size, alpha = 1, label = name_list[i])
 
             else:
                 im = ax.scatter(x = coords_i[:, 0], y = coords_i[:, 1],
-                           marker = markers[i], color = color_labels, s = marker_size, alpha = 1, cmap=cmap)
-                ax.scatter(x = [], y = [], marker = markers[i], color = "black", s = marker_size, alpha = 1, label = name_list[i])
+                           marker = markers_list[i], color = color_labels, s = marker_size, alpha = 1, cmap=cmap)
+                ax.scatter(x = [], y = [], marker = markers_list[i], color = "black", s = marker_size, alpha = 1, label = name_list[i])
 
         if self.category_name_list is not None:
             for i, category in enumerate(self.category_name_list):
