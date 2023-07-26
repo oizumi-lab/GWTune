@@ -499,7 +499,6 @@ class PairwiseAnalysis:
         """_summary_
 
         Args:
-            results_dir (_type_): _description_
             compute_OT (bool, optional): _description_. Defaults to False.
             delete_results (bool, optional): _description_. Defaults to False.
             OT_format (str, optional): _description_. Defaults to "default".
@@ -732,11 +731,7 @@ class PairwiseAnalysis:
         
         return GWD0_list, OT0_list
 
-    def get_optimization_log(
-        self,
-        fig_dir=None,
-        **kwargs,
-    ):
+    def get_optimization_log(self, fig_dir=None, **kwargs):
         figsize = kwargs.get('figsize', (8,6))
         marker_size = kwargs.get('marker_size', 20)
         show_figure = kwargs.get('show_figure', False)
