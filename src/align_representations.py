@@ -1043,6 +1043,7 @@ class AlignRepresentations:
             if self.results_dir_list is None:
                 results_dir = self.main_results_dir
             elif isinstance(self.results_dir_list, list):
+                assert isinstance(self.results_dir_list[i], str)
                 results_dir = self.results_dir_list[i]
             else:
                 raise ValueError("result_dir_list needs to be list of str.")
@@ -1050,6 +1051,7 @@ class AlignRepresentations:
             if self.pair_name_list is None:
                 pair_name = self.main_pair_name
             elif isinstance(self.pair_name_list, list):
+                assert isinstance(self.pair_name_list[i], str)
                 pair_name = self.pair_name_list[i]
             else:
                 raise ValueError("pair_name_list needs to be list of str.")
@@ -1057,6 +1059,7 @@ class AlignRepresentations:
             if self.file_name_list is None:
                 filename = self.main_file_name
             elif isinstance(self.file_name_list, list):
+                assert isinstance(self.file_name_list[i], str)
                 filename = self.file_name_list[i]
             else:
                 raise ValueError("pair_name_list needs to be list of str.")
