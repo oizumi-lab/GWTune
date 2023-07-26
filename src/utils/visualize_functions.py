@@ -321,8 +321,8 @@ class VisualizeEmbedding():
 
             else:
                 im = ax.scatter(x = coords_i[:, 0], y = coords_i[:, 1],
-                           marker = markers[i], color = color_labels, s = marker_size, alpha = 1, cmap=cmap)
-                ax.scatter(x = [], y = [], marker = markers[i], color = "black", s = marker_size, alpha = 1, label = name_list[i])
+                           marker = markers_list[i], color = color_labels, s = marker_size, alpha = 1, cmap=cmap)
+                ax.scatter(x = [], y = [], marker = markers_list[i], color = "black", s = marker_size, alpha = 1, label = name_list[i])
                 ax.set_aspect('equal')
 
         if self.category_name_list is not None:
