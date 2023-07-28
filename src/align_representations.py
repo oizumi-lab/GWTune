@@ -481,7 +481,7 @@ class PairwiseAnalysis:
         else:
             self.target.sim_mat = new_target
 
-    def run_gw(
+    def run_entropic_gwot(
         self,
         eps_list=None,
         compute_OT=False,
@@ -1047,8 +1047,7 @@ class AlignRepresentations:
             
             else:
                 self.pairwise_list = self._get_pairwise_list(self.all_pair_list)
-                
-    
+                 
     def _get_pairwise_list(self, pair_list):
         pairwise_list = []
         
@@ -1078,7 +1077,7 @@ class AlignRepresentations:
                 filename=self.main_file_name,
             )
             
-            print('pair:', pairwise.pair_name, ', eps_list:', config_copy.eps_list)
+            print('pair:', pairwise.pair_name, 'eps_list:', config_copy.eps_list)
 
             if self.histogram_matching:
                 pairwise.match_sim_mat_distribution()
@@ -1145,7 +1144,7 @@ class AlignRepresentations:
             if change_sampler_seed:
                 sampler_seed += 1
 
-            OT = pairwise.run_gw(
+            OT = pairwise.run_entropic_gwot(
                 compute_OT=compute_OT,
                 delete_results=delete_results,
                 return_data=return_data,
@@ -1247,7 +1246,7 @@ class AlignRepresentations:
                         sampler_seed = first_sampler_seed
 
                     future = pool.submit(
-                        pairwise.run_gw,
+                        pairwise.run_entropic_gwot,
                         compute_OT=compute_OT,
                         delete_results=delete_results,
                         return_data=False,
