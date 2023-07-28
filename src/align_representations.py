@@ -1040,6 +1040,7 @@ class AlignRepresentations:
                 
                 specific_pair_list.extend(rep_list)
             
+            self.pair_list = specific_pair_list
             self.pairwise_list = self._get_pairwise_list(specific_pair_list)
             
             return specific_pair_list
