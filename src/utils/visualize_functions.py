@@ -315,9 +315,18 @@ class VisualizeEmbedding():
         for i in range(len(self.embedding_list)):
             coords_i = self.embedding_list[i]
             if self.dim == 3:
-                im = ax.scatter(xs = coords_i[:, 0], ys = coords_i[:, 1], zs = coords_i[:, 2],
-                           marker = markers[i], color = color_labels, s = marker_size, alpha = 1, cmap=cmap)
-                ax.scatter([], [], [], marker = markers[i], color = "black", s = marker_size, alpha = 1, label = name_list[i])
+                im = ax.scatter(
+                    xs = coords_i[:, 0], 
+                    ys = coords_i[:, 1], 
+                    zs = coords_i[:, 2],       
+                    marker = markers_list[i], 
+                    color = color_labels, 
+                    s = marker_size, 
+                    alpha = 1, 
+                    cmap=cmap,
+                )
+                
+                ax.scatter([], [], [], marker = markers_list[i], color = "black", s = marker_size, alpha = 1, label = name_list[i].replace("_", " "))
 
             else:
                 im = ax.scatter(
