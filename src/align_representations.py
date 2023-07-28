@@ -1387,7 +1387,7 @@ class AlignRepresentations:
                 filename=self.main_file_name,
             )
 
-            pairwise.run_gw(
+            pairwise.run_entropic_gwot(
                 compute_OT=compute_OT,
                 delete_results=delete_results,
                 return_data=return_data,
