@@ -539,7 +539,6 @@ class PairwiseAnalysis:
             if not os.path.exists(fig_dir):
                 os.makedirs(fig_dir, exist_ok=True)
 
-        Path(fig_dir).mkdir(exist_ok=True, parents=True)
         OT = self._show_OT(
             title=f"$\Gamma$ ({self.pair_name.replace('_', ' ')})",
             return_data=return_data,
