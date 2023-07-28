@@ -1012,15 +1012,15 @@ class AlignRepresentations:
 
         self.RSA_corr = dict()
         
-        self.pair_number_list = list(itertools.combinations(range(len(self.representations_list)), 2))
-        
         self.name_list = [rep.name for rep in self.representations_list]
         
-        self.pair_list = self.set_specific_pairwise_list(specific_eps_list)
+        self.all_pair_list = list(itertools.combinations(range(len(self.representations_list)), 2))
         
-        self.pairwise_list = self._get_pairwise_list(self.pair_number_list)
+        self.set_specific_pairwise_list(specific_eps_list = specific_eps_list)
 
-    def set_specific_pairwise_list(self, specific_eps_list:dict = None) -> List[PairwiseAnalysis]:       
+        self.pairwise_list = self._get_pairwise_list(self.all_pair_list)
+
+    def set_specific_pairwise_list(self, specific_eps_list:dict = None, specific_only = False) -> List[PairwiseAnalysis]:       
         self.specific_eps_list = specific_eps_list
         
         if specific_eps_list is not None:
@@ -1036,17 +1036,18 @@ class AlignRepresentations:
                     
                 else:
                     rep_idx = self.name_list.index(key)
-                    rep_list = [nn for nn in self.pair_number_list if rep_idx in nn]
+                    rep_list = [nn for nn in self.all_pair_list if rep_idx in nn]
                 
                 specific_pair_list.extend(rep_list)
             
-            self.pair_list = specific_pair_list
-            self.pairwise_list = self._get_pairwise_list(specific_pair_list)
+            self.specific_pair_list = specific_pair_list
             
-            return specific_pair_list
-        
-        else:
-            return self.pair_number_list    
+            if specific_only:
+                self.pairwise_list = self._get_pairwise_list(specific_pair_list)
+            
+            else:
+                self.pairwise_list = self._get_pairwise_list(self.all_pair_list)
+                
     
     def _get_pairwise_list(self, pair_list):
         pairwise_list = []
@@ -1061,10 +1062,11 @@ class AlignRepresentations:
             t = self.representations_list[pair[1]]
                   
             if isinstance(self.specific_eps_list, dict):
+                pair_name = f"{s.name}_vs_{t.name}"
                 if s.name in self.specific_eps_list.keys():
                     config_copy.eps_list = self.specific_eps_list[s.name]
-                else:
-                    config_copy.eps_list = self.specific_eps_list[f"{s.name}_vs_{t.name}"]
+                elif pair_name in self.specific_eps_list.keys():
+                    config_copy.eps_list = self.specific_eps_list[pair_name]
 
             pairwise = PairwiseAnalysis(
                 results_dir=self.main_results_dir, 
@@ -1076,7 +1078,7 @@ class AlignRepresentations:
                 filename=self.main_file_name,
             )
             
-            print('pair:', pairwise.pair_name, 'eps_list:', config_copy.eps_list)
+            print('pair:', pairwise.pair_name, ', eps_list:', config_copy.eps_list)
 
             if self.histogram_matching:
                 pairwise.match_sim_mat_distribution()
@@ -1364,7 +1366,7 @@ class AlignRepresentations:
         ticks=None,
     ):
 
-        assert self.pair_list == range(len(self.pairwise_list))
+        assert self.all_pair_list == range(len(self.pairwise_list))
 
         # Select the pivot
         pivot_representation = self.representations_list[pivot]
@@ -1580,7 +1582,7 @@ class AlignRepresentations:
     def _check_pairs(self, pivot):
         the_others = set()
         pivot_idx_list = [] # [pair_idx, paivot_idx]
-        for i, pair in enumerate(self.pair_list):
+        for i, pair in enumerate(self.all_pair_list):
             if pivot in pair:
                 the_others.add(filter(lambda x: x != pivot, pair))
 
