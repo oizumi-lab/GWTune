@@ -95,7 +95,6 @@ class OptimizationConfig:
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
 
-
 class VisualizationConfig:
     def __init__(
         self,
