@@ -95,6 +95,7 @@ class OptimizationConfig:
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
 
+
 class VisualizationConfig:
     def __init__(
         self,
@@ -114,6 +115,9 @@ class VisualizationConfig:
         zlabel_size=15,
         color_labels=None,
         color_hue=None,
+        colorbar_label=None,
+        colorbar_range=[0, 1],
+        colorbar_shrink=1,
         markers_list=None,
         marker_size=30,
         color = 'C0',
@@ -147,6 +151,9 @@ class VisualizationConfig:
             'zlabel_size': zlabel_size,
             'color_labels': color_labels,
             'color_hue': color_hue,
+            'colorbar_label': colorbar_label,
+            'colorbar_range': colorbar_range,
+            'colorbar_shrink': colorbar_shrink,
             'markers_list': markers_list,
             'marker_size': marker_size,
             'color':color,
@@ -267,9 +274,9 @@ class Representation:
 
         if sim_mat_format == "default" or sim_mat_format == "both":
             visualize_functions.show_heatmap(
-                self.sim_mat, 
-                title=self.name, 
-                save_file_name=fig_path, 
+                self.sim_mat,
+                title=self.name,
+                save_file_name=fig_path,
                 **visualization_config(),
             )
 
@@ -483,7 +490,6 @@ class PairwiseAnalysis:
 
     def run_entropic_gwot(
         self,
-        eps_list=None,
         compute_OT=False,
         delete_results=False,
         OT_format="default",
@@ -522,7 +528,6 @@ class PairwiseAnalysis:
             self.delete_prev_results()
             
         self.OT, df_trial = self._gw_alignment(
-            eps_list,
             compute_OT,
             target_device=target_device,
             sampler_seed=sampler_seed,
@@ -534,7 +539,7 @@ class PairwiseAnalysis:
             if not os.path.exists(fig_dir):
                 os.makedirs(fig_dir, exist_ok=True)
 
-
+        Path(fig_dir).mkdir(exist_ok=True, parents=True)
         OT = self._show_OT(
             title=f"$\Gamma$ ({self.pair_name.replace('_', ' ')})",
             return_data=return_data,
@@ -550,7 +555,7 @@ class PairwiseAnalysis:
                 fig_dir=fig_dir,
                 **visualization_config(),
             )
-        
+
         if save_dataframe:
             df_trial.to_csv(self.save_path + '/' + self.filename + '.csv')
 
@@ -571,7 +576,7 @@ class PairwiseAnalysis:
                     os.rmdir(dir_path)
             shutil.rmtree(self.save_path)
 
-    def _gw_alignment(self, eps_list, compute_OT, target_device=None, sampler_seed=42):
+    def _gw_alignment(self, compute_OT, target_device=None, sampler_seed=42):
         """_summary_
 
         Args:
@@ -594,7 +599,6 @@ class PairwiseAnalysis:
             compute_OT = True
 
         study = self._run_optimization(
-            eps_list = eps_list,
             compute_OT = compute_OT,
             target_device = target_device,
             sampler_seed = sampler_seed,
@@ -618,7 +622,6 @@ class PairwiseAnalysis:
 
     def _run_optimization(
         self,
-        eps_list=None,
         compute_OT=False,
         target_device = None,
         sampler_seed = 42,
@@ -666,12 +669,9 @@ class PairwiseAnalysis:
             if self.config.init_mat_plan == "user_define":
                 gw.main_compute.init_mat_builder.set_user_define_init_mat_list(self.config.user_define_init_mat_list)
 
-            if eps_list is None:
-                eps_list = self.config.eps_list
-
             if self.config.sampler_name == "grid":
                 # used only in grid search sampler below the two lines
-                eps_space = opt.define_eps_space(eps_list, self.config.eps_log, self.config.num_trial)
+                eps_space = opt.define_eps_space(self.config.eps_list, self.config.eps_log, self.config.num_trial)
                 search_space = {"eps": eps_space}
             else:
                 search_space = None
@@ -685,7 +685,7 @@ class PairwiseAnalysis:
                 target_device,
                 seed=sampler_seed,
                 init_mat_plan=self.config.init_mat_plan,
-                eps_list=eps_list,
+                eps_list=self.config.eps_list,
                 eps_log=self.config.eps_log,
                 search_space=search_space,
             )
@@ -738,7 +738,7 @@ class PairwiseAnalysis:
         show_figure = kwargs.get('show_figure', False)
         plot_eps_log = kwargs.get('plot_eps_log', False)
         cmap = kwargs.get("cmap", 'viridis')
-        
+
         lim_eps = kwargs.get("lim_eps", None)
         lim_gwd = kwargs.get("lim_gwd", None)
         lim_acc = kwargs.get("lim_acc", None)
@@ -751,23 +751,23 @@ class PairwiseAnalysis:
         plt.scatter(df_trial["params_eps"], df_trial["value"], c = 100 * df_trial["user_attrs_best_acc"], s = marker_size, cmap=cmap)
         plt.xlabel("$\epsilon$")
         plt.ylabel("GWD")
-        
+
         if lim_eps is not None:
             plt.xlim(lim_eps)
-        
+
         if lim_gwd is not None:
             plt.ylim(lim_gwd)
-            
+
         if plot_eps_log:
             plt.xscale('log')
-        
+
         plt.title(f"$\epsilon$ - GWD ({self.pair_name.replace('_', ' ')})")
         plt.grid(True, which = 'both')
-        
+
         plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
         plt.tick_params(axis = 'x', rotation = 30,  which="both")
         plt.colorbar(label='accuracy (%)')
-        
+
         plt.tight_layout()
 
         if fig_dir is None:
@@ -780,7 +780,7 @@ class PairwiseAnalysis:
 
         plt.clf()
         plt.close()
-        
+
         plt.figure(figsize=figsize)
         plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap)
         plt.title(self.pair_name.replace('_', ' '))
@@ -788,15 +788,15 @@ class PairwiseAnalysis:
         plt.ylabel("GWD")
         plt.colorbar(label='eps', format = "%.2e")
         plt.grid(True)
-        
+
         if lim_acc is not None:
             plt.xlim(lim_acc)
-        
+
         if lim_gwd is not None:
             plt.ylim(lim_gwd)
-                
+
         plt.tight_layout()
-    
+
         plt.savefig(os.path.join(fig_dir, f"acc_gwd_eps({self.pair_name}).png"))
 
         if show_figure:
@@ -830,7 +830,7 @@ class PairwiseAnalysis:
             if OT_format == "default" or OT_format == "both":
                 visualize_functions.show_heatmap(
                     self.OT,
-                    title=title, 
+                    title=title,
                     save_file_name=fig_path,
                     object_labels = self.source.object_labels,
                     **visualization_config(),
@@ -1326,6 +1326,10 @@ class AlignRepresentations:
         fig_dir=None,
         visualization_config=VisualizationConfig(),
     ):
+        # default setting
+        plt.rcParams.update(plt.rcParamsDefault)
+        plt.style.use("seaborn-darkgrid")
+
         for pairwise in self.pairwise_list:
             pairwise.get_optimization_log(
                 fig_dir=fig_dir,
@@ -1529,6 +1533,9 @@ class AlignRepresentations:
         fig_name="Accuracy_ot_plan.png",
         scatter=True,
     ):
+        # default setting
+        plt.rcParams.update(plt.rcParamsDefault)
+        plt.style.use("seaborn-darkgrid")
         plt.figure(figsize=(5, 3))
 
         if scatter:
@@ -1601,8 +1608,6 @@ class AlignRepresentations:
         category_idx_list=None,
         title=None,
         legend=True,
-        colorbar_label=None,
-        colorbar_range=[0, 1],
         fig_dir=None,
         fig_name="Aligned_embedding.png",
     ):
@@ -1661,7 +1666,7 @@ class AlignRepresentations:
             )
 
             visualize_embedding.plot_embedding(
-                name_list=name_list, title=title, legend=legend, colorbar_label=colorbar_label, colorbar_range=colorbar_range, save_dir=fig_path, **visualization_config()
+                name_list=name_list, title=title, legend=legend, save_dir=fig_path, **visualization_config()
             )
 
         elif returned == "row_data":
