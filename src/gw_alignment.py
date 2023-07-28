@@ -294,7 +294,10 @@ class MainGromovWasserstainComputation:
             optuna.TrialPruned: _description_
         """
 
-        if math.isinf(gw_loss) or gw_loss <= 0.0 or math.isnan(gw_loss):
+        if math.isinf(gw_loss) or gw_loss <= 0.0:
+            raise optuna.TrialPruned(f"Trial for '{init_mat_plan}' was pruned with parameters: {{'eps': {eps:.5e}, 'gw_loss': '{gw_loss:.5e}'}}")
+
+        if (init_mat_plan not in ["random", "permutation", "user_define"]) and math.isnan(gw_loss):
             raise optuna.TrialPruned(f"Trial for '{init_mat_plan}' was pruned with parameters: {{'eps': {eps:.5e}, 'gw_loss': '{gw_loss:.5e}'}}")
 
         if num_iter is None:
@@ -434,7 +437,7 @@ class MainGromovWasserstainComputation:
                 if best_flag:
                     best_logv = logv
 
-            if self.best_gw_loss == float("inf"):
+            if math.isinf(self.best_gw_loss) or self.best_gw_loss <= 0.0 or math.isnan(self.best_gw_loss):
                 raise optuna.TrialPruned(
                     f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}"
                 )
