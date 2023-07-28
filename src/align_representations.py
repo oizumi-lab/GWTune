@@ -7,6 +7,7 @@ import shutil
 import warnings
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from typing import List, Union, Optional
+import copy
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -972,7 +973,6 @@ class PairwiseAnalysis:
     def get_new_source_embedding(self):
         return self.procrustes(self.target.embedding, self.source.embedding, self.OT)
 
-
 class AlignRepresentations:
     """
     This object has methods for conducting N groups level analysis and corresponding results.
@@ -981,29 +981,23 @@ class AlignRepresentations:
     def __init__(
         self,
         config: OptimizationConfig,
-        representations_list: List[Representation],
+        representations_list:List[Representation],
+        specific_eps_list:dict=None,
         histogram_matching=False,
         metric="cosine",
-        pair_number_list: Union[str, List[List[int]]] = "all",
         main_results_dir:str = None,
         data_name:str = None,
-        results_dir_list:List = None,
-        pair_name_list:List = None,
-        file_name_list:List = None,
     ) -> None:
         """_summary_
 
         Args:
             config (OptimizationConfig): _description_
             representations_list (List[Representation]): _description_
+            specific_eps_list (dict, optional): _description_. Defaults to None.
             histogram_matching (bool, optional): _description_. Defaults to False.
             metric (str, optional): _description_. Defaults to "cosine".
-            pair_number_list (Union[str, List[List[int]]], optional): _description_. Defaults to "all".
             main_results_dir (str, optional): _description_. Defaults to None.
             data_name (str, optional): _description_. Defaults to None.
-            results_dir_list (List, optional): _description_. Defaults to None.
-            pair_name_list (List, optional): _description_. Defaults to None.
-            file_name_list (List, optional): _description_. Defaults to None.
         """
         
         self.config = config
@@ -1011,68 +1005,80 @@ class AlignRepresentations:
         self.metric = metric
         self.representations_list = representations_list
         self.histogram_matching = histogram_matching
-        
-        self.results_dir_list = results_dir_list
-        self.pair_name_list = pair_name_list
-        self.file_name_list = file_name_list
-        
+
         self.main_results_dir = main_results_dir
         self.main_pair_name = None
         self.main_file_name = None
 
-        self.pairwise_list = self._get_pairwise_list(pair_number_list)
         self.RSA_corr = dict()
+        
+        self.pair_number_list = list(itertools.combinations(range(len(self.representations_list)), 2))
+        
+        self.name_list = [rep.name for rep in self.representations_list]
+        
+        self.pair_list = self.set_specific_pairwise_list(specific_eps_list)
+        
+        self.pairwise_list = self._get_pairwise_list(self.pair_number_list)
 
-    def _get_pairwise_list(self, pair_number_list) -> List[PairwiseAnalysis]:
-        if pair_number_list == "all":
-            self.pair_number_list = list(itertools.combinations(range(len(self.representations_list)), 2))
+    def set_specific_pairwise_list(self, specific_eps_list:dict = None) -> List[PairwiseAnalysis]:       
+        self.specific_eps_list = specific_eps_list
+        
+        if specific_eps_list is not None:
+            specific_pair_list = []
+            for key in specific_eps_list.keys():
+                if not key in self.name_list:
+                    source_name, target_name = key.split('_vs_')
+                    
+                    source_idx = self.name_list.index(source_name)
+                    target_idx = self.name_list.index(target_name)
+                    
+                    rep_list = [(source_idx, target_idx)]
+                    
+                else:
+                    rep_idx = self.name_list.index(key)
+                    rep_list = [nn for nn in self.pair_number_list if rep_idx in nn]
+                
+                specific_pair_list.extend(rep_list)
+            
+            self.pairwise_list = self._get_pairwise_list(specific_pair_list)
+            
+            return specific_pair_list
+        
         else:
-            self.pair_number_list = pair_number_list
-
+            return self.pair_number_list    
+    
+    def _get_pairwise_list(self, pair_list):
         pairwise_list = []
         
-        for i, pair in enumerate(self.pair_number_list):
+        print(f"data_name : {self.data_name}")
+        print("Here is the list of all the pairs...")
+  
+        for pair in pair_list:
+            config_copy = copy.deepcopy(self.config)
+            
             s = self.representations_list[pair[0]]
             t = self.representations_list[pair[1]]
-            
-            if self.results_dir_list is None:
-                results_dir = self.main_results_dir
-            elif isinstance(self.results_dir_list, list):
-                assert isinstance(self.results_dir_list[i], str)
-                results_dir = self.results_dir_list[i]
-            else:
-                raise ValueError("result_dir_list needs to be list of str.")
-            
-            if self.pair_name_list is None:
-                pair_name = self.main_pair_name
-            elif isinstance(self.pair_name_list, list):
-                assert isinstance(self.pair_name_list[i], str)
-                pair_name = self.pair_name_list[i]
-            else:
-                raise ValueError("pair_name_list needs to be list of str.")
-            
-            if self.file_name_list is None:
-                filename = self.main_file_name
-            elif isinstance(self.file_name_list, list):
-                assert isinstance(self.file_name_list[i], str)
-                filename = self.file_name_list[i]
-            else:
-                raise ValueError("pair_name_list needs to be list of str.")
+                  
+            if isinstance(self.specific_eps_list, dict):
+                if s.name in self.specific_eps_list.keys():
+                    config_copy.eps_list = self.specific_eps_list[s.name]
+                else:
+                    config_copy.eps_list = self.specific_eps_list[f"{s.name}_vs_{t.name}"]
 
             pairwise = PairwiseAnalysis(
-                results_dir=results_dir, 
-                config=self.config, 
+                results_dir=self.main_results_dir, 
+                config=config_copy, 
                 source=s, 
                 target=t, 
                 data_name=self.data_name,
-                pair_name=pair_name,
-                filename=filename,
+                pair_name=self.main_pair_name,
+                filename=self.main_file_name,
             )
+            
+            print('pair:', pairwise.pair_name, 'eps_list:', config_copy.eps_list)
 
             if self.histogram_matching:
                 pairwise.match_sim_mat_distribution()
-
-            # pairwise.show_both_sim_mats()
 
             pairwise_list.append(pairwise)
 
@@ -1116,7 +1122,6 @@ class AlignRepresentations:
 
     def _single_computation(
         self,
-        pair_eps_list=None,
         compute_OT=False,
         delete_results=False,
         return_data=False,
@@ -1137,13 +1142,7 @@ class AlignRepresentations:
             if change_sampler_seed:
                 sampler_seed += 1
 
-            if isinstance(pair_eps_list, dict):
-                eps_list = pair_eps_list.get(pairwise.pair_name, self.config.eps_list)
-            else:
-                eps_list = self.config.eps_list
-
             OT = pairwise.run_gw(
-                eps_list=eps_list,
                 compute_OT=compute_OT,
                 delete_results=delete_results,
                 return_data=return_data,
@@ -1164,7 +1163,6 @@ class AlignRepresentations:
 
     def gw_alignment(
         self,
-        pair_eps_list=None,
         compute_OT=False,
         delete_results=False,
         return_data=False,
@@ -1182,7 +1180,6 @@ class AlignRepresentations:
         """_summary_
 
         Args:
-            results_dir (_type_): _description_
             compute_OT (bool, optional): _description_. Defaults to False.
             delete_results (bool, optional): _description_. Defaults to False.
             return_data (bool, optional): _description_. Defaults to False.
@@ -1192,13 +1189,13 @@ class AlignRepresentations:
             show_log (bool, optional): _description_. Defaults to False.
             fig_dir (_type_, optional): _description_. Defaults to None.
             ticks (_type_, optional): _description_. Defaults to None.
-            filename (_type_, optional): _description_. Defaults to None.
             save_dataframe (bool, optional): _description_. Defaults to False.
             change_sampler_seed (bool, optional): _description_. Defaults to False.
             fix_sampler_seed (int, optional): _description_. Defaults to 42.
             parallel_method (str, optional): _description_. Defaults to "multithread".
 
         Raises:
+            ValueError: _description_
             ValueError: _description_
             ValueError: _description_
 
@@ -1246,14 +1243,8 @@ class AlignRepresentations:
                     else:
                         sampler_seed = first_sampler_seed
 
-                    if isinstance(pair_eps_list, dict):
-                        eps_list = pair_eps_list.get(pairwise.pair_name, self.config.eps_list)
-                    else:
-                        eps_list = self.config.eps_list
-
                     future = pool.submit(
                         pairwise.run_gw,
-                        eps_list=eps_list,
                         compute_OT=compute_OT,
                         delete_results=delete_results,
                         return_data=False,
@@ -1275,7 +1266,6 @@ class AlignRepresentations:
 
             if return_figure or return_data:
                 OT_list = self._single_computation(
-                    pair_eps_list=pair_eps_list,
                     compute_OT=False,
                     delete_results=False,
                     return_data=return_data,
@@ -1290,7 +1280,6 @@ class AlignRepresentations:
 
         if self.config.n_jobs == 1:
             OT_list = self._single_computation(
-                pair_eps_list=pair_eps_list,
                 compute_OT=compute_OT,
                 delete_results=delete_results,
                 return_data=return_data,
@@ -1374,7 +1363,7 @@ class AlignRepresentations:
         ticks=None,
     ):
 
-        assert self.pair_number_list == range(len(self.pairwise_list))
+        assert self.pair_list == range(len(self.pairwise_list))
 
         # Select the pivot
         pivot_representation = self.representations_list[pivot]
@@ -1568,8 +1557,8 @@ class AlignRepresentations:
     def _procrustes_to_pivot(self, pivot):
         the_others, pivot_idx_list = self._check_pairs(pivot)
 
-        # check whether 'pair_number_list' includes all pairs between the pivot and the other Representations
-        assert len(the_others) == len(self.representations_list)-1, "'pair_number_list' must include all pairs between the pivot and the other Representations."
+        # check whether 'pair_list' includes all pairs between the pivot and the other Representations
+        assert len(the_others) == len(self.representations_list)-1, "'pair_list' must include all pairs between the pivot and the other Representations."
 
         for pair_idx, pivot_idx in pivot_idx_list:
             pairwise = self.pairwise_list[pair_idx]
@@ -1590,7 +1579,7 @@ class AlignRepresentations:
     def _check_pairs(self, pivot):
         the_others = set()
         pivot_idx_list = [] # [pair_idx, paivot_idx]
-        for i, pair in enumerate(self.pair_number_list):
+        for i, pair in enumerate(self.pair_list):
             if pivot in pair:
                 the_others.add(filter(lambda x: x != pivot, pair))
 
