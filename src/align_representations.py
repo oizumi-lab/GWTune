@@ -1052,9 +1052,6 @@ class AlignRepresentations:
                 self.pairwise_list = self._get_pairwise_list(self.specific_pair_list)
             else:
                 self.pairwise_list = self._get_pairwise_list(self.all_pair_list)
-        
-        else:
-            print("eps_list for all the pairs will be the same as `config.eps_list`.")
 
     
     def _specific_pair_list(self, pair_list):
