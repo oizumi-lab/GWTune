@@ -980,6 +980,7 @@ class AlignRepresentations:
         self,
         config: OptimizationConfig,
         representations_list:List[Representation],
+        pairs_computed:List[str]=None,
         specific_eps_list:dict=None,
         histogram_matching=False,
         metric="cosine",
@@ -991,6 +992,7 @@ class AlignRepresentations:
         Args:
             config (OptimizationConfig): _description_
             representations_list (List[Representation]): _description_
+            pairs_computed (List[str], optional): _description_. Defaults to None.
             specific_eps_list (dict, optional): _description_. Defaults to None.
             histogram_matching (bool, optional): _description_. Defaults to False.
             metric (str, optional): _description_. Defaults to "cosine".
@@ -1003,7 +1005,7 @@ class AlignRepresentations:
         self.metric = metric
         self.representations_list = representations_list
         self.histogram_matching = histogram_matching
-
+        
         self.main_results_dir = main_results_dir
         self.main_pair_name = None
         self.main_file_name = None
@@ -1014,43 +1016,73 @@ class AlignRepresentations:
         
         self.all_pair_list = list(itertools.combinations(range(len(self.representations_list)), 2))
         
-        self.set_specific_pairwise_list(specific_eps_list = specific_eps_list)
-
-        self.pairwise_list = self._get_pairwise_list(self.all_pair_list)
-
-    def set_specific_pairwise_list(self, specific_eps_list:dict = None, specific_only = False) -> List[PairwiseAnalysis]:       
+        print(f"data_name : {self.data_name}")
+        
+        self.set_specific_eps_list(specific_eps_list)
+        
+        self.set_pair_computed(pairs_computed)
+        
+    def set_pair_computed(self, pairs_computed:Optional[List]):
+        self.pairs_computed = pairs_computed
+        
+        if pairs_computed is not None:
+            print("The pairs to compute was selected renew_pair_list ...")
+            self.specific_pair_list = self._specific_pair_list(pairs_computed)
+            self.pairwise_list = self._get_pairwise_list(self.specific_pair_list)
+        
+        else:
+            print("All the pairs in the list below will be computed. ")
+            self.pairwise_list = self._get_pairwise_list(self.all_pair_list)
+        
+    def set_specific_eps_list(
+        self, 
+        specific_eps_list:Optional[dict], 
+        specific_only:bool = False,
+    ):       
+        
         self.specific_eps_list = specific_eps_list
         
         if specific_eps_list is not None:
-            specific_pair_list = []
-            for key in specific_eps_list.keys():
-                if not key in self.name_list:
-                    source_name, target_name = key.split('_vs_')
-                    
-                    source_idx = self.name_list.index(source_name)
-                    target_idx = self.name_list.index(target_name)
-                    
-                    rep_list = [(source_idx, target_idx)]
-                    
-                else:
-                    rep_idx = self.name_list.index(key)
-                    rep_list = [nn for nn in self.all_pair_list if rep_idx in nn]
-                
-                specific_pair_list.extend(rep_list)
+            assert isinstance(self.specific_eps_list, dict), "specific_eps_list needs to be dict."
+            print("The range of epsilon for some pairs in the list below was changed ...")
             
-            self.specific_pair_list = specific_pair_list
-            
+            self.specific_pair_list = self._specific_pair_list(specific_eps_list)
+
             if specific_only:
-                self.pairwise_list = self._get_pairwise_list(specific_pair_list)
-            
+                self.pairwise_list = self._get_pairwise_list(self.specific_pair_list)
             else:
                 self.pairwise_list = self._get_pairwise_list(self.all_pair_list)
-                 
+        
+        else:
+            print("eps_list for all the pairs will be the same as `config.eps_list`.")
+
+    
+    def _specific_pair_list(self, pair_list):
+        if isinstance(pair_list, dict):
+            key_loop = pair_list.keys()
+        elif isinstance(pair_list, list):
+            key_loop = pair_list
+
+        specific_pair_list = [] 
+        for key in key_loop:
+            if not key in self.name_list:
+                source_name, target_name = key.split('_vs_')
+                
+                source_idx = self.name_list.index(source_name)
+                target_idx = self.name_list.index(target_name)
+                
+                rep_list = [(source_idx, target_idx)]
+                
+            else:
+                rep_idx = self.name_list.index(key)
+                rep_list = [nn for nn in self.all_pair_list if rep_idx in nn]
+            
+            specific_pair_list.extend(rep_list)
+        
+        return specific_pair_list
+    
     def _get_pairwise_list(self, pair_list):
         pairwise_list = []
-        
-        print(f"data_name : {self.data_name}")
-        print("Here is the list of all the pairs...")
   
         for pair in pair_list:
             config_copy = copy.deepcopy(self.config)
@@ -1058,7 +1090,7 @@ class AlignRepresentations:
             s = self.representations_list[pair[0]]
             t = self.representations_list[pair[1]]
                   
-            if isinstance(self.specific_eps_list, dict):
+            if self.specific_eps_list is not None:
                 pair_name = f"{s.name}_vs_{t.name}"
                 if s.name in self.specific_eps_list.keys():
                     config_copy.eps_list = self.specific_eps_list[s.name]
