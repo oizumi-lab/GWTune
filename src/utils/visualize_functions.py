@@ -131,7 +131,7 @@ def show_heatmap(
     if ot_object_tick and ot_category_tick:
         raise(ValueError, "please turn off either 'ot_category_tick' or 'ot_object_tick'.")
 
-    if  not ot_object_tick and ot_category_tick:
+    if not ot_object_tick and ot_category_tick:
         assert category_name_list is not None
         assert num_category_list is not None
 
