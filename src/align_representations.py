@@ -1026,7 +1026,7 @@ class AlignRepresentations:
         self.pairs_computed = pairs_computed
         
         if pairs_computed is not None:
-            print("The pairs to compute was selected renew_pair_list ...")
+            print("The pairs to compute was selected by pairs_computed...")
             self.specific_pair_list = self._specific_pair_list(pairs_computed)
             self.pairwise_list = self._get_pairwise_list(self.specific_pair_list)
         
