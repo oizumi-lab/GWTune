@@ -692,43 +692,6 @@ class PairwiseAnalysis:
             study = opt.load_study()
 
         return study
-    
-    def simulated_annealing(self, study, k):
-        """
-        GWOT without entropy
-        
-        By using optimal transportation plan obtained with entropic GW 
-        as an initial transportation matrix, we run the optimization of GWOT without entropy.  
-        
-        This procedure further minimizes GWD and enables us to fairly compare GWD values 
-        obtained with different entropy regularization values.  
-        """
-        
-        GWD0_list = list()
-        OT0_list = list()
-        
-        trials = study.trials_dataframe()
-        sorted_trials = trials.sort_values(by="value", ascending=True)
-        top_k_trials = sorted_trials.head(k)
-        top_k_trials = top_k_trials[['number', 'value', 'params_eps']]
-        
-        for i in top_k_trials['number']:
-            ot_path = glob.glob(self.data_path + f"/gw_{i}.*")[0]
-            if '.npy' in ot_path:
-                OT = np.load(ot_path)
-            elif '.pt' in ot_path:
-                OT = torch.load(ot_path).to("cpu").numpy()
-
-            C1 = self.source.sim_mat
-            C2 = self.target.sim_mat
-            p = OT.sum(axis=1)
-            q = OT.sum(axis=0)
-            OT0, log0 = ot.gromov.gromov_wasserstein(C1, C2, p, q, log=True, verbose=False, G0=OT)
-            GWD0 = log0['gw_dist']
-            GWD0_list.append(GWD0)
-            OT0_list.append(OT0)
-        
-        return GWD0_list, OT0_list
 
     def get_optimization_log(self, fig_dir=None, **kwargs):
         figsize = kwargs.get('figsize', (8,6))
@@ -970,7 +933,126 @@ class PairwiseAnalysis:
 
     def get_new_source_embedding(self):
         return self.procrustes(self.target.embedding, self.source.embedding, self.OT)
+    
+    def simulated(self, study, k = None, parallel_method = 'multiprocess'):
+        """
+        By using optimal transportation plan obtained with entropic GW 
+        as an initial transportation matrix, we run the optimization of GWOT without entropy.  
+        
+        This procedure further minimizes GWD and enables us to fairly compare GWD values 
+        obtained with different entropy regularization values.  
+        """
+        
+        GWD0_list = list()
+        OT0_list = list()
+        
+        trials = study.trials_dataframe()
+        sorted_trials = trials.sort_values(by="value", ascending=True)
+        
+        if k is not None:
+            top_k_trials = sorted_trials.head(k)
+            
+        else:
+            top_k_trials = sorted_trials.dropna()
+            
+        top_k_trials = top_k_trials[['number', 'value', 'params_eps']]
+        
+        if parallel_method == "single":
+            for i in top_k_trials['number']:
+                ot_path = glob.glob(self.data_path + f"/gw_{i}.*")[0]
+                if '.npy' in ot_path:
+                    OT = np.load(ot_path)
+                elif '.pt' in ot_path:
+                    OT = torch.load(ot_path).to("cpu").numpy()
 
+                OT0, log0 = self.run_gwot_without_entropic(ot_mat=OT)
+                GWD0 = log0['gw_dist']
+                GWD0_list.append(GWD0)
+                OT0_list.append(OT0)
+        
+        
+        else:
+            if parallel_method == "multiprocess":
+                pool = ProcessPoolExecutor(self.config.n_jobs)
+            elif parallel_method == "multithread":
+                pool = ThreadPoolExecutor(self.config.n_jobs)
+            else:
+                raise ValueError('parallel_method = "multiprocess" or "multithread".')
+    
+            with pool:
+                if self.config.to_types == "numpy":
+                    if self.config.multi_gpu != False:
+                        warnings.warn("numpy doesn't use GPU. Please 'multi_GPU = False'.", UserWarning)
+                    target_device = self.config.device
+
+                processes = []
+                for idx, i in enumerate(top_k_trials['number']):
+                    ot_path = glob.glob(self.data_path + f"/gw_{i}.*")[0]
+                    if '.npy' in ot_path:
+                        OT = np.load(ot_path)
+                    elif '.pt' in ot_path:
+                        OT = torch.load(ot_path).to("cpu").numpy()
+                    
+                    if self.config.multi_gpu:
+                        target_device = "cuda:" + str(idx % torch.cuda.device_count())
+                    else:
+                        target_device = self.config.device
+
+                    if isinstance(self.config.multi_gpu, list):
+                        gpu_idx = idx % len(self.config.multi_gpu)
+                        target_device = "cuda:" + str(self.config.multi_gpu[gpu_idx])
+
+                    future = pool.submit(
+                        self.run_gwot_without_entropic, 
+                        ot_mat=OT,
+                        max_iter = 10000, 
+                        device=target_device, 
+                        to_types=self.config.to_types,
+                    )
+                    
+                    OT0, log0 = self.run_gwot_without_entropic(ot_mat=OT)
+                    GWD0 = log0['gw_dist']
+                    GWD0_list.append(GWD0)
+                    OT0_list.append(OT0)
+
+                    processes.append(future)
+
+                for future in as_completed(processes):
+                    future.result()
+        
+       
+        return GWD0_list, OT0_list
+    
+    def run_gwot_without_entropic(self, ot_mat = None, max_iter = 10000, device='cpu', to_types='numpy'):
+        """
+        GWOT without entropy
+        """
+        if ot_mat is not None:
+            p = ot_mat.sum(axis=1)
+            q = ot_mat.sum(axis=0) 
+        else:
+            p = ot.unif(len(self.source.sim_mat))
+            q = ot.unif(len(self.target.sim_mat))
+            
+        new_ot_mat, log0 = ot.gromov.gromov_wasserstein(
+            self.source.sim_mat, 
+            self.target.sim_mat, 
+            p, 
+            q, 
+            loss_fun = 'square_loss',
+            symmetric = None,
+            log=True,
+            armijo = False,
+            G0 = ot_mat,
+            max_iter = max_iter,
+            tol_rel = 1e-9,
+            tol_abs = 1e-9,
+            verbose=False,
+        )
+        
+        return new_ot_mat, log0
+    
+    
 class AlignRepresentations:
     """
     This object has methods for conducting N groups level analysis and corresponding results.
