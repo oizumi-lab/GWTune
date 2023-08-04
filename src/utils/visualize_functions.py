@@ -121,6 +121,9 @@ def show_heatmap(
 
     show_figure = kwargs.get('show_figure', True)
 
+    plt.style.use("default")
+    plt.rcParams["grid.color"] = "black"
+    
     fig, ax = plt.subplots(figsize = figsize)
 
     if title is not None:
