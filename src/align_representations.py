@@ -962,10 +962,10 @@ class PairwiseAnalysis:
         OT0_list = list()
   
         trials = trials[trials['value'] != np.nan]
-        sorted_trials = trials.sort_values(by="value", ascending=True)
+        top_k_trials = trials.sort_values(by="value", ascending=True)
         
         if top_k is not None:
-            top_k_trials = sorted_trials.head(top_k)
+            top_k_trials = top_k_trials.head(top_k)
 
         top_k_trials = top_k_trials[['number', 'value', 'params_eps']]
         top_k_trials = top_k_trials.reset_index(drop=True)
@@ -1133,6 +1133,8 @@ class PairwiseAnalysis:
         plt.show()        
         plt.clf()
         plt.close()
+        
+        print(plot_df)
     
     def _plot_GWD_optimization(self, top_k_trials, GWD0_list, marker_size = 10, **kwargs):
         figsize = kwargs.get('figsize', (8, 6))
