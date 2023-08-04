@@ -131,13 +131,19 @@ delete_results = False
 # By using optimal transportation plan obtained with entropic GW as an initial transportation matrix, we run the optimization of GWOT without entropy.  
 # This procedure further minimizes GWD and enables us to fairly compare GWD values obtained with different entropy regularization values.  
 
+### top_k : The OTs of the top k (=lowest GWD) will be used to compute the GWOT without entripy.
+###         If top_k = None, the OT for all the sampled epsilon will be computed.     
+top_k=None
+
+# %%
 align_representation.gwot_after_entropic(
-    top_k=None,
-    parallel_method = "multithread",
+    top_k=top_k,
+    parallel_method = None,
+    OT_format="sorted",
     category_mat=category_mat, 
     visualization_config = visualize_config,
+    ticks="category",
 )
-
 # %%
 
 # import glob
