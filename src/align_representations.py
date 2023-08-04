@@ -960,18 +960,26 @@ class PairwiseAnalysis:
         
         GWD0_list = list()
         OT0_list = list()
-        
+  
+        trials = trials[trials['value'] != np.nan]
         sorted_trials = trials.sort_values(by="value", ascending=True)
         
         if top_k is not None:
             top_k_trials = sorted_trials.head(top_k)
-        else:
-            top_k_trials = sorted_trials.dropna()
-            
+
         top_k_trials = top_k_trials[['number', 'value', 'params_eps']]
-        
+        top_k_trials = top_k_trials.reset_index(drop=True)
+
+        drop_index_list = []
         for i in tqdm(top_k_trials['number']):
-            ot_path = glob.glob(self.data_path + f"/gw_{i}.*")[0]
+            try:
+                ot_path = glob.glob(self.data_path + f"/gw_{i}.*")[0]
+            except:
+                ind = top_k_trials[top_k_trials['number'] == i].index
+                drop_index_list.extend(ind.tolist())
+                print(f"gw_{i}.npy (or gw_{i}.pt) doesn't exist in the result folder...")
+                continue
+        
             if '.npy' in ot_path:
                 OT = np.load(ot_path)
             elif '.pt' in ot_path:
@@ -994,6 +1002,8 @@ class PairwiseAnalysis:
 
             GWD0_list.append(gwd)
             OT0_list.append(new_ot)
+        
+        top_k_trials = top_k_trials.drop(top_k_trials.index[drop_index_list])
         
         return GWD0_list, OT0_list, top_k_trials
     
@@ -1050,6 +1060,7 @@ class PairwiseAnalysis:
         self,
         top_k=None,
         OT_format = "default",
+        eval_type = "ot_plan",
         device=None,
         to_types=None,
         data_type=None,
@@ -1082,19 +1093,18 @@ class PairwiseAnalysis:
             ticks=ticks,
         )
 
-        self._evaluate_accuracy_and_plot("ot_plan", ot_to_evaluate = ot_no_ent)
-        self._evaluate_accuracy_and_plot("k_nearest", ot_to_evaluate = ot_no_ent)
+        self._evaluate_accuracy_and_plot(ot_no_ent, eval_type)
         
         if category_mat is not None:
-            self._evaluate_accuracy_and_plot("category", category_mat=category_mat, ot_to_evaluate = ot_no_ent)
+            self._evaluate_accuracy_and_plot(ot_no_ent, "category", category_mat=category_mat)
         
-        self._plot_GWD_optimization(top_k_trials, GWD0_list)
+        self._plot_GWD_optimization(top_k_trials, GWD0_list, **visualization_config())
 
-    def _evaluate_accuracy_and_plot(self, eval_type, category_mat=None, ot_to_evaluate = None):
+    def _evaluate_accuracy_and_plot(self, ot_to_evaluate, eval_type, category_mat=None):
         top_k_list = [1, 5, 10]
         df_before = self.eval_accuracy(
             top_k_list = top_k_list,
-            ot_to_evaluate = ot_to_evaluate,
+            ot_to_evaluate = None,
             eval_type=eval_type,
             category_mat=category_mat,
         )
@@ -1111,27 +1121,49 @@ class PairwiseAnalysis:
 
         plot_df = pd.concat([df_before, df_after], axis=1)
         plot_df.columns = ['before', 'after']
-        plot_df.plot(kind='bar', title=f'{self.pair_name.replace("_", " ")}, {eval_type} accuracy', legend=True, rot=90)
+        plot_df.plot(
+            kind='bar',
+            title=f'{self.pair_name.replace("_", " ")}, {eval_type} accuracy',
+            legend=True,
+            grid=True,
+            rot=0,
+        )
         
         plt.savefig(os.path.join(self.figure_path, "accuracy_comparison_with_or_without.png"))
         plt.show()        
         plt.clf()
         plt.close()
     
-    def _plot_GWD_optimization(self, top_k_trials, GWD0_list, marker_size = 10):
-        plt.figure(figsize=(8,6))
+    def _plot_GWD_optimization(self, top_k_trials, GWD0_list, marker_size = 10, **kwargs):
+        figsize = kwargs.get('figsize', (8, 6))
+        title_size = kwargs.get('title_size', 15)
+        plot_eps_log = kwargs.get('plot_eps_log', False)
+        show_figure = kwargs.get('show_figure', True)
+        
+        plt.rcParams.update(plt.rcParamsDefault)
+        plt.style.use("seaborn-darkgrid")
+
+        plt.figure(figsize = figsize)
+        plt.title("$\epsilon$ - GWD (" + self.pair_name.replace("_", " ") + ")", fontsize = title_size)
+        
         plt.scatter(top_k_trials["params_eps"], top_k_trials["value"], c = 'red', s=marker_size, label="before") # before
         plt.scatter(top_k_trials["params_eps"], GWD0_list, c = 'blue', s=marker_size, label = "after") # after
+        
+        if plot_eps_log:
+            plt.xscale('log')
+            
         plt.xlabel("$\epsilon$")
         plt.ylabel("GWD")
-        plt.xticks(rotation=30)
-        plt.title("$\epsilon$ - GWD (" + self.pair_name.replace("_", " ") + ")")
-        plt.grid(True)
         plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
+        plt.tick_params(axis = 'x', rotation = 30,  which="both")
+        plt.grid(True, which = 'both')
         plt.legend()
         plt.tight_layout()
         plt.savefig(os.path.join(self.figure_path, "eps_vs_gwd_comparison_with_or_without.png"))
-        plt.show()
+        
+        if show_figure:
+            plt.show()
+        
         plt.clf()
         plt.close()
     
@@ -1508,7 +1540,7 @@ class AlignRepresentations:
         elif parallel_method == "multithread":
             pool = ThreadPoolExecutor(self.config.n_jobs)
         
-        else:
+        elif parallel_method is None:
             for idx, pair in enumerate(self.pairwise_list):
                 pair.run_test_after_entropic_gwot(
                     top_k=top_k,
@@ -1520,7 +1552,8 @@ class AlignRepresentations:
                     category_mat=category_mat, 
                     visualization_config = visualization_config,
                 )
-            return True
+            
+            return None
                 
         with pool:
             if self.config.to_types == "numpy":
