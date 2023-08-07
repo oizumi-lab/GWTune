@@ -749,6 +749,7 @@ class PairwiseAnalysis:
         show_figure = kwargs.get('show_figure', False)
         plot_eps_log = kwargs.get('plot_eps_log', False)
         cmap = kwargs.get("cmap", 'viridis')
+        ticks_size = kwargs.get("ticks_size", 5)
 
         lim_eps = kwargs.get("lim_eps", None)
         lim_gwd = kwargs.get("lim_gwd", None)
@@ -763,7 +764,9 @@ class PairwiseAnalysis:
         plt.figure(figsize=figsize)
         plt.scatter(df_trial["params_eps"], df_trial["value"], c = 100 * df_trial["user_attrs_best_acc"], s = marker_size, cmap=cmap)
         plt.xlabel("$\epsilon$")
+        plt.xticks(fontsize=ticks_size)
         plt.ylabel("GWD")
+        plt.yticks(fontsize=ticks_size)
 
         if lim_eps is not None:
             plt.xlim(lim_eps)
@@ -798,7 +801,9 @@ class PairwiseAnalysis:
         plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap)
         plt.title(self.pair_name.replace('_', ' '))
         plt.xlabel("accuracy (%)")
+        plt.xticks(fontsize=ticks_size)
         plt.ylabel("GWD")
+        plt.yticks(fontsize=ticks_size)
         plt.colorbar(label='eps', format = "%.2e")
         plt.grid(True)
 

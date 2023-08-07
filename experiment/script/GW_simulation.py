@@ -108,6 +108,8 @@ embedding_1 = add_random_offset(circle, max_offset=3)
 embedding_2 = add_independent_noise(embedding_1, max_noise=3)
 #sim_mat_1 = distance.cdist(embedding, embedding, "euclidean")
 #sim_mat_2 = shuffle_matrix(sim_mat_1, N_divide=500)
+np.save("../../data/simulation1_embedding1.npy", embedding_1)
+np.save("../../data/simulation1_embedding2.npy", embedding_2)
 
 Group1 = Representation(
     name="Group1",
@@ -170,6 +172,9 @@ alignment.gw_alignment(
 
 alignment.visualize_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_1")
 
+alignment.calc_accuracy(top_k_list=[1, 3, 5], eval_type="ot_plan")
+alignment.calc_accuracy(top_k_list=[1, 3, 5], eval_type="k_nearest")
+
 #%%
 
 ### Pattern 2
@@ -227,6 +232,8 @@ block_sizes = [N_points//num_categories for i in range(num_categories)]
 matrix = get_block_mat(block_sizes)
 sim_mat_1 = add_noise_to_off_diagonal(matrix, mean=0.2, std=0.08, seed=0)
 sim_mat_2 = add_noise_to_off_diagonal(matrix, mean=0.2, std=0.08, seed=1)
+np.save("../../data/simulation2_sim_mat1.npy", sim_mat_1)
+np.save("../../data/simulation2_sim_mat2.npy", sim_mat_2)
 
 Group1 = Representation(
     name="Group1",
@@ -282,6 +289,9 @@ alignment.gw_alignment(
     )
 
 alignment.visualize_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_2")
+
+alignment.calc_accuracy(top_k_list=[1, 3, 5], eval_type="ot_plan")
+alignment.calc_accuracy(top_k_list=[1, 3, 5], eval_type="k_nearest")
 # %%
 
 ### Pattern 3
@@ -321,6 +331,8 @@ embedding_2 = rotate_points_around_center(circle, max_offset=0.35, start=N_point
 #new_points = np.array([[10, 10], [-10, -10]])
 #embedding_1 = np.append(embedding_1, new_points, axis=0)
 #embedding_2 = np.append(embedding_2, new_points, axis=0)
+np.save("../../data/simulation3_embedding1.npy", embedding_1)
+np.save("../../data/simulation3_embedding2.npy", embedding_2)
 
 Group1 = Representation(
     name="Group1",
@@ -375,5 +387,8 @@ alignment.gw_alignment(
     )
 
 alignment.visualize_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_3")
+
+alignment.calc_accuracy(top_k_list=[1, 3, 5], eval_type="ot_plan")
+alignment.calc_accuracy(top_k_list=[1, 3, 5], eval_type="k_nearest")
 
 # %%
