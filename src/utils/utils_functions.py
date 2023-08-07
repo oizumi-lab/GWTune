@@ -60,7 +60,7 @@ if __name__ == '__main__':
     category_mat = pd.read_csv("../../data/category_mat_manual_preprocessed.csv", sep = ",", index_col = 0)  
     object_labels, category_idx_list, category_num_list, new_category_name_list = get_category_data(category_mat = category_mat)
 
-    a = torch.load('../../data/mean_all_images_vgg19.pt').to('cpu').numpy()
+    a = np.random.randn(1854,1854)
     b = sort_matrix_with_categories(a, category_idx_list)
     
     plt.figure()
@@ -75,4 +75,3 @@ if __name__ == '__main__':
     plt.tight_layout()
     plt.show()
     
-# %%
