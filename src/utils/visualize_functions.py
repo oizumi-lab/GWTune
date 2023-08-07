@@ -121,6 +121,9 @@ def show_heatmap(
 
     show_figure = kwargs.get('show_figure', True)
 
+    plt.style.use("default")
+    plt.rcParams["grid.color"] = "black"
+    
     fig, ax = plt.subplots(figsize = figsize)
 
     if title is not None:
@@ -131,7 +134,7 @@ def show_heatmap(
     if ot_object_tick and ot_category_tick:
         raise(ValueError, "please turn off either 'ot_category_tick' or 'ot_object_tick'.")
 
-    if  not ot_object_tick and ot_category_tick:
+    if not ot_object_tick and ot_category_tick:
         assert category_name_list is not None
         assert num_category_list is not None
 
@@ -267,6 +270,8 @@ class VisualizeEmbedding():
         markers_list = kwargs.get('markers_list', None)
         marker_size = kwargs.get('marker_size', 30)
         cmap = kwargs.get('cmap', "viridis")
+        
+        show_figure = kwargs.get('show_figure', True)
 
         if color_labels is None:
             if self.num_category_list is None:
@@ -362,8 +367,12 @@ class VisualizeEmbedding():
             cbar.set_label(colorbar_label, size=xlabel_size)
             cbar.ax.tick_params(labelsize=xlabel_size)
             cbar.mappable.set_clim(colorbar_range[0], colorbar_range[1])
-
+        
         if save_dir is not None:
             plt.savefig(save_dir)
 
-        plt.show()
+        if show_figure:
+            plt.show()
+        
+        plt.clf()
+        plt.close()
