@@ -21,11 +21,12 @@ from sklearn import manifold
 from sqlalchemy import create_engine, URL
 from sqlalchemy_utils import create_database, database_exists, drop_database
 import glob
+from tqdm.auto import tqdm
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
 from .gw_alignment import GW_Alignment
 from .histogram_matching import SimpleHistogramMatching
-from .utils import gw_optimizer, visualize_functions
+from .utils import gw_optimizer, visualize_functions, backend
 
 # %%
 class OptimizationConfig:
@@ -547,7 +548,7 @@ class PairwiseAnalysis:
         if delete_results:
             self.delete_prev_results()
 
-        self.OT, df_trial = self._gw_alignment(
+        self.OT, df_trial = self._entropic_gw_alignment(
             compute_OT,
             target_device=target_device,
             sampler_seed=sampler_seed,
@@ -559,7 +560,8 @@ class PairwiseAnalysis:
             if not os.path.exists(fig_dir):
                 os.makedirs(fig_dir, exist_ok=True)
 
-        OT = self._show_OT(
+        OT = self.show_OT(
+            ot_to_plot = None,
             title=f"$\Gamma$ ({self.pair_name.replace('_', ' ')})",
             return_data=return_data,
             return_figure=return_figure,
@@ -595,7 +597,7 @@ class PairwiseAnalysis:
                     os.rmdir(dir_path)
             shutil.rmtree(self.save_path)
 
-    def _gw_alignment(self, compute_OT, target_device=None, sampler_seed=42):
+    def _entropic_gw_alignment(self, compute_OT, target_device=None, sampler_seed=42):
         """_summary_
 
         Args:
@@ -633,9 +635,6 @@ class PairwiseAnalysis:
 
         elif '.pt' in ot_path:
             OT = torch.load(ot_path).to("cpu").numpy()
-
-        # GWD0_list, OT0_list = self.simulated_annealing(study, k = 1)
-        # new_OT = OT0_list[np.argmin(GWD0_list)]
 
         return OT, df_trial
 
@@ -714,43 +713,6 @@ class PairwiseAnalysis:
 
         return study
 
-    def simulated_annealing(self, study, k):
-        """
-        GWOT without entropy
-
-        By using optimal transportation plan obtained with entropic GW
-        as an initial transportation matrix, we run the optimization of GWOT without entropy.
-
-        This procedure further minimizes GWD and enables us to fairly compare GWD values
-        obtained with different entropy regularization values.
-        """
-
-        GWD0_list = list()
-        OT0_list = list()
-
-        trials = study.trials_dataframe()
-        sorted_trials = trials.sort_values(by="value", ascending=True)
-        top_k_trials = sorted_trials.head(k)
-        top_k_trials = top_k_trials[['number', 'value', 'params_eps']]
-
-        for i in top_k_trials['number']:
-            ot_path = glob.glob(self.data_path + f"/gw_{i}.*")[0]
-            if '.npy' in ot_path:
-                OT = np.load(ot_path)
-            elif '.pt' in ot_path:
-                OT = torch.load(ot_path).to("cpu").numpy()
-
-            C1 = self.source.sim_mat
-            C2 = self.target.sim_mat
-            p = OT.sum(axis=1)
-            q = OT.sum(axis=0)
-            OT0, log0 = ot.gromov.gromov_wasserstein(C1, C2, p, q, log=True, verbose=False, G0=OT)
-            GWD0 = log0['gw_dist']
-            GWD0_list.append(GWD0)
-            OT0_list.append(OT0)
-
-        return GWD0_list, OT0_list
-
     def get_optimization_log(self, fig_dir=None, **kwargs):
         figsize = kwargs.get('figsize', (8,6))
         marker_size = kwargs.get('marker_size', 20)
@@ -824,9 +786,10 @@ class PairwiseAnalysis:
         plt.clf()
         plt.close()
 
-    def _show_OT(
+    def show_OT(
         self,
-        title,
+        ot_to_plot:Optional[np.ndarray]=None,
+        title=None,
         OT_format="default",
         return_data=False,
         return_figure=True,
@@ -834,10 +797,12 @@ class PairwiseAnalysis:
         fig_dir=None,
         ticks=None,
     ):
+        if ot_to_plot is None:
+            ot_to_plot = self.OT
 
         if OT_format == "sorted" or OT_format == "both":
             assert self.source.sorted_sim_mat is not None, "No label info to sort the 'sim_mat'."
-            OT_sorted = self.source.func_for_sort_sim_mat(self.OT, category_idx_list=self.source.category_idx_list)
+            OT_sorted = self.source.func_for_sort_sim_mat(ot_to_plot, category_idx_list=self.source.category_idx_list)
 
         if return_figure:
             save_file = self.data_name + "_" + self.pair_name
@@ -848,7 +813,7 @@ class PairwiseAnalysis:
 
             if OT_format == "default" or OT_format == "both":
                 visualize_functions.show_heatmap(
-                    self.OT,
+                    ot_to_plot,
                     title=title,
                     save_file_name=fig_path,
                     object_labels = self.source.object_labels,
@@ -872,13 +837,13 @@ class PairwiseAnalysis:
 
         if return_data:
             if OT_format == "default":
-                return self.OT
+                return ot_to_plot
 
             elif OT_format == "sorted":
                 return OT_sorted
 
             elif OT_format == "both":
-                return self.OT, OT_sorted
+                return ot_to_plot, OT_sorted
 
             else:
                 raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
@@ -886,6 +851,7 @@ class PairwiseAnalysis:
     def eval_accuracy(
         self,
         top_k_list,
+        ot_to_evaluate = None,
         eval_type="ot_plan",
         metric="cosine",
         barycenter=False,
@@ -897,6 +863,11 @@ class PairwiseAnalysis:
 
         if supervised:
             OT = np.diag([1 / len(self.target.sim_mat)] * len(self.target.sim_mat))
+        else:
+            OT = self.OT
+
+        if ot_to_evaluate is not None:
+            OT = ot_to_evaluate
         else:
             OT = self.OT
 
@@ -992,6 +963,233 @@ class PairwiseAnalysis:
     def get_new_source_embedding(self):
         return self.procrustes(self.target.embedding, self.source.embedding, self.OT)
 
+    def _simulated(
+        self,
+        trials,
+        top_k=None,
+        device=None,
+        to_types=None,
+        data_type=None,
+    ):
+        """
+        By using optimal transportation plan obtained with entropic GW
+        as an initial transportation matrix, we run the optimization of GWOT without entropy.
+
+        This procedure further minimizes GWD and enables us to fairly compare GWD values
+        obtained with different entropy regularization values.
+        """
+
+        GWD0_list = list()
+        OT0_list = list()
+
+        trials = trials[trials['value'] != np.nan]
+        top_k_trials = trials.sort_values(by="value", ascending=True)
+
+        if top_k is not None:
+            top_k_trials = top_k_trials.head(top_k)
+
+        top_k_trials = top_k_trials[['number', 'value', 'params_eps']]
+        top_k_trials = top_k_trials.reset_index(drop=True)
+
+        drop_index_list = []
+        for i in tqdm(top_k_trials['number']):
+            try:
+                ot_path = glob.glob(self.data_path + f"/gw_{i}.*")[0]
+            except:
+                ind = top_k_trials[top_k_trials['number'] == i].index
+                drop_index_list.extend(ind.tolist())
+                print(f"gw_{i}.npy (or gw_{i}.pt) doesn't exist in the result folder...")
+                continue
+
+            if '.npy' in ot_path:
+                OT = np.load(ot_path)
+            elif '.pt' in ot_path:
+                OT = torch.load(ot_path).to("cpu").numpy()
+
+            log0 = self.run_gwot_without_entropic(
+                ot_mat=OT,
+                max_iter=10000,
+                device=device,
+                to_types=to_types,
+                data_type=data_type,
+            )
+
+            gwd = log0['gw_dist']
+            new_ot = log0['ot0']
+
+            if isinstance(new_ot, torch.Tensor):
+                gwd = gwd.to('cpu').item()
+                new_ot = new_ot.to('cpu').numpy()
+
+            GWD0_list.append(gwd)
+            OT0_list.append(new_ot)
+
+        top_k_trials = top_k_trials.drop(top_k_trials.index[drop_index_list])
+
+        return GWD0_list, OT0_list, top_k_trials
+
+    def run_gwot_without_entropic(
+        self,
+        ot_mat = None,
+        max_iter = 10000,
+        device=None,
+        to_types=None,
+        data_type=None,
+    ):
+        """
+        GWOT without entropy
+        """
+
+        if ot_mat is not None:
+            p = ot_mat.sum(axis=1)
+            q = ot_mat.sum(axis=0)
+        else:
+            p = ot.unif(len(self.source.sim_mat))
+            q = ot.unif(len(self.target.sim_mat))
+
+        sim_mat1 = self.source.sim_mat
+        sim_mat2 = self.target.sim_mat
+
+        if device is None and to_types is None and data_type is None:
+            back_end = backend.Backend(self.config.device, self.config.to_types, self.config.data_type)
+        else:
+            back_end = backend.Backend(device, to_types, data_type)
+
+        sim_mat1, sim_mat2, p, q, ot_mat = back_end(sim_mat1, sim_mat2, p, q, ot_mat)
+
+        new_ot_mat, log0 = ot.gromov.gromov_wasserstein(
+            sim_mat1,
+            sim_mat2,
+            p,
+            q,
+            loss_fun = 'square_loss',
+            symmetric = None,
+            log=True,
+            armijo = False,
+            G0 = ot_mat,
+            max_iter = max_iter,
+            tol_rel = 1e-9,
+            tol_abs = 1e-9,
+            verbose=False,
+        )
+
+        log0["ot0"] = new_ot_mat
+
+        return log0
+
+    def run_test_after_entropic_gwot(
+        self,
+        top_k=None,
+        OT_format = "default",
+        eval_type = "ot_plan",
+        device=None,
+        to_types=None,
+        data_type=None,
+        ticks=None,
+        category_mat = None,
+        visualization_config: VisualizationConfig = VisualizationConfig(),
+    ):
+
+        self.OT, df_trial = self._entropic_gw_alignment(compute_OT=False)
+
+        GWD0_list, OT0_list, top_k_trials = self._simulated(
+            df_trial,
+            top_k=top_k,
+            device=device,
+            to_types=to_types,
+            data_type=data_type,
+        )
+
+        ot_no_ent = OT0_list[np.argmin(GWD0_list)]
+
+        # plot results
+        self.show_OT(
+            ot_to_plot = ot_no_ent,
+            title=f"$\Gamma$ (GWOT Without Entropy) ({self.pair_name.replace('_', ' ')})",
+            return_data=False,
+            return_figure=True,
+            OT_format=OT_format,
+            visualization_config=visualization_config,
+            fig_dir=None,
+            ticks=ticks,
+        )
+
+        self._evaluate_accuracy_and_plot(ot_no_ent, eval_type)
+
+        if category_mat is not None:
+            self._evaluate_accuracy_and_plot(ot_no_ent, "category", category_mat=category_mat)
+
+        self._plot_GWD_optimization(top_k_trials, GWD0_list, **visualization_config())
+
+    def _evaluate_accuracy_and_plot(self, ot_to_evaluate, eval_type, category_mat=None):
+        top_k_list = [1, 5, 10]
+        df_before = self.eval_accuracy(
+            top_k_list = top_k_list,
+            ot_to_evaluate = None,
+            eval_type=eval_type,
+            category_mat=category_mat,
+        )
+
+        df_after = self.eval_accuracy(
+            top_k_list = top_k_list,
+            ot_to_evaluate=ot_to_evaluate,
+            eval_type=eval_type,
+            category_mat=category_mat,
+        )
+
+        df_before = df_before.set_index('top_n')
+        df_after  = df_after.set_index('top_n')
+
+        plot_df = pd.concat([df_before, df_after], axis=1)
+        plot_df.columns = ['before', 'after']
+        plot_df.plot(
+            kind='bar',
+            title=f'{self.pair_name.replace("_", " ")}, {eval_type} accuracy',
+            legend=True,
+            grid=True,
+            rot=0,
+        )
+
+        plt.savefig(os.path.join(self.figure_path, "accuracy_comparison_with_or_without.png"))
+        plt.show()
+        plt.clf()
+        plt.close()
+
+        print(plot_df)
+
+    def _plot_GWD_optimization(self, top_k_trials, GWD0_list, marker_size = 10, **kwargs):
+        figsize = kwargs.get('figsize', (8, 6))
+        title_size = kwargs.get('title_size', 15)
+        plot_eps_log = kwargs.get('plot_eps_log', False)
+        show_figure = kwargs.get('show_figure', True)
+
+        plt.rcParams.update(plt.rcParamsDefault)
+        plt.style.use("seaborn-darkgrid")
+
+        plt.figure(figsize = figsize)
+        plt.title("$\epsilon$ - GWD (" + self.pair_name.replace("_", " ") + ")", fontsize = title_size)
+
+        plt.scatter(top_k_trials["params_eps"], top_k_trials["value"], c = 'red', s=marker_size, label="before") # before
+        plt.scatter(top_k_trials["params_eps"], GWD0_list, c = 'blue', s=marker_size, label = "after") # after
+
+        if plot_eps_log:
+            plt.xscale('log')
+
+        plt.xlabel("$\epsilon$")
+        plt.ylabel("GWD")
+        plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
+        plt.tick_params(axis = 'x', rotation = 30,  which="both")
+        plt.grid(True, which = 'both')
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.figure_path, "eps_vs_gwd_comparison_with_or_without.png"))
+
+        if show_figure:
+            plt.show()
+
+        plt.clf()
+        plt.close()
+
 class AlignRepresentations:
     """
     This object has methods for conducting N groups level analysis and corresponding results.
@@ -1050,7 +1248,7 @@ class AlignRepresentations:
         self.pairs_computed = pairs_computed
 
         if pairs_computed is not None:
-            print("The pairs to compute was selected renew_pair_list ...")
+            print("The pairs to compute was selected by pairs_computed...")
             self.specific_pair_list = self._specific_pair_list(pairs_computed)
             self.pairwise_list = self._get_pairwise_list(self.specific_pair_list)
 
@@ -1076,7 +1274,6 @@ class AlignRepresentations:
                 self.pairwise_list = self._get_pairwise_list(self.specific_pair_list)
             else:
                 self.pairwise_list = self._get_pairwise_list(self.all_pair_list)
-
 
     def _specific_pair_list(self, pair_list):
         if isinstance(pair_list, dict):
@@ -1357,6 +1554,72 @@ class AlignRepresentations:
         if return_data:
             return OT_list
 
+    def gwot_after_entropic(
+        self,
+        top_k=None,
+        parallel_method=None,
+        OT_format="default",
+        ticks=None,
+        category_mat=None,
+        visualization_config: VisualizationConfig = VisualizationConfig(),
+    ):
+        if parallel_method == "multiprocess":
+            pool = ProcessPoolExecutor(self.config.n_jobs)
+
+        elif parallel_method == "multithread":
+            pool = ThreadPoolExecutor(self.config.n_jobs)
+
+        elif parallel_method is None:
+            for idx, pair in enumerate(self.pairwise_list):
+                pair.run_test_after_entropic_gwot(
+                    top_k=top_k,
+                    OT_format=OT_format,
+                    device=None,
+                    to_types=None,
+                    data_type=None,
+                    ticks=ticks,
+                    category_mat=category_mat,
+                    visualization_config = visualization_config,
+                )
+
+            return None
+
+        with pool:
+            if self.config.to_types == "numpy":
+                if self.config.multi_gpu != False:
+                    warnings.warn("numpy doesn't use GPU. Please 'multi_GPU = False'.", UserWarning)
+                target_device = self.config.device
+
+            processes = []
+            for idx, pair in enumerate(self.pairwise_list):
+                if self.config.multi_gpu:
+                    target_device = "cuda:" + str(idx % torch.cuda.device_count())
+                else:
+                    target_device = self.config.device
+
+                if isinstance(self.config.multi_gpu, list):
+                    gpu_idx = idx % len(self.config.multi_gpu)
+                    target_device = "cuda:" + str(self.config.multi_gpu[gpu_idx])
+
+                future = pool.submit(
+                    pair.run_test_after_entropic_gwot,
+                    top_k=top_k,
+                    OT_format=OT_format,
+                    device=target_device,
+                    to_types=self.config.to_types,
+                    data_type=self.config.data_type,
+                    ticks=ticks,
+                    category_mat=category_mat,
+                    visualization_config = visualization_config,
+                )
+                processes.append(future)
+
+            for future in as_completed(processes):
+                future.result()
+
+
+
+
     def drop_gw_alignment_files(self, drop_filenames: Optional[List[str]] = None, drop_all: bool = False):
         """Delete the specified database and directory with the given filename
 
@@ -1510,7 +1773,7 @@ class AlignRepresentations:
         # visualize
         OT_list = []
         for pairwise in self.pairwise_list:
-            OT = pairwise._show_OT(
+            OT = pairwise.show_OT(
                 title=f"$\Gamma$ ({pairwise.pair_name})",
                 return_data=return_data,
                 return_figure=return_figure,
