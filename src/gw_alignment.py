@@ -299,6 +299,9 @@ class MainGromovWasserstainComputation:
 
         if (init_mat_plan not in ["random", "permutation", "user_define"]) and math.isnan(gw_loss):
             raise optuna.TrialPruned(f"Trial for '{init_mat_plan}' was pruned with parameters: {{'eps': {eps:.5e}, 'gw_loss': '{gw_loss:.5e}'}}")
+        
+        if (init_mat_plan in ["uniform", "diag"]) and math.isnan(gw_loss):
+            raise optuna.TrialPruned(f"Trial for '{init_mat_plan}' was pruned with parameters: {{'eps': {eps:.5e}, 'gw_loss': '{gw_loss:.5e}'}}")
 
         if num_iter is None:
             trial.report(gw_loss, 0)

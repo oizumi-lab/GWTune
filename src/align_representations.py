@@ -7,6 +7,7 @@ import shutil
 import warnings
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from typing import List, Union, Optional
+import copy
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -44,7 +45,6 @@ class OptimizationConfig:
         user_define_init_mat_list = None,
         n_iter=1,
         max_iter=200,
-        data_name="THINGS",
         sampler_name="tpe",
         pruner_name="hyperband",
         pruner_params={"n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3},
@@ -91,12 +91,9 @@ class OptimizationConfig:
 
         self.sampler_name = sampler_name
         self.user_define_init_mat_list = user_define_init_mat_list
-
-        self.data_name = data_name
-
+        
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
-
 
 class VisualizationConfig:
     def __init__(
@@ -178,7 +175,6 @@ class VisualizationConfig:
     def set_params(self, **kwargs):
         for key, item in kwargs.items():
             self.visualization_params[key] = item
-
 
 class Representation:
     """
@@ -364,24 +360,47 @@ class PairwiseAnalysis:
     """
 
     def __init__(
-        self,
-        config: OptimizationConfig,
-        source: Representation,
+        self, 
+        results_dir:str,
+        config: OptimizationConfig, 
+        source: Representation, 
         target: Representation,
+        pair_name=None,
+        data_name=None,
+        filename=None,
     ) -> None:
-        """
+        """_summary_
+
         Args:
-            config (Optimization_Config) : instance of Optimization_Config
-            source (Representation): instance of Representation
-            target (Representation): instance of Representation
+            results_dir (str): _description_
+            config (OptimizationConfig): _description_
+            source (Representation): _description_
+            target (Representation): _description_
+            pair_name (_type_, optional): _description_. Defaults to None.
+            data_name (_type_, optional): _description_. Defaults to None.
+            filename (_type_, optional): _description_. Defaults to None.
         """
+        
         self.source = source
         self.target = target
         self.config = config
 
-        self.pair_name = f"{source.name}_vs_{target.name}"
-
-        # assert self.source.sim_mat.shape == self.target.sim_mat.shape, "the shape of sim_mat is not the same."
+        if pair_name is None:
+            self.pair_name = f"{source.name}_vs_{target.name}"
+        else:
+            self.pair_name = pair_name
+        
+        self.data_name = data_name
+        
+        if filename is None:
+            self.filename = self.data_name + "_" + self.pair_name
+        else:
+            self.filename = filename
+        
+        self.results_dir = results_dir
+        self.save_path = os.path.join(results_dir, self.data_name, self.filename, self.config.init_mat_plan)
+        self.figure_path = os.path.join(self.save_path, 'figure')
+        self.data_path = os.path.join(self.save_path, 'data')
 
         assert np.array_equal(
             self.source.num_category_list, self.target.num_category_list
@@ -390,6 +409,14 @@ class PairwiseAnalysis:
         assert np.array_equal(
             self.source.object_labels, self.target.object_labels
         ), "the label information doesn't seem to be the same."
+        
+        # Generate the URL for the database. Syntax differs for SQLite and others.
+        if self.config.db_params["drivername"] == "sqlite":
+            self.storage = "sqlite:///" + self.save_path + "/" + self.filename + "_" + self.config.init_mat_plan + ".db"
+        else:
+            self.storage = URL.create(
+                database=self.filename + "_" + self.config.init_mat_plan,
+                **self.config.db_params).render_as_string(hide_password=False)
 
     def show_both_sim_mats(self):
 
@@ -460,11 +487,8 @@ class PairwiseAnalysis:
         else:
             self.target.sim_mat = new_target
 
-    def run_gw(
+    def run_entropic_gwot(
         self,
-        results_dir,
-        save_path: Optional[str] = None,
-        eps_list=None,
         compute_OT=False,
         delete_results=False,
         OT_format="default",
@@ -474,7 +498,6 @@ class PairwiseAnalysis:
         show_log=False,
         fig_dir=None,
         ticks=None,
-        filename=None,
         save_dataframe=False,
         target_device=None,
         sampler_seed=42,
@@ -482,7 +505,6 @@ class PairwiseAnalysis:
         """_summary_
 
         Args:
-            results_dir (_type_): _description_
             compute_OT (bool, optional): _description_. Defaults to False.
             delete_results (bool, optional): _description_. Defaults to False.
             OT_format (str, optional): _description_. Defaults to "default".
@@ -499,16 +521,12 @@ class PairwiseAnalysis:
         Returns:
             _type_: _description_
         """
-        self._save_path_checker(
-            results_dir,
-            filename,
-            compute_OT,
-            save_path=save_path,
-            delete_results=delete_results,
-        )
-
+        
+        # Delete the previous results if the flag is True.
+        if delete_results:
+            self.delete_prev_results()
+            
         self.OT, df_trial = self._gw_alignment(
-            eps_list,
             compute_OT,
             target_device=target_device,
             sampler_seed=sampler_seed,
@@ -520,7 +538,6 @@ class PairwiseAnalysis:
             if not os.path.exists(fig_dir):
                 os.makedirs(fig_dir, exist_ok=True)
 
-        Path(fig_dir).mkdir(exist_ok=True, parents=True)
         OT = self._show_OT(
             title=f"$\Gamma$ ({self.pair_name.replace('_', ' ')})",
             return_data=return_data,
@@ -533,8 +550,6 @@ class PairwiseAnalysis:
 
         if show_log:
             self.get_optimization_log(
-                results_dir,
-                df_trial=df_trial,
                 fig_dir=fig_dir,
                 **visualization_config(),
             )
@@ -544,77 +559,22 @@ class PairwiseAnalysis:
 
         return OT
 
-    def _save_path_checker(
-        self,
-        results_dir,
-        filename,
-        compute_OT,
-        save_path: Optional[str] = None,
-        delete_results=False,
-    ):
-        if filename is None:
-            filename = self.config.data_name + "_" + self.pair_name
-
-        self.filename = filename
-
-        if save_path is None:
-            self.save_path = os.path.join(results_dir, self.config.data_name, filename, self.config.init_mat_plan)
-        else:
-            self.save_path = save_path
-
-        self.figure_path = os.path.join(self.save_path, 'figure')
-
-        self.data_path = os.path.join(self.save_path, 'data')
-
-        # Generate the URL for the database. Syntax differs for SQLite and others.
-        if self.config.db_params["drivername"] == "sqlite":
-            self.storage = "sqlite:///" + self.save_path + "/" + filename + "_" + self.config.init_mat_plan + ".db"
-        else:
-            # self.storage = URL.create(database=filename, **self.config.db_params).render_as_string(hide_password=False)
-            self.storage = URL.create(
-                database=filename + "_" + self.config.init_mat_plan,
-                **self.config.db_params).render_as_string(hide_password=False)
-
-        # Delete the previous results if the flag is True.
-        if delete_results:
-            if not compute_OT and os.path.exists(self.save_path) and self.config.n_jobs == 1:
-                self._confirm_delete()
-            else:
-                self.delete_prev_results()
-
-    def _confirm_delete(self) -> None:
-        while True:
-            confirmation = input(
-                f"The study, result folder, and database named '{self.filename}' existed in your environment will be deleted.\n \
-                 Do you want to execute it? (Y/n)"
-            )
-            if confirmation == "Y":
-               self.delete_prev_results()
-            elif confirmation == "n":
-                print(f"The study, result folder, and database named '{self.filename}' existed in your environment weren't deleted.")
-                break
-            else:
-                print("Invalid input. Please enter again.")
-
     def delete_prev_results(self):
         # drop database
         if database_exists(self.storage):
             drop_database(self.storage)
         # delete directory
         if os.path.exists(self.save_path):
-            self._delete_directory(self.save_path)
+            for root, dirs, files in os.walk(self.save_path, topdown=False):
+                for name in files:
+                    file_path = os.path.join(root, name)
+                    os.remove(file_path)
+                for name in dirs:
+                    dir_path = os.path.join(root, name)
+                    os.rmdir(dir_path)
+            shutil.rmtree(self.save_path)
 
-    def _delete_directory(self, save_path):
-        for root, dirs, files in os.walk(save_path, topdown=False):
-            for name in files:
-                file_path = os.path.join(root, name)
-                os.remove(file_path)
-            for name in dirs:
-                dir_path = os.path.join(root, name)
-                os.rmdir(dir_path)
-        shutil.rmtree(save_path)
-
-    def _gw_alignment(self, eps_list, compute_OT, target_device=None, sampler_seed=42):
+    def _gw_alignment(self, compute_OT, target_device=None, sampler_seed=42):
         """_summary_
 
         Args:
@@ -637,7 +597,6 @@ class PairwiseAnalysis:
             compute_OT = True
 
         study = self._run_optimization(
-            eps_list = eps_list,
             compute_OT = compute_OT,
             target_device = target_device,
             sampler_seed = sampler_seed,
@@ -653,12 +612,14 @@ class PairwiseAnalysis:
 
         elif '.pt' in ot_path:
             OT = torch.load(ot_path).to("cpu").numpy()
+            
+        # GWD0_list, OT0_list = self.simulated_annealing(study, k = 1)
+        # new_OT = OT0_list[np.argmin(GWD0_list)]
 
         return OT, df_trial
 
     def _run_optimization(
         self,
-        eps_list=None,
         compute_OT=False,
         target_device = None,
         sampler_seed = 42,
@@ -706,12 +667,9 @@ class PairwiseAnalysis:
             if self.config.init_mat_plan == "user_define":
                 gw.main_compute.init_mat_builder.set_user_define_init_mat_list(self.config.user_define_init_mat_list)
 
-            if eps_list is None:
-                eps_list = self.config.eps_list
-
             if self.config.sampler_name == "grid":
                 # used only in grid search sampler below the two lines
-                eps_space = opt.define_eps_space(eps_list, self.config.eps_log, self.config.num_trial)
+                eps_space = opt.define_eps_space(self.config.eps_list, self.config.eps_log, self.config.num_trial)
                 search_space = {"eps": eps_space}
             else:
                 search_space = None
@@ -725,7 +683,7 @@ class PairwiseAnalysis:
                 target_device,
                 seed=sampler_seed,
                 init_mat_plan=self.config.init_mat_plan,
-                eps_list=eps_list,
+                eps_list=self.config.eps_list,
                 eps_log=self.config.eps_log,
                 search_space=search_space,
             )
@@ -734,16 +692,45 @@ class PairwiseAnalysis:
             study = opt.load_study()
 
         return study
+    
+    def simulated_annealing(self, study, k):
+        """
+        GWOT without entropy
+        
+        By using optimal transportation plan obtained with entropic GW 
+        as an initial transportation matrix, we run the optimization of GWOT without entropy.  
+        
+        This procedure further minimizes GWD and enables us to fairly compare GWD values 
+        obtained with different entropy regularization values.  
+        """
+        
+        GWD0_list = list()
+        OT0_list = list()
+        
+        trials = study.trials_dataframe()
+        sorted_trials = trials.sort_values(by="value", ascending=True)
+        top_k_trials = sorted_trials.head(k)
+        top_k_trials = top_k_trials[['number', 'value', 'params_eps']]
+        
+        for i in top_k_trials['number']:
+            ot_path = glob.glob(self.data_path + f"/gw_{i}.*")[0]
+            if '.npy' in ot_path:
+                OT = np.load(ot_path)
+            elif '.pt' in ot_path:
+                OT = torch.load(ot_path).to("cpu").numpy()
 
-    def get_optimization_log(
-        self,
-        results_dir,
-        df_trial=None,
-        filename=None,
-        fig_dir=None,
-        save_path=None,
-        **kwargs,
-    ):
+            C1 = self.source.sim_mat
+            C2 = self.target.sim_mat
+            p = OT.sum(axis=1)
+            q = OT.sum(axis=0)
+            OT0, log0 = ot.gromov.gromov_wasserstein(C1, C2, p, q, log=True, verbose=False, G0=OT)
+            GWD0 = log0['gw_dist']
+            GWD0_list.append(GWD0)
+            OT0_list.append(OT0)
+        
+        return GWD0_list, OT0_list
+
+    def get_optimization_log(self, fig_dir=None, **kwargs):
         figsize = kwargs.get('figsize', (8,6))
         marker_size = kwargs.get('marker_size', 20)
         show_figure = kwargs.get('show_figure', False)
@@ -753,11 +740,9 @@ class PairwiseAnalysis:
         lim_eps = kwargs.get("lim_eps", None)
         lim_gwd = kwargs.get("lim_gwd", None)
         lim_acc = kwargs.get("lim_acc", None)
-
-        if df_trial is None:
-            self._save_path_checker(results_dir, filename, save_path=save_path, compute_OT=False, delete_results=False)
-            study = self._run_optimization(compute_OT = False)
-            df_trial = study.trials_dataframe()
+       
+        study = self._run_optimization(compute_OT = False)
+        df_trial = study.trials_dataframe()
 
         # figure plotting epsilon as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
@@ -834,7 +819,7 @@ class PairwiseAnalysis:
             OT_sorted = self.source.func_for_sort_sim_mat(self.OT, category_idx_list=self.source.category_idx_list)
 
         if return_figure:
-            save_file = self.config.data_name + "_" + self.pair_name
+            save_file = self.data_name + "_" + self.pair_name
             if fig_dir is not None:
                 fig_path = os.path.join(fig_dir, f"{save_file}.png")
             else:
@@ -986,7 +971,6 @@ class PairwiseAnalysis:
     def get_new_source_embedding(self):
         return self.procrustes(self.target.embedding, self.source.embedding, self.OT)
 
-
 class AlignRepresentations:
     """
     This object has methods for conducting N groups level analysis and corresponding results.
@@ -995,41 +979,135 @@ class AlignRepresentations:
     def __init__(
         self,
         config: OptimizationConfig,
-        representations_list: List[Representation],
+        representations_list:List[Representation],
+        pairs_computed:List[str]=None,
+        specific_eps_list:dict=None,
         histogram_matching=False,
-        pair_number_list: Union[str, List[List[int]]] = "all",
         metric="cosine",
+        main_results_dir:str = None,
+        data_name:str = None,
     ) -> None:
-        """
-        Args:
-            representations_list (list): a list of Representations
-        """
-        self.config = config
+        """_summary_
 
+        Args:
+            config (OptimizationConfig): _description_
+            representations_list (List[Representation]): _description_
+            pairs_computed (List[str], optional): _description_. Defaults to None.
+            specific_eps_list (dict, optional): _description_. Defaults to None.
+            histogram_matching (bool, optional): _description_. Defaults to False.
+            metric (str, optional): _description_. Defaults to "cosine".
+            main_results_dir (str, optional): _description_. Defaults to None.
+            data_name (str, optional): _description_. Defaults to None.
+        """
+        
+        self.config = config
+        self.data_name = data_name
         self.metric = metric
         self.representations_list = representations_list
         self.histogram_matching = histogram_matching
+        
+        self.main_results_dir = main_results_dir
+        self.main_pair_name = None
+        self.main_file_name = None
 
-        self.pairwise_list = self._get_pairwise_list(pair_number_list)
         self.RSA_corr = dict()
-
-    def _get_pairwise_list(self, pair_number_list) -> List[PairwiseAnalysis]:
-        if pair_number_list == "all":
-            self.pair_number_list = list(itertools.combinations(range(len(self.representations_list)), 2))
+        
+        self.name_list = [rep.name for rep in self.representations_list]
+        
+        self.all_pair_list = list(itertools.combinations(range(len(self.representations_list)), 2))
+        
+        print(f"data_name : {self.data_name}")
+        
+        self.set_specific_eps_list(specific_eps_list)
+        
+        self.set_pair_computed(pairs_computed)
+        
+    def set_pair_computed(self, pairs_computed:Optional[List]):
+        self.pairs_computed = pairs_computed
+        
+        if pairs_computed is not None:
+            print("The pairs to compute was selected renew_pair_list ...")
+            self.specific_pair_list = self._specific_pair_list(pairs_computed)
+            self.pairwise_list = self._get_pairwise_list(self.specific_pair_list)
+        
         else:
-            self.pair_number_list = pair_number_list
+            print("All the pairs in the list below will be computed. ")
+            self.pairwise_list = self._get_pairwise_list(self.all_pair_list)
+        
+    def set_specific_eps_list(
+        self, 
+        specific_eps_list:Optional[dict], 
+        specific_only:bool = False,
+    ):       
+        
+        self.specific_eps_list = specific_eps_list
+        
+        if specific_eps_list is not None:
+            assert isinstance(self.specific_eps_list, dict), "specific_eps_list needs to be dict."
+            print("The range of epsilon for some pairs in the list below was changed ...")
+            
+            self.specific_pair_list = self._specific_pair_list(specific_eps_list)
 
+            if specific_only:
+                self.pairwise_list = self._get_pairwise_list(self.specific_pair_list)
+            else:
+                self.pairwise_list = self._get_pairwise_list(self.all_pair_list)
+
+    
+    def _specific_pair_list(self, pair_list):
+        if isinstance(pair_list, dict):
+            key_loop = pair_list.keys()
+        elif isinstance(pair_list, list):
+            key_loop = pair_list
+
+        specific_pair_list = [] 
+        for key in key_loop:
+            if not key in self.name_list:
+                source_name, target_name = key.split('_vs_')
+                
+                source_idx = self.name_list.index(source_name)
+                target_idx = self.name_list.index(target_name)
+                
+                rep_list = [(source_idx, target_idx)]
+                
+            else:
+                rep_idx = self.name_list.index(key)
+                rep_list = [nn for nn in self.all_pair_list if rep_idx in nn]
+            
+            specific_pair_list.extend(rep_list)
+        
+        return specific_pair_list
+    
+    def _get_pairwise_list(self, pair_list):
         pairwise_list = []
-        for i, pair in enumerate(self.pair_number_list):
+  
+        for pair in pair_list:
+            config_copy = copy.deepcopy(self.config)
+            
             s = self.representations_list[pair[0]]
             t = self.representations_list[pair[1]]
+                  
+            if self.specific_eps_list is not None:
+                pair_name = f"{s.name}_vs_{t.name}"
+                if s.name in self.specific_eps_list.keys():
+                    config_copy.eps_list = self.specific_eps_list[s.name]
+                elif pair_name in self.specific_eps_list.keys():
+                    config_copy.eps_list = self.specific_eps_list[pair_name]
 
-            pairwise = PairwiseAnalysis(config=self.config, source=s, target=t)
+            pairwise = PairwiseAnalysis(
+                results_dir=self.main_results_dir, 
+                config=config_copy, 
+                source=s, 
+                target=t, 
+                data_name=self.data_name,
+                pair_name=self.main_pair_name,
+                filename=self.main_file_name,
+            )
+            
+            print('pair:', pairwise.pair_name, 'eps_list:', config_copy.eps_list)
 
             if self.histogram_matching:
                 pairwise.match_sim_mat_distribution()
-
-            # pairwise.show_both_sim_mats()
 
             pairwise_list.append(pairwise)
 
@@ -1073,9 +1151,6 @@ class AlignRepresentations:
 
     def _single_computation(
         self,
-        results_dir,
-        save_path: Optional[str] = None,
-        pair_eps_list=None,
         compute_OT=False,
         delete_results=False,
         return_data=False,
@@ -1085,7 +1160,6 @@ class AlignRepresentations:
         show_log=False,
         fig_dir=None,
         ticks=None,
-        filename=None,
         save_dataframe=False,
         target_device=None,
         change_sampler_seed=False,
@@ -1097,15 +1171,7 @@ class AlignRepresentations:
             if change_sampler_seed:
                 sampler_seed += 1
 
-            if isinstance(pair_eps_list, dict):
-                eps_list = pair_eps_list.get(pairwise.pair_name, self.config.eps_list)
-            else:
-                eps_list = self.config.eps_list
-
-            OT = pairwise.run_gw(
-                results_dir=results_dir,
-                save_path=save_path,
-                eps_list=eps_list,
+            OT = pairwise.run_entropic_gwot(
                 compute_OT=compute_OT,
                 delete_results=delete_results,
                 return_data=return_data,
@@ -1115,7 +1181,6 @@ class AlignRepresentations:
                 show_log=show_log,
                 fig_dir=fig_dir,
                 ticks=ticks,
-                filename=filename,
                 save_dataframe=save_dataframe,
                 target_device=target_device,
                 sampler_seed=sampler_seed,
@@ -1127,9 +1192,6 @@ class AlignRepresentations:
 
     def gw_alignment(
         self,
-        results_dir,
-        save_path: Optional[str] = None,
-        pair_eps_list=None,
         compute_OT=False,
         delete_results=False,
         return_data=False,
@@ -1139,7 +1201,6 @@ class AlignRepresentations:
         show_log=False,
         fig_dir=None,
         ticks=None,
-        filename=None,
         save_dataframe=False,
         change_sampler_seed=False,
         fix_sampler_seed=42,
@@ -1148,7 +1209,6 @@ class AlignRepresentations:
         """_summary_
 
         Args:
-            results_dir (_type_): _description_
             compute_OT (bool, optional): _description_. Defaults to False.
             delete_results (bool, optional): _description_. Defaults to False.
             return_data (bool, optional): _description_. Defaults to False.
@@ -1158,13 +1218,13 @@ class AlignRepresentations:
             show_log (bool, optional): _description_. Defaults to False.
             fig_dir (_type_, optional): _description_. Defaults to None.
             ticks (_type_, optional): _description_. Defaults to None.
-            filename (_type_, optional): _description_. Defaults to None.
             save_dataframe (bool, optional): _description_. Defaults to False.
             change_sampler_seed (bool, optional): _description_. Defaults to False.
             fix_sampler_seed (int, optional): _description_. Defaults to 42.
             parallel_method (str, optional): _description_. Defaults to "multithread".
 
         Raises:
+            ValueError: _description_
             ValueError: _description_
             ValueError: _description_
 
@@ -1212,16 +1272,8 @@ class AlignRepresentations:
                     else:
                         sampler_seed = first_sampler_seed
 
-                    if isinstance(pair_eps_list, dict):
-                        eps_list = pair_eps_list.get(pairwise.pair_name, self.config.eps_list)
-                    else:
-                        eps_list = self.config.eps_list
-
                     future = pool.submit(
-                        pairwise.run_gw,
-                        results_dir=results_dir,
-                        save_path=save_path,
-                        eps_list=eps_list,
+                        pairwise.run_entropic_gwot,
                         compute_OT=compute_OT,
                         delete_results=delete_results,
                         return_data=False,
@@ -1231,7 +1283,6 @@ class AlignRepresentations:
                         show_log=False,
                         fig_dir=None,
                         ticks=None,
-                        filename=filename,
                         save_dataframe=save_dataframe,
                         target_device=target_device,
                         sampler_seed=sampler_seed,
@@ -1244,9 +1295,6 @@ class AlignRepresentations:
 
             if return_figure or return_data:
                 OT_list = self._single_computation(
-                    results_dir=results_dir,
-                    save_path=save_path,
-                    pair_eps_list=pair_eps_list,
                     compute_OT=False,
                     delete_results=False,
                     return_data=return_data,
@@ -1256,15 +1304,11 @@ class AlignRepresentations:
                     show_log=show_log,
                     fig_dir=fig_dir,
                     ticks=ticks,
-                    filename=filename,
                     save_dataframe=save_dataframe,
                 )
 
         if self.config.n_jobs == 1:
             OT_list = self._single_computation(
-                results_dir=results_dir,
-                save_path=save_path,
-                pair_eps_list=pair_eps_list,
                 compute_OT=compute_OT,
                 delete_results=delete_results,
                 return_data=return_data,
@@ -1274,7 +1318,6 @@ class AlignRepresentations:
                 show_log=show_log,
                 fig_dir=fig_dir,
                 ticks=ticks,
-                filename=filename,
                 save_dataframe=save_dataframe,
                 change_sampler_seed=change_sampler_seed,
                 sampler_seed=first_sampler_seed,
@@ -1307,8 +1350,6 @@ class AlignRepresentations:
 
     def show_optimization_log(
         self,
-        results_dir,
-        filename=None,
         fig_dir=None,
         visualization_config=VisualizationConfig(),
     ):
@@ -1318,8 +1359,6 @@ class AlignRepresentations:
 
         for pairwise in self.pairwise_list:
             pairwise.get_optimization_log(
-                results_dir=results_dir,
-                filename=filename,
                 fig_dir=fig_dir,
                 **visualization_config(),
             )
@@ -1346,7 +1385,6 @@ class AlignRepresentations:
         self,
         pivot,
         n_iter,
-        results_dir,
         compute_OT=False,
         delete_results=False,
         return_data=False,
@@ -1358,7 +1396,7 @@ class AlignRepresentations:
         ticks=None,
     ):
 
-        assert self.pair_number_list == range(len(self.pairwise_list))
+        assert self.all_pair_list == range(len(self.pairwise_list))
 
         # Select the pivot
         pivot_representation = self.representations_list[pivot]
@@ -1367,10 +1405,17 @@ class AlignRepresentations:
         # GW alignment to the pivot
         # ここの部分はあとでself.gw_alignmentの中に組み込む
         for representation in others_representaions:
-            pairwise = PairwiseAnalysis(config=self.config, source=representation, target=pivot_representation)
+            pairwise = PairwiseAnalysis(
+                results_dir=self.main_results_dir,
+                config=self.config, 
+                source=representation, 
+                target=pivot_representation,
+                data_name=self.data_name,
+                pair_name=self.main_pair_name,
+                filename=self.main_file_name,
+            )
 
-            pairwise.run_gw(
-                results_dir=results_dir,
+            pairwise.run_entropic_gwot(
                 compute_OT=compute_OT,
                 delete_results=delete_results,
                 return_data=return_data,
@@ -1396,7 +1441,15 @@ class AlignRepresentations:
         # Set pairwises whose target is the barycenter
         pairwise_barycenters = []
         for representation in self.representations_list:
-            pairwise = PairwiseAnalysis(config=self.config, source=representation, target=self.barycenter)
+            pairwise = PairwiseAnalysis(
+                results_dir=self.main_results_dir,
+                config=self.config, 
+                source=representation, 
+                target=self.barycenter,
+                data_name=self.data_name,
+                pair_name=self.main_pair_name,
+                filename=self.main_file_name,
+            )
             pairwise_barycenters.append(pairwise)
 
         # Barycenter alignment
@@ -1540,8 +1593,8 @@ class AlignRepresentations:
     def _procrustes_to_pivot(self, pivot):
         the_others, pivot_idx_list = self._check_pairs(pivot)
 
-        # check whether 'pair_number_list' includes all pairs between the pivot and the other Representations
-        assert len(the_others) == len(self.representations_list)-1, "'pair_number_list' must include all pairs between the pivot and the other Representations."
+        # check whether 'pair_list' includes all pairs between the pivot and the other Representations
+        assert len(the_others) == len(self.representations_list)-1, "'pair_list' must include all pairs between the pivot and the other Representations."
 
         for pair_idx, pivot_idx in pivot_idx_list:
             pairwise = self.pairwise_list[pair_idx]
@@ -1562,7 +1615,7 @@ class AlignRepresentations:
     def _check_pairs(self, pivot):
         the_others = set()
         pivot_idx_list = [] # [pair_idx, paivot_idx]
-        for i, pair in enumerate(self.pair_number_list):
+        for i, pair in enumerate(self.all_pair_list):
             if pivot in pair:
                 the_others.add(filter(lambda x: x != pivot, pair))
 

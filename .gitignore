@@ -19,3 +19,4 @@ pyproject.toml
 .history
 .vscode/
 *.png
+*.svg
