@@ -527,7 +527,7 @@ class PairwiseAnalysis:
         if delete_results:
             self.delete_prev_results()
 
-        self.OT, df_trial = self._gw_alignment(
+        self.OT, df_trial = self._entropic_gw_alignment(
             compute_OT,
             target_device=target_device,
             sampler_seed=sampler_seed,
@@ -615,9 +615,6 @@ class PairwiseAnalysis:
         elif '.pt' in ot_path:
             OT = torch.load(ot_path).to("cpu").numpy()
 
-        # GWD0_list, OT0_list = self.simulated_annealing(study, k = 1)
-        # new_OT = OT0_list[np.argmin(GWD0_list)]
-
         return OT, df_trial
 
     def _run_optimization(
@@ -694,43 +691,6 @@ class PairwiseAnalysis:
             study = opt.load_study()
 
         return study
-
-    def simulated_annealing(self, study, k):
-        """
-        GWOT without entropy
-
-        By using optimal transportation plan obtained with entropic GW
-        as an initial transportation matrix, we run the optimization of GWOT without entropy.
-
-        This procedure further minimizes GWD and enables us to fairly compare GWD values
-        obtained with different entropy regularization values.
-        """
-
-        GWD0_list = list()
-        OT0_list = list()
-
-        trials = study.trials_dataframe()
-        sorted_trials = trials.sort_values(by="value", ascending=True)
-        top_k_trials = sorted_trials.head(k)
-        top_k_trials = top_k_trials[['number', 'value', 'params_eps']]
-
-        for i in top_k_trials['number']:
-            ot_path = glob.glob(self.data_path + f"/gw_{i}.*")[0]
-            if '.npy' in ot_path:
-                OT = np.load(ot_path)
-            elif '.pt' in ot_path:
-                OT = torch.load(ot_path).to("cpu").numpy()
-
-            C1 = self.source.sim_mat
-            C2 = self.target.sim_mat
-            p = OT.sum(axis=1)
-            q = OT.sum(axis=0)
-            OT0, log0 = ot.gromov.gromov_wasserstein(C1, C2, p, q, log=True, verbose=False, G0=OT)
-            GWD0 = log0['gw_dist']
-            GWD0_list.append(GWD0)
-            OT0_list.append(OT0)
-
-        return GWD0_list, OT0_list
 
     def get_optimization_log(self, fig_dir=None, **kwargs):
         figsize = kwargs.get('figsize', (8,6))
@@ -1290,7 +1250,6 @@ class AlignRepresentations:
                 self.pairwise_list = self._get_pairwise_list(self.specific_pair_list)
             else:
                 self.pairwise_list = self._get_pairwise_list(self.all_pair_list)
-
 
     def _specific_pair_list(self, pair_list):
         if isinstance(pair_list, dict):
