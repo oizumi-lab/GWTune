@@ -22,6 +22,24 @@ from .utils.init_matrix import InitMatrix
 
 # %%
 class GW_Alignment:
+    """The main object for entropic Gromov-Wasserstein (GW) alignment.
+
+    This class encapsulates the necessary parameters and methods for the alignment process,
+    including the dissimilarity matrices for the source and target, the path to save results, and various algorithm parameters such as the maximum number of iterations and the method for the Sinkhorn algorithm. This class also sets up the main computation object for performing the GW alignment.
+
+    Attributes:
+        to_types (str): Specifies the type of data structure to be used for computations,
+                        either "torch" or "numpy".
+        data_type (str): Specifies the type of data to be used in computation.
+        sinkhorn_method (str): Method used for the solver. Options are "sinkhorn", "sinkhorn_log",
+                               "greenkhorn", "sinkhorn_stabilized", or "sinkhorn_epsilon_scaling".
+        source_size (int): The size (number of elements) of the source distribution.
+        target_size (int): The size (number of elements) of the target distribution.
+        data_path (str): Directory to save the computation results.
+        n_iter (int):   The number of initial plans evaluated during optimization
+                        when init_mat_plan is set to "random", "permutation", or "user_define".
+        main_compute (MainGromovWasserstainComputation): The main computation object for performing the GW alignment.
+    """
     def __init__(
         self,
         source_dist: Any,
@@ -34,10 +52,7 @@ class GW_Alignment:
         data_type: str = "double",
         sinkhorn_method: str = "sinkhorn",
     ) -> None:
-        """The object which is used for entropic Gromov-Wasserstein (GW) alignment between source and target distributions.
-
-        This class encapsulates the necessary parameters and methods for the alignment process,
-        including the dissimilarity matrices for the source and target, the path to save results, and various algorithm parameters such as the maximum number of iterations and the method for the Sinkhorn algorithm. This class also sets up the main computation object for performing the GW alignment.
+        """Initialize the Gromov-Wasserstein alignment object.
 
         Args:
             source_dist (Any):  Array-like, shape (n_source, n_source).
@@ -183,7 +198,19 @@ class MainGromovWasserstainComputation:
     """The object responsible for the specific computations of the entropic Gromov-Wasserstein alignment.
 
     Attributes:
-        source_dist (Any): The pairwise distance matrix for the source data, represented as a 2D array.
+        to_types (str): Specifies the type of data structure to be used, either "torch" or "numpy".
+        data_type (str): Specifies the type of data to be used in computation.
+        source_dist (Any): Array-like, shape (n_source, n_source). Dissimilarity matrix of the source data.
+        target_dist (Any): Array-like, shape (n_target, n_target). Dissimilarity matrix of the target data.
+        p (Any): Probability distribution for the source data.
+        q (Any): Probability distribution for the target data.
+        source_size (int): Size of the source data.
+        target_size (int): Size of the target data.
+        init_mat_builder (InitMatrix): Object for building initial matrices.
+        max_iter (int): Maximum number of iterations for entropic Gromov-Wasserstein alignment by POT.
+        numItermax (int): Maximum number of iterations for the Sinkhorn algorithm.
+        n_iter (int): Number of trials, i.e., the number of initial plans evaluated in optimization.
+        back_end (Backend): Backend object to handle computations on the specified device and data type.
     """
     def __init__(
         self,
@@ -449,7 +476,9 @@ class MainGromovWasserstainComputation:
             seed (Any, optional): Seed for generating the initial matrix. Defaults to None.
 
         Returns:
-            Tuple[dict, optuna.trial.Trial, Optional[bool]]: A tuple containing the log variables, the updated trial object, and a flag indicating if the current loss is the best loss.
+            logv (dict): A dictionary containing the Gromov-Wasserstein loss(distance) and accuracy.
+            trial (optuna.trial.Trial): The trial object from the Optuna.
+            best_flag (Optional[bool]): A flag indicating whether the current trial is the best trial.
         """
 
         if init_mat_plan == "user_define":
@@ -502,29 +531,33 @@ class MainGromovWasserstainComputation:
 
     def compute_GW_with_init_plans(
         self,
-        trial,
-        eps,
-        init_mat_plan,
-        device,
-        sinkhorn_method = "sinkhorn"
-    ):
-        """
+        trial: optuna.trial.Trial,
+        eps: float,
+        init_mat_plan: str,
+        device: str,
+        sinkhorn_method: str = "sinkhorn"
+    ) -> Tuple[dict, optuna.trial.Trial]:
+        """Calculate Gromov-Wasserstein (GW) alignment based on specified parameters.
 
-        calculate GW alignment with parameters given by user.
+        This function computes the GW alignment given the initialization plan and the parameter.
 
         Args:
-            trial (_type_): _description_
-            eps (_type_): _description_
-            init_mat_plan (_type_): _description_
-            device (_type_): _description_
-            sinkhorn_method (str, optional): _description_. Defaults to "sinkhorn".
+            trial (optuna.trial.Trial): The trial object from the Optuna.
+            eps (float): Regularization term.
+            init_mat_plan (str):    The initialization method of transportation plan for Gromov-Wasserstein alignment.
+                                    Options are "random", "permutation", "user_define", "uniform", or "diag".
+            device (str): The device to be used for computation, either "cpu" or "cuda".
+            sinkhorn_method (str, optional):    Method used for the solver. Options are "sinkhorn", "sinkhorn_log",
+                                                "greenkhorn", "sinkhorn_stabilized", or "sinkhorn_epsilon_scaling".
+                                                Defaults to "sinkhorn".
 
         Raises:
-            optuna.TrialPruned: _description_
-            ValueError: _description_
+            optuna.TrialPruned: Raised when all iterations fail with the given parameters.
+            ValueError: Raised when an undefined initialization method is provided.
 
         Returns:
-            _type_: _description_
+            best_logv (dict): A dictionary containing the best Gromov-Wasserstein loss(distance) and accuracy.
+            trial (optuna.trial.Trial): The trial object from the Optuna.
         """
 
         if init_mat_plan in ["uniform", "diag"]:
