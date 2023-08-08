@@ -1,39 +1,68 @@
 # %%
-# Standard Library
-import os
+from typing import Tuple
+
 import numpy as np
-import scipy as sp
+
 
 #%%
 class SimpleHistogramMatching():
     def __init__(self, source:np.ndarray, target:np.ndarray) -> None:
-        """
-        Simple Histogram Matching
+        """Simple Histogram Matching
 
         Args:
-            source (np.ndarray): source's dis-similarity matrix
-            target (np.ndarray): target's dis-similarity matrix
+            source (np.ndarray): source's dissimilarity matrix
+            target (np.ndarray): target's dissimilarity matrix
         """
         self.source = source
         self.target = target
         pass
 
-    def _sort_for_scaling(self, X):
+    def _sort_for_scaling(self, X: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Sorts the input matrix for scaling.
+
+        Args:
+            X (np.ndarray): Input dissimilarity matrix.
+
+        Returns:
+            x (np.ndarray): Flattened input matrix.
+            x_sorted (np.ndarray): Sorted input matrix.
+            x_inverse_idx (np.ndarray): Inverse index of the sorted input matrix.
+        """
         x = X.flatten()
         x_sorted = np.sort(x)
         x_inverse_idx = np.argsort(x).argsort()
         return x, x_sorted, x_inverse_idx
 
-    def _simple_histogram_matching(self, X, Y):
+    def _simple_histogram_matching(self, X: np.ndarray, Y: np.ndarray) -> np.ndarray:
+        """Performs simple histogram matching between two matrices.
+
+        Args:
+            X (np.ndarray): Source's dissimilarity matrix.
+            Y (np.ndarray): Target's dissimilarity matrix.
+
+        Returns:
+            Y_t (np.ndarray): Transformed target's dissimilarity matrix.
+        """
         # X, Y: dissimilarity matrices
-        x, x_sorted, x_inverse_idx = self._sort_for_scaling(X)
-        y, y_sorted, y_inverse_idx = self._sort_for_scaling(Y)
+        _, x_sorted, _ = self._sort_for_scaling(X)
+        _, _, y_inverse_idx = self._sort_for_scaling(Y)
 
         y_t = x_sorted[y_inverse_idx]
         Y_t = y_t.reshape(Y.shape)  # transformed matrix
         return Y_t
 
-    def simple_histogram_matching(self, method = 'target'):
+    def simple_histogram_matching(self, method: str = 'target') -> np.ndarray:
+        """Public method to perform simple histogram matching.
+
+        Args:
+            method (str, optional): Direction of the histogram matching. Either "source" or "target". Defaults to "target".
+
+        Returns:
+            np.ndarray: New embedding after histogram matching.
+
+        Raises:
+            ValueError: If method is not "source" or "target".
+        """
         if method == 'target':
             new_emb = self._simple_histogram_matching(self.source, self.target)
 

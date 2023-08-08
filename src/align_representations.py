@@ -92,7 +92,7 @@ class OptimizationConfig:
 
         self.sampler_name = sampler_name
         self.user_define_init_mat_list = user_define_init_mat_list
-        
+
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
 
@@ -363,10 +363,10 @@ class PairwiseAnalysis:
     """
 
     def __init__(
-        self, 
+        self,
         results_dir:str,
-        config: OptimizationConfig, 
-        source: Representation, 
+        config: OptimizationConfig,
+        source: Representation,
         target: Representation,
         pair_name=None,
         data_name=None,
@@ -383,7 +383,7 @@ class PairwiseAnalysis:
             data_name (_type_, optional): _description_. Defaults to None.
             filename (_type_, optional): _description_. Defaults to None.
         """
-        
+
         self.source = source
         self.target = target
         self.config = config
@@ -392,14 +392,14 @@ class PairwiseAnalysis:
             self.pair_name = f"{source.name}_vs_{target.name}"
         else:
             self.pair_name = pair_name
-        
+
         self.data_name = data_name
-        
+
         if filename is None:
             self.filename = self.data_name + "_" + self.pair_name
         else:
             self.filename = filename
-        
+
         self.results_dir = results_dir
         self.save_path = os.path.join(results_dir, self.data_name, self.filename, self.config.init_mat_plan)
         self.figure_path = os.path.join(self.save_path, 'figure')
@@ -412,7 +412,7 @@ class PairwiseAnalysis:
         assert np.array_equal(
             self.source.object_labels, self.target.object_labels
         ), "the label information doesn't seem to be the same."
-        
+
         # Generate the URL for the database. Syntax differs for SQLite and others.
         if self.config.db_params["drivername"] == "sqlite":
             self.storage = "sqlite:///" + self.save_path + "/" + self.filename + "_" + self.config.init_mat_plan + ".db"
@@ -524,11 +524,11 @@ class PairwiseAnalysis:
         Returns:
             _type_: _description_
         """
-        
+
         # Delete the previous results if the flag is True.
         if delete_results:
             self.delete_prev_results()
-            
+
         self.OT, df_trial = self._entropic_gw_alignment(
             compute_OT,
             target_device=target_device,
@@ -705,7 +705,7 @@ class PairwiseAnalysis:
         lim_eps = kwargs.get("lim_eps", None)
         lim_gwd = kwargs.get("lim_gwd", None)
         lim_acc = kwargs.get("lim_acc", None)
-       
+
         study = self._run_optimization(compute_OT = False)
         df_trial = study.trials_dataframe()
 
@@ -785,7 +785,7 @@ class PairwiseAnalysis:
     ):
         if ot_to_plot is None:
             ot_to_plot = self.OT
-            
+
         if OT_format == "sorted" or OT_format == "both":
             assert self.source.sorted_sim_mat is not None, "No label info to sort the 'sim_mat'."
             OT_sorted = self.source.func_for_sort_sim_mat(ot_to_plot, category_idx_list=self.source.category_idx_list)
@@ -851,7 +851,7 @@ class PairwiseAnalysis:
             OT = np.diag([1 / len(self.target.sim_mat)] * len(self.target.sim_mat))
         else:
             OT = self.OT
-        
+
         if ot_to_evaluate is not None:
             OT = ot_to_evaluate
         else:
@@ -913,7 +913,7 @@ class PairwiseAnalysis:
         # Calculate the accuracy as the proportion of counts to the total number of rows
         accuracy = count / matrix.shape[0]
         accuracy *= 100
-        
+
         return accuracy
 
     def procrustes(self, embedding_target, embedding_source, OT):
@@ -948,7 +948,7 @@ class PairwiseAnalysis:
 
     def get_new_source_embedding(self):
         return self.procrustes(self.target.embedding, self.source.embedding, self.OT)
-    
+
     def _simulated(
         self,
         trials,
@@ -958,19 +958,19 @@ class PairwiseAnalysis:
         data_type=None,
     ):
         """
-        By using optimal transportation plan obtained with entropic GW 
-        as an initial transportation matrix, we run the optimization of GWOT without entropy.  
-        
-        This procedure further minimizes GWD and enables us to fairly compare GWD values 
-        obtained with different entropy regularization values.  
+        By using optimal transportation plan obtained with entropic GW
+        as an initial transportation matrix, we run the optimization of GWOT without entropy.
+
+        This procedure further minimizes GWD and enables us to fairly compare GWD values
+        obtained with different entropy regularization values.
         """
-        
+
         GWD0_list = list()
         OT0_list = list()
-  
+
         trials = trials[trials['value'] != np.nan]
         top_k_trials = trials.sort_values(by="value", ascending=True)
-        
+
         if top_k is not None:
             top_k_trials = top_k_trials.head(top_k)
 
@@ -986,7 +986,7 @@ class PairwiseAnalysis:
                 drop_index_list.extend(ind.tolist())
                 print(f"gw_{i}.npy (or gw_{i}.pt) doesn't exist in the result folder...")
                 continue
-        
+
             if '.npy' in ot_path:
                 OT = np.load(ot_path)
             elif '.pt' in ot_path:
@@ -999,21 +999,21 @@ class PairwiseAnalysis:
                 to_types=to_types,
                 data_type=data_type,
             )
-            
+
             gwd = log0['gw_dist']
             new_ot = log0['ot0']
-            
+
             if isinstance(new_ot, torch.Tensor):
                 gwd = gwd.to('cpu').item()
                 new_ot = new_ot.to('cpu').numpy()
 
             GWD0_list.append(gwd)
             OT0_list.append(new_ot)
-        
+
         top_k_trials = top_k_trials.drop(top_k_trials.index[drop_index_list])
-        
+
         return GWD0_list, OT0_list, top_k_trials
-    
+
     def run_gwot_without_entropic(
         self,
         ot_mat = None,
@@ -1025,29 +1025,29 @@ class PairwiseAnalysis:
         """
         GWOT without entropy
         """
-        
+
         if ot_mat is not None:
             p = ot_mat.sum(axis=1)
-            q = ot_mat.sum(axis=0) 
+            q = ot_mat.sum(axis=0)
         else:
             p = ot.unif(len(self.source.sim_mat))
             q = ot.unif(len(self.target.sim_mat))
-        
+
         sim_mat1 = self.source.sim_mat
         sim_mat2 = self.target.sim_mat
-        
+
         if device is None and to_types is None and data_type is None:
             back_end = backend.Backend(self.config.device, self.config.to_types, self.config.data_type)
         else:
             back_end = backend.Backend(device, to_types, data_type)
-        
+
         sim_mat1, sim_mat2, p, q, ot_mat = back_end(sim_mat1, sim_mat2, p, q, ot_mat)
-    
+
         new_ot_mat, log0 = ot.gromov.gromov_wasserstein(
-            sim_mat1, 
-            sim_mat2, 
-            p, 
-            q, 
+            sim_mat1,
+            sim_mat2,
+            p,
+            q,
             loss_fun = 'square_loss',
             symmetric = None,
             log=True,
@@ -1058,11 +1058,11 @@ class PairwiseAnalysis:
             tol_abs = 1e-9,
             verbose=False,
         )
-        
+
         log0["ot0"] = new_ot_mat
-        
+
         return log0
-    
+
     def run_test_after_entropic_gwot(
         self,
         top_k=None,
@@ -1075,19 +1075,19 @@ class PairwiseAnalysis:
         category_mat = None,
         visualization_config: VisualizationConfig = VisualizationConfig(),
     ):
-        
+
         self.OT, df_trial = self._entropic_gw_alignment(compute_OT=False)
 
         GWD0_list, OT0_list, top_k_trials = self._simulated(
-            df_trial, 
+            df_trial,
             top_k=top_k,
             device=device,
             to_types=to_types,
             data_type=data_type,
         )
-        
+
         ot_no_ent = OT0_list[np.argmin(GWD0_list)]
-        
+
         # plot results
         self.show_OT(
             ot_to_plot = ot_no_ent,
@@ -1101,10 +1101,10 @@ class PairwiseAnalysis:
         )
 
         self._evaluate_accuracy_and_plot(ot_no_ent, eval_type)
-        
+
         if category_mat is not None:
             self._evaluate_accuracy_and_plot(ot_no_ent, "category", category_mat=category_mat)
-        
+
         self._plot_GWD_optimization(top_k_trials, GWD0_list, **visualization_config())
 
     def _evaluate_accuracy_and_plot(self, ot_to_evaluate, eval_type, category_mat=None):
@@ -1115,14 +1115,14 @@ class PairwiseAnalysis:
             eval_type=eval_type,
             category_mat=category_mat,
         )
-        
+
         df_after = self.eval_accuracy(
             top_k_list = top_k_list,
             ot_to_evaluate=ot_to_evaluate,
             eval_type=eval_type,
             category_mat=category_mat,
         )
-        
+
         df_before = df_before.set_index('top_n')
         df_after  = df_after.set_index('top_n')
 
@@ -1135,32 +1135,32 @@ class PairwiseAnalysis:
             grid=True,
             rot=0,
         )
-        
+
         plt.savefig(os.path.join(self.figure_path, "accuracy_comparison_with_or_without.png"))
-        plt.show()        
+        plt.show()
         plt.clf()
         plt.close()
-        
+
         print(plot_df)
-    
+
     def _plot_GWD_optimization(self, top_k_trials, GWD0_list, marker_size = 10, **kwargs):
         figsize = kwargs.get('figsize', (8, 6))
         title_size = kwargs.get('title_size', 15)
         plot_eps_log = kwargs.get('plot_eps_log', False)
         show_figure = kwargs.get('show_figure', True)
-        
+
         plt.rcParams.update(plt.rcParamsDefault)
         plt.style.use("seaborn-darkgrid")
 
         plt.figure(figsize = figsize)
         plt.title("$\epsilon$ - GWD (" + self.pair_name.replace("_", " ") + ")", fontsize = title_size)
-        
+
         plt.scatter(top_k_trials["params_eps"], top_k_trials["value"], c = 'red', s=marker_size, label="before") # before
         plt.scatter(top_k_trials["params_eps"], GWD0_list, c = 'blue', s=marker_size, label = "after") # after
-        
+
         if plot_eps_log:
             plt.xscale('log')
-            
+
         plt.xlabel("$\epsilon$")
         plt.ylabel("GWD")
         plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
@@ -1169,13 +1169,13 @@ class PairwiseAnalysis:
         plt.legend()
         plt.tight_layout()
         plt.savefig(os.path.join(self.figure_path, "eps_vs_gwd_comparison_with_or_without.png"))
-        
+
         if show_figure:
             plt.show()
-        
+
         plt.clf()
         plt.close()
-    
+
 class AlignRepresentations:
     """
     This object has methods for conducting N groups level analysis and corresponding results.
@@ -1204,93 +1204,93 @@ class AlignRepresentations:
             main_results_dir (str, optional): _description_. Defaults to None.
             data_name (str, optional): _description_. Defaults to None.
         """
-        
+
         self.config = config
         self.data_name = data_name
         self.metric = metric
         self.representations_list = representations_list
         self.histogram_matching = histogram_matching
-        
+
         self.main_results_dir = main_results_dir
         self.main_pair_name = None
         self.main_file_name = None
 
         self.RSA_corr = dict()
-        
+
         self.name_list = [rep.name for rep in self.representations_list]
-        
+
         self.all_pair_list = list(itertools.combinations(range(len(self.representations_list)), 2))
-        
+
         print(f"data_name : {self.data_name}")
-        
+
         self.set_specific_eps_list(specific_eps_list)
-        
+
         self.set_pair_computed(pairs_computed)
-        
+
     def set_pair_computed(self, pairs_computed:Optional[List]):
         self.pairs_computed = pairs_computed
-        
+
         if pairs_computed is not None:
             print("The pairs to compute was selected by pairs_computed...")
             self.specific_pair_list = self._specific_pair_list(pairs_computed)
             self.pairwise_list = self._get_pairwise_list(self.specific_pair_list)
-        
+
         else:
             print("All the pairs in the list below will be computed. ")
             self.pairwise_list = self._get_pairwise_list(self.all_pair_list)
-        
+
     def set_specific_eps_list(
-        self, 
-        specific_eps_list:Optional[dict], 
+        self,
+        specific_eps_list:Optional[dict],
         specific_only:bool = False,
-    ):       
-        
+    ):
+
         self.specific_eps_list = specific_eps_list
-        
+
         if specific_eps_list is not None:
             assert isinstance(self.specific_eps_list, dict), "specific_eps_list needs to be dict."
             print("The range of epsilon for some pairs in the list below was changed ...")
-            
+
             self.specific_pair_list = self._specific_pair_list(specific_eps_list)
 
             if specific_only:
                 self.pairwise_list = self._get_pairwise_list(self.specific_pair_list)
             else:
                 self.pairwise_list = self._get_pairwise_list(self.all_pair_list)
- 
+
     def _specific_pair_list(self, pair_list):
         if isinstance(pair_list, dict):
             key_loop = pair_list.keys()
         elif isinstance(pair_list, list):
             key_loop = pair_list
 
-        specific_pair_list = [] 
+        specific_pair_list = []
         for key in key_loop:
             if not key in self.name_list:
                 source_name, target_name = key.split('_vs_')
-                
+
                 source_idx = self.name_list.index(source_name)
                 target_idx = self.name_list.index(target_name)
-                
+
                 rep_list = [(source_idx, target_idx)]
-                
+
             else:
                 rep_idx = self.name_list.index(key)
                 rep_list = [nn for nn in self.all_pair_list if rep_idx in nn]
-            
+
             specific_pair_list.extend(rep_list)
-        
+
         return specific_pair_list
-    
+
     def _get_pairwise_list(self, pair_list):
         pairwise_list = []
-  
+
         for pair in pair_list:
             config_copy = copy.deepcopy(self.config)
-            
+
             s = self.representations_list[pair[0]]
             t = self.representations_list[pair[1]]
-                  
+
             if self.specific_eps_list is not None:
                 pair_name = f"{s.name}_vs_{t.name}"
                 if s.name in self.specific_eps_list.keys():
@@ -1299,15 +1299,15 @@ class AlignRepresentations:
                     config_copy.eps_list = self.specific_eps_list[pair_name]
 
             pairwise = PairwiseAnalysis(
-                results_dir=self.main_results_dir, 
-                config=config_copy, 
-                source=s, 
-                target=t, 
+                results_dir=self.main_results_dir,
+                config=config_copy,
+                source=s,
+                target=t,
                 data_name=self.data_name,
                 pair_name=self.main_pair_name,
                 filename=self.main_file_name,
             )
-            
+
             print('pair:', pairwise.pair_name, 'eps_list:', config_copy.eps_list)
 
             if self.histogram_matching:
@@ -1533,9 +1533,9 @@ class AlignRepresentations:
 
         if return_data:
             return OT_list
-    
+
     def gwot_after_entropic(
-        self, 
+        self,
         top_k=None,
         parallel_method=None,
         OT_format="default",
@@ -1545,10 +1545,10 @@ class AlignRepresentations:
     ):
         if parallel_method == "multiprocess":
             pool = ProcessPoolExecutor(self.config.n_jobs)
-        
+
         elif parallel_method == "multithread":
             pool = ThreadPoolExecutor(self.config.n_jobs)
-        
+
         elif parallel_method is None:
             for idx, pair in enumerate(self.pairwise_list):
                 pair.run_test_after_entropic_gwot(
@@ -1558,12 +1558,12 @@ class AlignRepresentations:
                     to_types=None,
                     data_type=None,
                     ticks=ticks,
-                    category_mat=category_mat, 
+                    category_mat=category_mat,
                     visualization_config = visualization_config,
                 )
-            
+
             return None
-                
+
         with pool:
             if self.config.to_types == "numpy":
                 if self.config.multi_gpu != False:
@@ -1576,11 +1576,11 @@ class AlignRepresentations:
                     target_device = "cuda:" + str(idx % torch.cuda.device_count())
                 else:
                     target_device = self.config.device
-                    
+
                 if isinstance(self.config.multi_gpu, list):
                     gpu_idx = idx % len(self.config.multi_gpu)
                     target_device = "cuda:" + str(self.config.multi_gpu[gpu_idx])
-                
+
                 future = pool.submit(
                     pair.run_test_after_entropic_gwot,
                     top_k=top_k,
@@ -1589,16 +1589,16 @@ class AlignRepresentations:
                     to_types=self.config.to_types,
                     data_type=self.config.data_type,
                     ticks=ticks,
-                    category_mat=category_mat, 
+                    category_mat=category_mat,
                     visualization_config = visualization_config,
                 )
                 processes.append(future)
 
             for future in as_completed(processes):
                 future.result()
-                
-                
-                
+
+
+
 
     def drop_gw_alignment_files(self, drop_filenames: Optional[List[str]] = None, drop_all: bool = False):
         """Delete the specified database and directory with the given filename
@@ -1677,8 +1677,8 @@ class AlignRepresentations:
         for representation in others_representaions:
             pairwise = PairwiseAnalysis(
                 results_dir=self.main_results_dir,
-                config=self.config, 
-                source=representation, 
+                config=self.config,
+                source=representation,
                 target=pivot_representation,
                 data_name=self.data_name,
                 pair_name=self.main_pair_name,
@@ -1713,8 +1713,8 @@ class AlignRepresentations:
         for representation in self.representations_list:
             pairwise = PairwiseAnalysis(
                 results_dir=self.main_results_dir,
-                config=self.config, 
-                source=representation, 
+                config=self.config,
+                source=representation,
                 target=self.barycenter,
                 data_name=self.data_name,
                 pair_name=self.main_pair_name,
