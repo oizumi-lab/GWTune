@@ -354,7 +354,6 @@ def load_optimizer(
         pruner_name (str, optional): Name of the pruner used in optimization. Options are "hyperband", "median", and "nop". Defaults to "median".
         pruner_params (dict, optional): Additional parameters for the pruner. See Optuna's pruner page for more details
 
-
     Returns:
         opt : instance of optimzer.
     """
