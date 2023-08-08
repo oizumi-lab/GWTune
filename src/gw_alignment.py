@@ -29,7 +29,7 @@ class GW_Alignment:
         data_path: str,
         max_iter: int = 1000,
         numItermax: int = 1000,
-        num_trial: int = 20,
+        n_iter: int = 20,
         to_types: str = "torch",
         data_type: str = "double",
         sinkhorn_method: str = "sinkhorn",
@@ -50,7 +50,7 @@ class GW_Alignment:
                                         Defaults to 1000.
             numItermax (int, optional): Maximum number of iterations for the
                                         Sinkhorn algorithm. Defaults to 1000.
-            num_trial (int, optional):  Number of trials, i.e., the number of
+            n_iter (int, optional):  Number of trials, i.e., the number of
                                         initial plans evaluated in optimization.
                                         Defaults to 20.
             to_types (str, optional):   Specifies the type of data structure to be used,
@@ -74,7 +74,7 @@ class GW_Alignment:
         if not os.path.exists(self.data_path):
             os.makedirs(self.data_path, exist_ok=True)
 
-        self.num_trial = num_trial
+        self.n_iter = n_iter
 
         self.main_compute = MainGromovWasserstainComputation(
             source_dist,
@@ -83,7 +83,7 @@ class GW_Alignment:
             data_type=self.data_type,
             max_iter=max_iter,
             numItermax=numItermax,
-            num_trial=num_trial,
+            n_iter=n_iter,
         )
 
     def define_eps_range(
@@ -193,7 +193,7 @@ class MainGromovWasserstainComputation:
         data_type: str = 'double',
         max_iter: int = 1000,
         numItermax: int = 1000,
-        num_trial: int = 20
+        n_iter: int = 20
     ) -> None:
         """Initialize the Gromov-Wasserstein alignment computation object.
 
@@ -211,7 +211,7 @@ class MainGromovWasserstainComputation:
                                         Defaults to 1000.
             numItermax (int, optional): Maximum number of iterations for the
                                         Sinkhorn algorithm. Defaults to 1000.
-            num_trial (int, optional):  Number of trials, i.e., the number of
+            n_iter (int, optional):  Number of trials, i.e., the number of
                                         initial plans evaluated in optimization.
                                         Defaults to 20.
         """
@@ -236,7 +236,7 @@ class MainGromovWasserstainComputation:
         self.numItermax = numItermax
 
         # the number of iteration mainly used for random init matrix.
-        self.num_trial = num_trial
+        self.n_iter = n_iter
 
         self.back_end = Backend("cpu", self.to_types, self.data_type)
 
@@ -303,7 +303,6 @@ class MainGromovWasserstainComputation:
         init_mat: Any,
         eps: float,
         device: str,
-        trial: Optional[optuna.trial.Trial] = None,
         sinkhorn_method: str = "sinkhorn",
     ) -> Dict[str, Any]:
         """Modify the result of Gromov-Wasserstein alignment to make it easier to optimize.
@@ -312,8 +311,6 @@ class MainGromovWasserstainComputation:
             init_mat (Any): The initial value of transportation plan for Gromov-Wasserstein alignment.
             eps (float):    Regularization term for Gromov-Wasserstein alignment.
             device (str):   The device to be used for computation, either "cpu" or "cuda".
-            trial (Optional[optuna.trial.Trial], optional): The trial object from the Optuna for hyperparameter optimization.
-                                                            Defaults to None.
             sinkhorn_method (str, optional):    Method used for the solver. Options are "sinkhorn", "sinkhorn_log",
                                                 "greenkhorn", "sinkhorn_stabilized", or "sinkhorn_epsilon_scaling".
                                                 Defaults to "sinkhorn".
@@ -326,7 +323,6 @@ class MainGromovWasserstainComputation:
             device,
             eps,
             init_mat,
-            trial=trial,
             sinkhorn_method=sinkhorn_method,
         )
 
@@ -545,7 +541,7 @@ class MainGromovWasserstainComputation:
             self.best_gw_loss = float("inf")
 
             if init_mat_plan in ["random", "permutation"]:
-                pbar = tqdm(np.random.randint(0, 100000, self.num_trial))
+                pbar = tqdm(np.random.randint(0, 100000, self.n_iter))
 
             if init_mat_plan == "user_define":
                 pbar = tqdm(self.init_mat_builder.user_define_init_mat_list)
