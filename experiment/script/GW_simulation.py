@@ -129,7 +129,6 @@ config = OptimizationConfig(
     num_trial=50,
     db_params={"drivername": "sqlite"},
     n_iter=1,
-    data_name="Simulation_1"
 )
 
 vis_config = VisualizationConfig(
@@ -147,7 +146,9 @@ vis_emb = VisualizationConfig(
 
 alignment = AlignRepresentations(
     config=config,
-    representations_list=[Group1, Group2]
+    representations_list=[Group1, Group2],
+    main_results_dir="../results/",
+    data_name="Simulation_1"
 )
 
 # RSA
@@ -164,7 +165,6 @@ Group2.show_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/S
 # %%
 # GW
 alignment.gw_alignment(
-    results_dir="../results",
     compute_OT=False,
     delete_results=False,
     visualization_config=vis_config
@@ -232,8 +232,8 @@ block_sizes = [N_points//num_categories for i in range(num_categories)]
 matrix = get_block_mat(block_sizes)
 sim_mat_1 = add_noise_to_off_diagonal(matrix, mean=0.2, std=0.08, seed=0)
 sim_mat_2 = add_noise_to_off_diagonal(matrix, mean=0.2, std=0.08, seed=1)
-np.save("../../data/simulation2_sim_mat1.npy", sim_mat_1)
-np.save("../../data/simulation2_sim_mat2.npy", sim_mat_2)
+#np.save("../../data/simulation2_sim_mat1.npy", sim_mat_1)
+#np.save("../../data/simulation2_sim_mat2.npy", sim_mat_2)
 
 Group1 = Representation(
     name="Group1",
@@ -253,7 +253,6 @@ config = OptimizationConfig(
     num_trial=50,
     db_params={"drivername": "sqlite"},
     n_iter=1,
-    data_name="Simulation_2"
 )
 
 vis_config = VisualizationConfig(
@@ -265,7 +264,9 @@ vis_config = VisualizationConfig(
 
 alignment = AlignRepresentations(
     config=config,
-    representations_list=[Group1, Group2]
+    representations_list=[Group1, Group2],
+    main_results_dir="../results/",
+    data_name="Simulation_2"
 )
 
 # RSA
@@ -279,10 +280,12 @@ alignment.RSA_get_corr()
 # show embeddings
 Group1.show_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_2", fig_name="Group1")
 Group2.show_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_2", fig_name="Group2")
+
+np.save("../../data/simulation2_embedding1.npy", Group1.embedding)
+np.save("../../data/simulation2_embedding2.npy", Group2.embedding)
 # %%
 # GW
 alignment.gw_alignment(
-    results_dir="../results",
     compute_OT=False,
     delete_results=False,
     visualization_config=vis_config
@@ -350,12 +353,13 @@ config = OptimizationConfig(
     num_trial=50,
     db_params={"drivername": "sqlite"},
     n_iter=1,
-    data_name="Simulation_3"
 )
 
 alignment = AlignRepresentations(
     config=config,
-    representations_list=[Group1, Group2]
+    representations_list=[Group1, Group2],
+    main_results_dir="../results/",
+    data_name="Simulation_3"
 )
 
 vis_config = VisualizationConfig(
@@ -380,7 +384,6 @@ Group2.show_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/S
 # %%
 # GW
 alignment.gw_alignment(
-    results_dir="../results",
     compute_OT=False,
     delete_results=False,
     visualization_config=vis_config
