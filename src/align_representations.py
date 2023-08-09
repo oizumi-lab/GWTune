@@ -1445,10 +1445,6 @@ class PairwiseAnalysis:
         plt.close()
 
 class AlignRepresentations:
-    """
-    This object has methods for conducting N groups level analysis and corresponding results.
-    This has information of all pairs of representations.
-    """
     def __init__(
         self,
         config: OptimizationConfig,
@@ -1458,19 +1454,36 @@ class AlignRepresentations:
         histogram_matching=False,
         metric="cosine",
         main_results_dir:str = None,
-        data_name:str = None,
+        data_name:str = "NoDefined",
     ) -> None:
-        """_summary_
+        """
+        This object has methods for conducting N groups level analysis and corresponding results.
+        This has information of all pairs of representations.
 
         Args:
-            config (OptimizationConfig): _description_
-            representations_list (List[Representation]): _description_
-            pairs_computed (List[str], optional): _description_. Defaults to None.
-            specific_eps_list (dict, optional): _description_. Defaults to None.
-            histogram_matching (bool, optional): _description_. Defaults to False.
-            metric (str, optional): _description_. Defaults to "cosine".
-            main_results_dir (str, optional): _description_. Defaults to None.
-            data_name (str, optional): _description_. Defaults to None.
+            config (OptimizationConfig): 
+                all the essential parameters for GWOT.
+            
+            representations_list (List[Representation]): 
+                List of Representation.
+            
+            pairs_computed (List[str], optional):
+                You can change the specific pairs to be computed by setting `pair_computed` . Defaults to None.
+            
+            specific_eps_list (dict, optional): 
+                You can also change the epsilon range `specific_eps_list`. Defaults to None.
+            
+            histogram_matching (bool, optional): 
+                This will adjust the histogram of target to that of source. Defaults to False.
+            
+            metric (str, optional): 
+                Please set the metric that can be used in "scipy.spatical.distance.cdist()". Defaults to "cosine".
+            
+            main_results_dir (str, optional): 
+                The main folder directory to save the results. Defaults to None.
+                
+            data_name (str, optional): 
+                The name of the folder to save the result for each pair. Defaults to "NoDefined".
         """
 
         self.config = config
@@ -1496,6 +1509,13 @@ class AlignRepresentations:
         self.set_pair_computed(pairs_computed)
 
     def set_pair_computed(self, pairs_computed:Optional[List]):
+        """
+        User can only re-run the optimization for specific pairs by using `set_pair_computed`.
+
+        (examples)
+        >>> pairs_computed = ["Group1", "Group2_vs_Group4"] 
+        >>> align_representation.set_pair_computed(pairs_computed)
+        """
         self.pairs_computed = pairs_computed
 
         if pairs_computed is not None:
@@ -1512,6 +1532,17 @@ class AlignRepresentations:
         specific_eps_list:Optional[dict],
         specific_only:bool = False,
     ):
+        """
+        Also, user can re-define the epsilon range for some pairs by using `set_specific_eps_list`. 
+        
+        The rest of them will be computed with `config.eps_list`. 
+        
+        If `specific_only` is True (default is False), only these pairs will be computed and the rest of them were skipped.
+
+        (examples) 
+        >>> specific_eps_list = {'Group1': [0.02, 0.1], "Group2_vs_Group4":[0.1, 0.2]}
+        >>> align_representation.set_specific_eps_list(specific_eps_list, specific_only=False)
+        """
 
         self.specific_eps_list = specific_eps_list
 
@@ -1586,6 +1617,14 @@ class AlignRepresentations:
         return pairwise_list
 
     def RSA_get_corr(self, metric="spearman", method="normal"):
+        """
+        Conventional representation similarity analysis (RSA).
+
+        Args:
+            metric (str, optional): spearman or pearson. Defaults to "spearman".
+            method (str, optional): compute RSA from all ("all") or upper tri ("normal") 
+                                    of the element in the matrices. Defaults to "normal".
+        """
         for pairwise in self.pairwise_list:
             corr = pairwise.RSA(metric=metric, method=method)
             self.RSA_corr[pairwise.pair_name] = corr
@@ -1600,14 +1639,19 @@ class AlignRepresentations:
         show_distribution=True,
         ticks=None,
     ):
-        """_summary_
+        """
+        Show the dissimilarity matrix of the representation.
 
         Args:
-            sim_mat_format (str, optional): _description_. Defaults to "default".
-            visualization_config (VisualizationConfig, optional): _description_. Defaults to VisualizationConfig().
-            fig_dir (_type_, optional): _description_. Defaults to None.
-            show_distribution (bool, optional): _description_. Defaults to True.
-            ticks (_type_, optional): _description_. Defaults to None.
+            sim_mat_format (str, optional): "default", "sorted", or "both". If "sorted" is selected, the rearranged matrix is shown. Defaults to "default".
+            visualization_config (VisualizationConfig, optional): container of parameters used for figure. Defaults to VisualizationConfig().
+            visualization_config_hist (VisualizationConfig, optional): container of parameters used for histogram figure. Defaults to VisualizationConfig().
+            fig_dir (_type_, optional): The directory for saving the figure. Defaults to None.
+            show_distribution : show the histogram figures. Defaults to True.
+            ticks (_type_, optional): "numbers", "objects", or "category". Defaults to None.
+
+        Raises:
+            ValueError: _description_
         """
         for representation in self.representations_list:
             representation.show_sim_mat(
@@ -1678,30 +1722,55 @@ class AlignRepresentations:
         fix_sampler_seed=42,
         parallel_method="multithread",
     ):
-        """_summary_
+        """
+        compute GWOT for each pair.
 
         Args:
-            compute_OT (bool, optional): _description_. Defaults to False.
-            delete_results (bool, optional): _description_. Defaults to False.
-            return_data (bool, optional): _description_. Defaults to False.
-            return_figure (bool, optional): _description_. Defaults to True.
-            OT_format (str, optional): _description_. Defaults to "default".
-            visualization_config (VisualizationConfig, optional): _description_. Defaults to VisualizationConfig().
-            show_log (bool, optional): _description_. Defaults to False.
-            fig_dir (_type_, optional): _description_. Defaults to None.
-            ticks (_type_, optional): _description_. Defaults to None.
-            save_dataframe (bool, optional): _description_. Defaults to False.
-            change_sampler_seed (bool, optional): _description_. Defaults to False.
-            fix_sampler_seed (int, optional): _description_. Defaults to 42.
-            parallel_method (str, optional): _description_. Defaults to "multithread".
-
-        Raises:
-            ValueError: _description_
-            ValueError: _description_
-            ValueError: _description_
-
-        Returns:
-            _type_: _description_
+            compute_OT (bool, optional): 
+                If True, the GWOT will be computed. 
+                If False, the saved results will be loaded. Defaults to False.
+            
+            delete_results (bool, optional): 
+                If True, all the saved results will be deleted. Defaults to False.
+            
+            return_data (bool, optional): 
+                return the computed OT. Defaults to False.
+            
+            return_figure (bool, optional): 
+                make the result figures or not. Defaults to True.
+            
+            OT_format (str, optional):
+                format of sim_mat to visualize. 
+                Options are "default", "sorted", and "both". Defaults to "default".
+            
+            visualization_config (VisualizationConfig, optional): 
+                container of parameters used for figure. Defaults to VisualizationConfig().
+            
+            show_log (bool, optional): 
+                If True, the evaluation figure of GWOT will be made. Defaults to False.
+            
+            fig_dir (str, optional): 
+                you can define the path to which you save the figures (.png).  
+                If None, the figures will be saved in the same subfolder in "results_dir".   
+                Defaults to None.
+            
+            ticks (str, optional): 
+                you can use "objects" or "category (if existed)" or "None". Defaults to None.
+            
+            save_dataframe (bool, optional): 
+                If True, you can save all the computed data stored in SQlite or PyMySQL in csv 
+                format (pandas.DataFrame) in the result folder.  Defaults to False.
+            
+            change_sampler_seed (bool, optional):
+                If True, the random seed will be different for each pair. Defaults to False.
+            
+            fix_sampler_seed (int, optional): 
+                The random seed value for optuna sampler. Defaults to 42.
+            
+            parallel_method (str, optional): 
+                parallel method to compute GWOT. Defaults to "multithread".
+                perhaps, multithread may be better to compute fast, because of Optuna's regulations.
+            
         """
 
         if isinstance(fix_sampler_seed, int) and fix_sampler_seed > -1:
@@ -1811,6 +1880,31 @@ class AlignRepresentations:
         category_mat=None,
         visualization_config: VisualizationConfig = VisualizationConfig(),
     ):
+        """
+        run GWOT without entropy by setting the optimized entropic GWOT as the initial plan.
+ 
+        Args:
+            top_k (int, optional): 
+                this will be used for loading the optimized OT from the bottom k of lowest GWD (= top_k) value.
+                Defaults to None. If None, all the computed OT will be used for GWOT without entropy.
+            
+            parallel_method (str, optional): 
+                parallel method to compute GWOT. Defaults to "multithread".
+                
+            OT_format (str, optional):
+                format of sim_mat to visualize. 
+                Options are "default", "sorted", and "both". Defaults to "default".
+
+            ticks (str, optional): 
+                you can use "objects" or "category (if existed)" or "None". Defaults to None.
+            
+            category_mat (_type_, optional): 
+                This will be used for the category info. Defaults to None.
+            
+            visualization_config (VisualizationConfig, optional): 
+                container of parameters used for figure. Defaults to VisualizationConfig().
+            
+        """
         if parallel_method == "multiprocess":
             pool = ProcessPoolExecutor(self.config.n_jobs)
 
@@ -1891,6 +1985,15 @@ class AlignRepresentations:
         fig_dir=None,
         visualization_config=VisualizationConfig(),
     ):
+        """
+        show both the relationships between epsilons and GWD, and between accuracy and GWD
+
+        Args:
+            fig_dir (_type_, optional): 
+                you can define the path to which you save the figures (.png). 
+                If None, the figures will be saved in the same subfolder in "results_dir". Defaults to None.
+            
+        """
         # default setting
         plt.rcParams.update(plt.rcParamsDefault)
         plt.style.use("seaborn-darkgrid")
@@ -2074,6 +2177,21 @@ class AlignRepresentations:
         category_mat=None,
         barycenter=False
     ):
+        """
+        Evaluation of the accuracy of the unsupervised alignment
+
+        Args:
+            top_k_list (list): define the top k accuracy in list 
+            
+            eval_type (str, optional): 
+                two ways to evaluate the accuracy as above. Defaults to "ot_plan".
+       
+            category_mat (_type_, optional): 
+                This will be used for the category info. Defaults to None.
+            
+            barycenter (bool, optional): _description_. Defaults to False.
+            
+        """
         accuracy = pd.DataFrame()
         accuracy["top_n"] = top_k_list
 
@@ -2121,6 +2239,9 @@ class AlignRepresentations:
         fig_name="Accuracy_ot_plan.png",
         scatter=True,
     ):
+        """
+        plot the accuracy of the unsupervised alignment for each top_k
+        """
         # default setting
         plt.rcParams.update(plt.rcParamsDefault)
         plt.style.use("seaborn-darkgrid")
