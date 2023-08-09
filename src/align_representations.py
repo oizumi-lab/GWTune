@@ -1731,15 +1731,34 @@ class AlignRepresentations:
         fig_dir=None,
         ticks=None,
     ):
+        """
+        The unuspervised alignment method using Wasserstein barycenter proposed by Lian et al. (2021).
+        
 
-        assert self.all_pair_list == range(len(self.pairwise_list))
+        Args:
+            pivot (_type_): The representation to which the other representations are aligned initially using gw alignment
+            n_iter (_type_): The number of iterations to calculate the location of the barycenter.
+            compute_OT (bool, optional): _description_. Defaults to False.
+            delete_results (bool, optional): _description_. Defaults to False.
+            return_data (bool, optional): _description_. Defaults to False.
+            return_figure (bool, optional): _description_. Defaults to True.
+            OT_format (str, optional): _description_. Defaults to "default".
+            visualization_config (VisualizationConfig, optional): _description_. Defaults to VisualizationConfig().
+            show_log (bool, optional): _description_. Defaults to False.
+            fig_dir (_type_, optional): _description_. Defaults to None.
+            ticks (_type_, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
+
+        #assert self.all_pair_list == range(len(self.pairwise_list))
 
         # Select the pivot
         pivot_representation = self.representations_list[pivot]
         others_representaions = self.representations_list[:pivot] + self.representations_list[pivot + 1 :]
 
         # GW alignment to the pivot
-        # ここの部分はあとでself.gw_alignmentの中に組み込む
         for representation in others_representaions:
             pairwise = PairwiseAnalysis(
                 results_dir=self.main_results_dir,
@@ -1770,11 +1789,15 @@ class AlignRepresentations:
         self.barycenter = Representation(
             name="barycenter",
             embedding=init_embedding,
-            category_mat=self.representations_list[0].category_mat,
+            object_labels=self.representations_list[0].object_labels,
             category_name_list=self.representations_list[0].category_name_list,
+            num_category_list=self.representations_list[0].num_category_list,
+            category_idx_list=self.representations_list[0].category_idx_list,
+            func_for_sort_sim_mat=self.representations_list[0].func_for_sort_sim_mat
+            
         )
 
-        # Set pairwises whose target is the barycenter
+        # Set pairwises whose target are the barycenter
         pairwise_barycenters = []
         for representation in self.representations_list:
             pairwise = PairwiseAnalysis(
