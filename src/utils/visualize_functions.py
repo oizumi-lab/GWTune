@@ -1,12 +1,12 @@
-import numpy as np
-import pandas as pd
+import colorsys
+from typing import List
+
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-import colorsys
-from sklearn.decomposition import PCA
-import seaborn as sns
-from typing import List
+import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from sklearn.decomposition import PCA
+
 
 def get_color_labels(n, hue = None, show_labels = True):
     """Create color labels for n objects
@@ -124,7 +124,7 @@ def show_heatmap(
 
     plt.style.use("default")
     plt.rcParams["grid.color"] = "black"
-    
+
     fig, ax = plt.subplots(figsize = figsize)
 
     if title is not None:
@@ -271,7 +271,7 @@ class VisualizeEmbedding():
         markers_list = kwargs.get('markers_list', None)
         marker_size = kwargs.get('marker_size', 30)
         cmap = kwargs.get('cmap', "viridis")
-        
+
         show_figure = kwargs.get('show_figure', True)
 
         if color_labels is None:
@@ -368,12 +368,12 @@ class VisualizeEmbedding():
             cbar.set_label(colorbar_label, size=xlabel_size)
             cbar.ax.tick_params(labelsize=xlabel_size)
             cbar.mappable.set_clim(colorbar_range[0], colorbar_range[1])
-        
+
         if save_dir is not None:
             plt.savefig(save_dir)
 
         if show_figure:
             plt.show()
-        
+
         plt.clf()
         plt.close()
