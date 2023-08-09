@@ -331,10 +331,17 @@ class Representation:
             fig_path = None
 
         if sim_mat_format == "default" or sim_mat_format == "both":
+            if sim_mat_format == "default":
+                assert self.category_name_list is None, "please set the 'sim_mat_format = sorted'. "
+            
             visualize_functions.show_heatmap(
                 self.sim_mat,
                 title=self.name,
                 save_file_name=fig_path,
+                ticks=ticks,
+                category_name_list=None,
+                num_category_list=None,
+                object_labels=self.object_labels,
                 **visualization_config(),
             )
 
@@ -2175,7 +2182,8 @@ class AlignRepresentations:
         top_k_list,
         eval_type="ot_plan",
         category_mat=None,
-        barycenter=False
+        barycenter=False,
+        return_dataframe:bool=False,
     ):
         """
         Evaluation of the accuracy of the unsupervised alignment
@@ -2189,7 +2197,11 @@ class AlignRepresentations:
             category_mat (_type_, optional): 
                 This will be used for the category info. Defaults to None.
             
-            barycenter (bool, optional): _description_. Defaults to False.
+            barycenter (bool, optional): 
+                _description_. Defaults to False.
+            
+            return_dataframe (bool, optional): 
+                If True, the accuracy result will be returned in pandas.DataFrame format. Defaults to False.
             
         """
         accuracy = pd.DataFrame()
@@ -2215,6 +2227,9 @@ class AlignRepresentations:
             print("category level accuracy : \n", accuracy)
 
         print("Mean : \n", accuracy.iloc[:, 1:].mean(axis="columns"))
+    
+        if return_dataframe:
+            return accuracy
 
     def _get_dataframe(self, eval_type="ot_plan", concat=True):
         if eval_type == "ot_plan":
