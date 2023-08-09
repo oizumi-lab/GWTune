@@ -50,7 +50,11 @@ class OptimizationConfig:
         pruner_name="hyperband",
         pruner_params={"n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3},
     ) -> None:
-        """_summary_
+        """
+        
+        This is an instance for sharing the parameters to compute GWOT with the instance PairwiseAnalysis.
+        
+        Please check the tutoial.ipynb for detailed info.
 
         Args:
             eps_list (list, optional): _description_. Defaults to [1, 10].
@@ -134,6 +138,47 @@ class VisualizationConfig:
         lim_gwd=None,
         lim_acc=None,
     ) -> None:
+        """
+        This is an instance for sharing the parameters to make the figures of GWOT with the instance PairwiseAnalysis.
+        
+        Please check the tutoial.ipynb for detailed info.
+
+        Args:
+            show_figure (bool, optional): _description_. Defaults to True.
+            figsize (tuple, optional): _description_. Defaults to (8, 6).
+            cbar_ticks_size (int, optional): _description_. Defaults to 5.
+            cbar_format (_type_, optional): _description_. Defaults to None.
+            ticks_size (int, optional): _description_. Defaults to 5.
+            xticks_rotation (int, optional): _description_. Defaults to 90.
+            yticks_rotation (int, optional): _description_. Defaults to 0.
+            title_size (int, optional): _description_. Defaults to 20.
+            legend_size (int, optional): _description_. Defaults to 5.
+            xlabel (_type_, optional): _description_. Defaults to None.
+            xlabel_size (int, optional): _description_. Defaults to 15.
+            ylabel (_type_, optional): _description_. Defaults to None.
+            ylabel_size (int, optional): _description_. Defaults to 15.
+            zlabel (_type_, optional): _description_. Defaults to None.
+            zlabel_size (int, optional): _description_. Defaults to 15.
+            color_labels (_type_, optional): _description_. Defaults to None.
+            color_hue (_type_, optional): _description_. Defaults to None.
+            colorbar_label (_type_, optional): _description_. Defaults to None.
+            colorbar_range (list, optional): _description_. Defaults to [0, 1].
+            colorbar_shrink (int, optional): _description_. Defaults to 1.
+            markers_list (_type_, optional): _description_. Defaults to None.
+            marker_size (int, optional): _description_. Defaults to 30.
+            color (str, optional): _description_. Defaults to 'C0'.
+            cmap (str, optional): _description_. Defaults to 'cividis'.
+            ot_object_tick (bool, optional): _description_. Defaults to False.
+            ot_category_tick (bool, optional): _description_. Defaults to False.
+            draw_category_line (bool, optional): _description_. Defaults to False.
+            category_line_color (str, optional): _description_. Defaults to 'C2'.
+            category_line_alpha (float, optional): _description_. Defaults to 0.2.
+            category_line_style (str, optional): _description_. Defaults to 'dashed'.
+            plot_eps_log (bool, optional): _description_. Defaults to False.
+            lim_eps (_type_, optional): _description_. Defaults to None.
+            lim_gwd (_type_, optional): _description_. Defaults to None.
+            lim_acc (_type_, optional): _description_. Defaults to None.
+        """
 
         self.visualization_params = {
             'show_figure':show_figure,
@@ -180,17 +225,13 @@ class VisualizationConfig:
             self.visualization_params[key] = item
 
 class Representation:
-    """
-    A class object that has information of a representation, such as embeddings and similarity matrices
-    """
-
     def __init__(
         self,
         name,
         metric="cosine",
         sim_mat: np.ndarray = None,
         embedding: np.ndarray = None,
-        get_embedding=True,
+        get_embedding=False,
         MDS_dim=3,
         object_labels=None,
         category_name_list=None,
@@ -198,6 +239,23 @@ class Representation:
         category_idx_list=None,
         func_for_sort_sim_mat=None,
     ) -> None:
+        """
+        A class object that has information of a representation, such as embeddings and similarity matrices
+
+        Args:
+            name (_type_): the name of the embedding and/or dis-similarity matrix.
+            metric (str, optional): Please set the metric that can be used in "scipy.spatical.distance.cdist()". Defaults to "cosine".
+            sim_mat (np.ndarray, optional): Array-like. Defaults to None.
+            embedding (np.ndarray, optional): Array-like. Defaults to None.
+            get_embedding (bool, optional): If True, embedding will be automatically computed from sim_mat. Defaults to False.
+            MDS_dim (int, optional): _description_. Defaults to 3.
+            object_labels (list, optional): Please check the tutorial.ipynb as an example. Defaults to None.
+            category_name_list (list, optional): Please check the tutorial.ipynb as an example. Defaults to None.
+            num_category_list (list, optional): Please check the tutorial.ipynb as an example. Defaults to None.
+            category_idx_list (list, optional): Please check the tutorial.ipynb as an example. Defaults to None.
+            func_for_sort_sim_mat (function or method): This needs to be a function to sort the sim_mat. 
+                                                        Please check the tutorial.ipynb as an example. Defaults to None.
+        """
 
         # meta data for the representation matrix (dis-similarity matrix).
         self.name = name
@@ -252,18 +310,26 @@ class Representation:
 
     def show_sim_mat(
         self,
-        sim_mat_format="default",
+        sim_mat_format:str="default",
         visualization_config: VisualizationConfig = VisualizationConfig(),
-        fig_dir=None,
-        ticks=None,
+        fig_dir:Optional[str]=None,
+        ticks:Optional[str]=None,
     ):
         """_summary_
 
         Args:
-            sim_mat_format (str, optional): _description_. Defaults to "default".
-            visualization_config (VisualizationConfig, optional): _description_. Defaults to VisualizationConfig().
-            fig_dir (_type_, optional): _description_. Defaults to None.
-            ticks (_type_, optional): _description_. Defaults to None.
+            sim_mat_format (str, optional): format of sim_mat to visualize. 
+                                            Options are "default", "sorted", and "both".
+                                            Defaults to "default".
+                                            
+            visualization_config (VisualizationConfig, optional): container of parameters used for figure. 
+                                                                    Defaults to VisualizationConfig().
+            
+            fig_dir (str, optional): the directory of figure to save. Defaults is None.
+                                     If None, the figures will not be saved. 
+            
+            ticks (str, optional): . 
+                                    Options are "object", "category", and "None" Defaults to None.
 
         Raises:
             ValueError: _description_
