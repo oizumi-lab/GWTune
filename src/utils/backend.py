@@ -1,27 +1,48 @@
 # %%
+from typing import Any, List, Union
+
 import numpy as np
-import torch
 import ot
+import torch
+
 
 #%%
 class Backend():
-    def __init__(self, device = 'cpu', to_types = 'torch', data_type = 'double'):
-        """
-        all the variable for GW alignment will be placed on the device, data type and numpy or torch defined by user.
-        
-        This instance will assist some functions implemented in python file under "src" directory.
+    """A class that manages data types and device-specific operations for Gromov-Wasserstein alignment.
+
+    This instance will assist some functions implemented in python file under "src" directory, adjusting
+    variables for GW alignment based on user-defined device, data type, and either numpy or torch settings.
+
+    Attributes:
+        device (str): The device to be used for computation, either "cpu" or "cuda".
+        to_types (str): Specifies the data structure to be used, either 'torch' or 'numpy'.
+        data_type (str): Specifies the type of data to be used in computation.
+        nx (backend module): The backend module from POT (Python Optimal Transport) corresponding to the data type.
+    """
+
+    def __init__(self, device: str = 'cpu', to_types: str = 'torch', data_type: str = 'double') -> None:
+        """Initializes the Backend class.
 
         Args:
-            device (str, optional): _description_. Defaults to 'cpu'.
-            to_types (str, optional): _description_. Defaults to 'torch'.
-            data_type (str, optional): _description_. Defaults to 'double'.
+            device (str, optional): The device to be used for computation, either "cpu" or "cuda". Defaults to 'cpu'.
+            to_types (str, optional): Specifies the data structure to be used, either 'torch' or 'numpy'. Defaults to 'torch'.
+            data_type (str, optional): Specifies the type of data to be used in computation. Defaults to 'double'.
         """
+
         self.device = device
         self.to_types = to_types
         self.data_type = data_type
         pass
 
-    def __call__(self, *args):
+    def __call__(self, *args) -> Union[List[Any], Any]:
+        """Convert the provided data to the specified data type and device.
+
+        Args:
+            *args: The data items to be converted.
+
+        Returns:
+            Union[List[Any], Any]: Converted data items. If only one item is provided, it's returned directly, else a list.
+        """
         output = []
         for a in args:
             a = self._change_types(a)
@@ -35,20 +56,51 @@ class Backend():
 
         return output
 
-    def save(self, file, a):
+    def save(self, file: str, a: Any) -> None:
+        """Save the provided data to a file.
+
+        Args:
+            file (str): Path to the file.
+            a (Any): Data to be saved.
+
+        Raises:
+            NotImplementedError: If the method is not implemented.
+        """
+
         raise NotImplementedError()
 
-    def load(self, file):
+    def load(self, file: str) -> None:
+        """Load data from a file.
+
+        Args:
+            file (str): Path to the file.
+
+        Raises:
+            NotImplementedError: If the method is not implemented.
+        """
+
         raise NotImplementedError()
 
-    def _change_types(self, args):
+    def _change_types(self, args) -> Any:
+        """Convert the data type of the provided data.
+
+        Args:
+            args (Any): Data to be converted.
+
+        Returns:
+            Any: Converted data.
+
+        Raises:
+            ValueError: If the provided data type and device do not match.
+        """
+
         if self.to_types == 'torch':
             if 'gpu' in self.device:
                 raise ValueError('torch uses "cuda" instead of "gpu".')
 
             if isinstance(args, np.ndarray):
                 return torch.from_numpy(args)
-            
+
             else:
                 return args
 
@@ -65,7 +117,17 @@ class Backend():
         else:
             raise ValueError("Unknown type of non implemented here.")
 
-    def change_device(self, device, *args):
+    def change_device(self, device: str, *args) -> Union[List[Any], Any]:
+        """Change the device of the provided data.
+
+        Args:
+            device (str): The target device.
+            *args: Data items to be moved to the specified device.
+
+        Returns:
+            Union[List[Any], Any]: Data on the new device. If only one item is provided, it's returned directly, else a list.
+        """
+
         device_list = ('cpu', 'cuda')
 
         if not device.startswith(device_list):
@@ -82,7 +144,17 @@ class Backend():
 
         return output
 
-    def _change_device(self, args, device = 'cpu'):
+    def _change_device(self, args: Any, device: str = 'cpu') -> Any:
+        """Helper method to change the device of the provided data.
+
+        Args:
+            args (Any): Data to be moved.
+            device (str, optional): Target device. Defaults to 'cpu'.
+
+        Returns:
+            Any: Data on the new device.
+        """
+
         if isinstance(args, np.ndarray):
             if device == 'cpu':
                 if self.data_type == 'double' or self.data_type == 'float64':
@@ -91,17 +163,26 @@ class Backend():
                     return args.astype(np.float32)
             else:
                 raise ValueError('Numpy only accepts CPU!!')
-    
+
         elif isinstance(args, torch.Tensor):
             if self.data_type == 'double' or self.data_type == 'float64':
                 return args.to(device).double()
             elif self.data_type == 'float' or self.data_type == 'float32':
                 return args.to(device).float()
-            
+
         else:
             raise ValueError("Unknown type of non implemented here.")
 
-    def get_item_from_torch_or_jax(self, *args):
+    def get_item_from_torch_or_jax(self, *args) -> Union[List[float], float]:
+        """Retrieve scalar values from tensors.
+
+        Args:
+            *args: Data items, either tensors or other.
+
+        Returns:
+            Union[List[float], float]: Scalar values. If only one item is provided, it's returned directly, else a list.
+        """
+
         l = []
         for v in args:
             if isinstance(v, torch.Tensor):
@@ -113,7 +194,15 @@ class Backend():
 
         return  l
 
-    def save_computed_results(self, gw, file_path, number):
+    def save_computed_results(self, gw: Any, file_path: str, number: int) -> None:
+        """Save computed Gromov-Wasserstein results to a file.
+
+        Args:
+            gw (Any): Array-like, shape (n_source, n_target). Computed Gromov-Wasserstein matrix.
+            file_path (str): Base path for saving results.
+            number (int): A number to distinguish saved results.
+        """
+
         # save data
         if self.to_types == 'torch':
             torch.save(gw, file_path + f'/gw_{number}.pt')
@@ -121,7 +210,16 @@ class Backend():
             np.save(file_path + f'/gw_{number}', gw)
 
 
-    def check_zeros(self, args):
+    def check_zeros(self, args: Any) -> bool:
+        """Check if the provided data contains only zeros.
+
+        Args:
+            args (Any): Data to be checked.
+
+        Returns:
+            bool: True if the data contains only zeros, False otherwise.
+        """
+
         if isinstance(args, torch.Tensor):
             if torch.count_nonzero(args).item() == 0:
                 flag = True
@@ -157,4 +255,3 @@ if __name__ == '__main__':
     test_torch1 = backend.change_data(test_numpy1)
     print(test_torch1)
     print(type(test_torch1))
-
