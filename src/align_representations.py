@@ -1,16 +1,18 @@
 # %%
+import copy
+import glob
 import itertools
-from pathlib import Path
 import os
-import sys
 import shutil
+import sys
 import warnings
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
-from typing import List, Union, Optional
-import copy
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
+import optuna
 import ot
 import pandas as pd
 import seaborn as sns
@@ -18,64 +20,83 @@ import torch
 from scipy.spatial import distance
 from scipy.stats import pearsonr, spearmanr
 from sklearn import manifold
-from sqlalchemy import create_engine, URL
+from sqlalchemy import URL, create_engine
 from sqlalchemy_utils import create_database, database_exists, drop_database
-import glob
 from tqdm.auto import tqdm
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
 from .gw_alignment import GW_Alignment
 from .histogram_matching import SimpleHistogramMatching
-from .utils import gw_optimizer, visualize_functions, backend
+from .utils import backend, gw_optimizer, visualize_functions
+
 
 # %%
 class OptimizationConfig:
+    """This is an instance for sharing the parameters to compute GWOT with the instance PairwiseAnalysis.
+
+    Please check the tutoial.ipynb for detailed info.
+    """
+
     def __init__(
         self,
-        eps_list=[1, 10],
-        eps_log=True,
-        num_trial=4,
-        sinkhorn_method='sinkhorn',
-        device="cpu",
-        to_types="numpy",
-        data_type="double",
-        n_jobs=1,
+        eps_list: List[float] = [1., 10.],
+        eps_log: bool = True,
+        num_trial: int = 4,
+        sinkhorn_method: str = 'sinkhorn',
+        device: str = "cpu",
+        to_types: str = "numpy",
+        data_type: str = "double",
+        n_jobs: int = 1,
         multi_gpu: Union[bool, List[int]] = False,
-        db_params={"drivername": "mysql", "username": "root", "password": "", "host": "localhost", "port": 3306},
-        init_mat_plan="random",
-        user_define_init_mat_list = None,
-        n_iter=1,
-        max_iter=200,
-        sampler_name="tpe",
-        pruner_name="hyperband",
-        pruner_params={"n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3},
+        db_params: Dict[str, Union[str, int]] = {"drivername": "mysql", "username": "root", "password": "", "host": "localhost", "port": 3306},
+        init_mat_plan: str = "random",
+        user_define_init_mat_list: Union[List, None] = None,
+        n_iter: int = 1,
+        max_iter: int = 200,
+        sampler_name: str = "tpe",
+        pruner_name: str = "hyperband",
+        pruner_params: Dict[str, Union[int, float]] = {"n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3}
     ) -> None:
-        """
-        
-        This is an instance for sharing the parameters to compute GWOT with the instance PairwiseAnalysis.
-        
-        Please check the tutoial.ipynb for detailed info.
+        """Initialization of the instance.
 
         Args:
-            eps_list (list, optional): _description_. Defaults to [1, 10].
-            eps_log (bool, optional): _description_. Defaults to True.
-            num_trial (int, optional): _description_. Defaults to 4.
-            sinkhorn_method (str, optional): _description_. Defaults to 'sinkhorn'.
-            device (str, optional): _description_. Defaults to "cpu".
-            to_types (str, optional): _description_. Defaults to "numpy".
-            data_type (str, optional): _description_. Defaults to "double".
-            n_jobs (int, optional): _description_. Defaults to 1.
-            multi_gpu (Union[bool, List[int]], optional): _description_. Defaults to False.
-            db_params (dict, optional): _description_. Defaults to {"drivername": "mysql", "username": "root", "password": "", "host": "localhost", "port": 3306}.
-            init_mat_plan (str, optional): _description_. Defaults to "random".
-            n_iter (int, optional): _description_. Defaults to 1.
-            max_iter (int, optional): _description_. Defaults to 200.
-            data_name (str, optional): _description_. Defaults to "THINGS".
-            sampler_name (str, optional): _description_. Defaults to "tpe".
-            pruner_name (str, optional): _description_. Defaults to "hyperband".
-            pruner_params (dict, optional): _description_. Defaults to {"n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3}.
-            user_define_init_mat_list (_type_, optional): _description_. Defaults to None.
+            eps_list (List[float], optional):
+                List of epsilon values (regularization term). Defaults to [1., 10.].
+            eps_log (bool, optional):
+                Indicates if the epsilon values are sampled from log space. Defaults to True.
+            num_trial (int, optional):
+                Number of trials for the optimization. Defaults to 4.
+            sinkhorn_method (str, optional):
+                Method used for Sinkhorn algorithm. Options are "sinkhorn", "sinkhorn_log", "greenkhorn",
+                "sinkhorn_stabilized", or "sinkhorn_epsilon_scaling". Defaults to 'sinkhorn'.
+            device (str, optional):
+                The device to be used for computation, either "cpu" or "cuda". Defaults to "cpu".
+            to_types (str, optional):
+                Specifies the type of data structure to be used, either "torch" or "numpy". Defaults to "numpy".
+            data_type (str, optional):
+                Specifies the type of data to be used in computation. Defaults to "double".
+            n_jobs (int, optional):
+                Number of jobs to run in parallel. Defaults to 1.
+            multi_gpu (Union[bool, List[int]], optional):
+                Indicates if multiple GPUs are used for computation. Defaults to False.
+            db_params (dict, optional):
+                Parameters for creating the database URL.
+                Defaults to {"drivername": "mysql", "username": "root", "password": "", "host": "localhost", "port": 3306}.
+            init_mat_plan (str, optional):
+                The method to initialize transportation plan. Defaults to "random".
+            n_iter (int, optional):
+                Number of initial plans evaluated in single optimization. Defaults to 1.
+            max_iter (int, optional):
+                Maximum number of iterations for entropic Gromov-Wasserstein alignment by POT. Defaults to 200.
+            sampler_name (str, optional):
+                Name of the sampler used in optimization. Options are "random", "grid", and "tpe". Defaults to "tpe".
+            pruner_name (str, optional):
+                Name of the pruner used in optimization. Options are "hyperband", "median", and "nop". Defaults to "hyperband".
+            pruner_params (dict, optional):
+                Additional parameters for the pruner. See Optuna's pruner page for more details.
+                Defaults to {"n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3}.
         """
+
         self.eps_list = eps_list
         self.eps_log = eps_log
         self.num_trial = num_trial
@@ -100,84 +121,121 @@ class OptimizationConfig:
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
 
+
 class VisualizationConfig:
+    """This is an instance for sharing the parameters to make the figures of GWOT with the instance PairwiseAnalysis.
+
+    Please check the tutoial.ipynb for detailed info.
+    """
+
     def __init__(
         self,
-        show_figure=True,
-        figsize=(8, 6),
-        cbar_ticks_size=5,
-        cbar_format=None,
-        ticks_size=5,
-        xticks_rotation=90,
-        yticks_rotation=0,
-        title_size=20,
-        legend_size=5,
-        xlabel=None,
-        xlabel_size=15,
-        ylabel=None,
-        ylabel_size=15,
-        zlabel=None,
-        zlabel_size=15,
-        color_labels=None,
-        color_hue=None,
-        colorbar_label=None,
-        colorbar_range=[0, 1],
-        colorbar_shrink=1,
-        markers_list=None,
-        marker_size=30,
-        color = 'C0',
-        cmap = 'cividis',
-        ot_object_tick=False,
-        ot_category_tick=False,
-        draw_category_line=False,
-        category_line_color='C2',
-        category_line_alpha=0.2,
-        category_line_style='dashed',
-        plot_eps_log=False,
-        lim_eps=None,
-        lim_gwd=None,
-        lim_acc=None,
+        show_figure: bool = True,
+        figsize: Tuple[int, int] = (8, 6),
+        cbar_ticks_size: int = 5,
+        cbar_format: Optional[str]=None,
+        ticks_size: int = 5,
+        xticks_rotation: int = 90,
+        yticks_rotation: int = 0,
+        title_size: int = 20,
+        legend_size: int = 5,
+        xlabel: Optional[str] = None,
+        xlabel_size: int = 15,
+        ylabel: Optional[str] = None,
+        ylabel_size: int = 15,
+        zlabel: Optional[str] = None,
+        zlabel_size: int = 15,
+        color_labels: Optional[List[str]] = None,
+        color_hue: Optional[str] = None,
+        colorbar_label: Optional[str] = None,
+        colorbar_range: List[float] = [0., 1.],
+        colorbar_shrink: float = 1.,
+        markers_list: Optional[List[str]] = None,
+        marker_size: int = 30,
+        color: str = 'C0',
+        cmap: str = 'cividis',
+        ot_object_tick: bool = False,
+        ot_category_tick: bool = False,
+        draw_category_line: bool = False,
+        category_line_color: str = 'C2',
+        category_line_alpha: float = 0.2,
+        category_line_style: str = 'dashed',
+        plot_eps_log: bool = False,
+        lim_eps: Optional[float] = None,
+        lim_gwd: Optional[float] = None,
+        lim_acc: Optional[float] = None
     ) -> None:
-        """
-        This is an instance for sharing the parameters to make the figures of GWOT with the instance PairwiseAnalysis.
-        
-        Please check the tutoial.ipynb for detailed info.
+        """Initializes the VisualizationConfig class with specified visualization parameters.
 
         Args:
-            show_figure (bool, optional): _description_. Defaults to True.
-            figsize (tuple, optional): _description_. Defaults to (8, 6).
-            cbar_ticks_size (int, optional): _description_. Defaults to 5.
-            cbar_format (_type_, optional): _description_. Defaults to None.
-            ticks_size (int, optional): _description_. Defaults to 5.
-            xticks_rotation (int, optional): _description_. Defaults to 90.
-            yticks_rotation (int, optional): _description_. Defaults to 0.
-            title_size (int, optional): _description_. Defaults to 20.
-            legend_size (int, optional): _description_. Defaults to 5.
-            xlabel (_type_, optional): _description_. Defaults to None.
-            xlabel_size (int, optional): _description_. Defaults to 15.
-            ylabel (_type_, optional): _description_. Defaults to None.
-            ylabel_size (int, optional): _description_. Defaults to 15.
-            zlabel (_type_, optional): _description_. Defaults to None.
-            zlabel_size (int, optional): _description_. Defaults to 15.
-            color_labels (_type_, optional): _description_. Defaults to None.
-            color_hue (_type_, optional): _description_. Defaults to None.
-            colorbar_label (_type_, optional): _description_. Defaults to None.
-            colorbar_range (list, optional): _description_. Defaults to [0, 1].
-            colorbar_shrink (int, optional): _description_. Defaults to 1.
-            markers_list (_type_, optional): _description_. Defaults to None.
-            marker_size (int, optional): _description_. Defaults to 30.
-            color (str, optional): _description_. Defaults to 'C0'.
-            cmap (str, optional): _description_. Defaults to 'cividis'.
-            ot_object_tick (bool, optional): _description_. Defaults to False.
-            ot_category_tick (bool, optional): _description_. Defaults to False.
-            draw_category_line (bool, optional): _description_. Defaults to False.
-            category_line_color (str, optional): _description_. Defaults to 'C2'.
-            category_line_alpha (float, optional): _description_. Defaults to 0.2.
-            category_line_style (str, optional): _description_. Defaults to 'dashed'.
-            plot_eps_log (bool, optional): _description_. Defaults to False.
-            lim_eps (_type_, optional): _description_. Defaults to None.
-            lim_gwd (_type_, optional): _description_. Defaults to None.
-            lim_acc (_type_, optional): _description_. Defaults to None.
+            show_figure (bool, optional):
+                Whether to display the figure. Defaults to True.
+            figsize (Tuple[int, int], optional):
+                Size of the figure. Defaults to (8, 6).
+            cbar_ticks_size (int, optional):
+                Size of the colorbar ticks. Defaults to 5.
+            cbar_format (Optional[str]):
+                Format of the colorbar. Defaults to None.
+            ticks_size (int, optional):
+                Size of the ticks. Defaults to 5.
+            xticks_rotation (int, optional):
+                Rotation angle of the xticks. Defaults to 90.
+            yticks_rotation (int, optional):
+                Rotation angle of the yticks. Defaults to 0.
+            title_size (int, optional):
+                Size of the title. Defaults to 20.
+            legend_size (int, optional):
+                Size of the legend. Defaults to 5.
+            xlabel (str, optional):
+                Label of the x-axis. Defaults to None.
+            xlabel_size (int, optional):
+                Size of the x-axis label. Defaults to 15.
+            ylabel (str, optional):
+                Label of the y-axis. Defaults to None.
+            ylabel_size (int, optional):
+                Size of the y-axis label. Defaults to 15.
+            zlabel (str, optional):
+                Label of the z-axis. Defaults to None.
+            zlabel_size (int, optional):
+                Size of the z-axis label. Defaults to 15.
+            color_labels (List[str], optional):
+                Labels of the color. Defaults to None.
+            color_hue (str, optional):
+                Hue of the color. Defaults to None.
+            colorbar_label (str, optional):
+                Label of the colorbar. Defaults to None.
+            colorbar_range (list, optional):
+                Range of the colorbar. Defaults to [0, 1].
+            colorbar_shrink (float, optional):
+                Shrink of the colorbar. Defaults to 1.
+            markers_list (List[str], optional):
+                List of markers. Defaults to None.
+            marker_size (int, optional):
+                Size of the marker. Defaults to 30.
+            color (str, optional):
+                Color for plots. Defaults to 'C0'.
+            cmap (str, optional):
+                Colormap of the figure. Defaults to 'cividis'.
+            ot_object_tick (bool, optional):
+                Whether to tick object. Defaults to False.
+            ot_category_tick (bool, optional):
+                Whether to tick category. Defaults to False.
+            draw_category_line (bool, optional):
+                Whether to draw category lines. Defaults to False.
+            category_line_color (str, optional):
+                Color for category lines. Defaults to 'C2'.
+            category_line_alpha (float, optional):
+                Alpha for category lines. Defaults to 0.2.
+            category_line_style (str, optional):
+                Style for category lines. Defaults to 'dashed'.
+            plot_eps_log (bool, optional):
+                Whether to plot in logarithmic scale for epsilon. Defaults to False.
+            lim_eps (float, optional):
+                Limits for epsilon. Defaults to None.
+            lim_gwd (float, optional):
+                Limits for GWD. Defaults to None.
+            lim_acc (float, optional):
+                Limits for accuracy. Defaults to None.
         """
 
         self.visualization_params = {
@@ -217,42 +275,97 @@ class VisualizationConfig:
             'lim_acc':lim_acc,
         }
 
-    def __call__(self):
+    def __call__(self) -> Dict[str, Any]:
+        """Returns the visualization parameters.
+
+        Returns:
+            Dict[str, Any]: Dictionary containing the visualization parameters.
+        """
         return self.visualization_params
 
-    def set_params(self, **kwargs):
+    def set_params(self, **kwargs) -> None:
+        """Allows updating the visualization parameters.
+
+        Args:
+            **kwargs: keyword arguments representing the parameters to be updated.
+        """
+
         for key, item in kwargs.items():
             self.visualization_params[key] = item
 
+
 class Representation:
+    """A class that has information of a representation, such as embeddings and similarity matrices.
+
+    The class provides methods and attributes to manage and visualize different data representations,
+    such as embeddings and similarity matrices. It supports operations like computing similarity matrices from embeddings,
+    estimating embeddings from similarity matrices using Multi-Dimensional Scaling (MDS), and various visualization techniques
+    for the embeddings and similarity matrices. Additionally, it incorporates functionality to handle and visualize category-wise
+    information if provided.
+
+    Attributes:
+        name (str):
+            The name of the representation.
+        metric (str):
+            The metric for computing distances between embeddings.
+        object_labels (List[str]):
+            The labels for each stimulus or points.
+        category_name_list (List[str], optional):
+            List of category names.
+        category_idx_list (List[int], optional):
+            List of category indices.
+        num_category_list (List[int], optional):
+            List of numbers of stimuli each coarse category contains.
+        func_for_sort_sim_mat (Callable, optional):
+            A function to rearrange the matrix so that stimuli belonging to the same coarse category are arranged adjacent to each other.
+        sim_mat (np.ndarray):
+            Representational dissimilarity matrix.
+        embedding (np.ndarray):
+            The array of N-dimensional embeddings of all stimuli.
+        sorted_sim_mat (np.ndarray, optional):
+            Similarity matrix rearranged according to category labels, if applicable.
+    """
+
     def __init__(
         self,
-        name,
-        metric="cosine",
-        sim_mat: np.ndarray = None,
-        embedding: np.ndarray = None,
-        get_embedding=False,
-        MDS_dim=3,
-        object_labels=None,
-        category_name_list=None,
-        num_category_list=None,
-        category_idx_list=None,
-        func_for_sort_sim_mat=None,
+        name: str,
+        metric: str = "cosine",
+        sim_mat: Optional[np.ndarray] = None,
+        embedding: Optional[np.ndarray] = None,
+        get_embedding: bool = False,
+        MDS_dim: int = 3,
+        object_labels: Optional[List[str]] = None,
+        category_name_list: Optional[List[str]] = None,
+        num_category_list: Optional[List[int]] = None,
+        category_idx_list: Optional[List[int]] = None,
+        func_for_sort_sim_mat: Optional[Callable] = None,
     ) -> None:
-        """
-        A class object that has information of a representation, such as embeddings and similarity matrices
+        """Initialize the Representation class.
+
         Args:
-            name (_type_): The name of the representation. 
-            metric (str, optional): The metric for computing distances between embeddings. Defaults to "cosine".
-            sim_mat (np.ndarray, optional): Representational dissimilarity matrix. Defaults to None.
-            embedding (np.ndarray, optional): The array of N-dimensional embeddings of all stimuli. Defaults to None.
-            get_embedding (bool, optional): If True, the embeddings are automatically computed from the sim_mat using MDS method. Defaults to True.
-            MDS_dim (int, optional): The dimension of the embeddings computed automatically from the sim_mat using MDS. Defaults to 3.
-            object_labels (_type_, optional): The labels for each stimulus or points. Defaults to None.
-            category_name_list (_type_, optional): If there is coarse category labels, you can select categories to be used in the unsupervised alignment. Defaults to None.
-            num_category_list (_type_, optional): The list of numbers of stimuli each coarse category contains. Defaults to None.
-            category_idx_list (_type_, optional): The list of indices that represents which coarse category each stimulus belongs to. Defaults to None.
-            func_for_sort_sim_mat (_type_, optional): A function to rearrange the matrix so that stimuli belonging to the same coarse category are arranged adjacent to each other. Defaults to None.
+            name (str):
+                The name of the representation.
+            metric (str, optional):
+                The metric for computing distances between embeddings. Defaults to "cosine".
+            sim_mat (np.ndarray, optional):
+                Representational dissimilarity matrix. Defaults to None.
+            embedding (np.ndarray, optional):
+                The array of N-dimensional embeddings of all stimuli. Defaults to None.
+            get_embedding (bool, optional):
+                If True, the embeddings are automatically computed from the sim_mat using MDS method. Defaults to True.
+            MDS_dim (int, optional):
+                The dimension of the embeddings computed automatically from the sim_mat using MDS. Defaults to 3.
+            object_labels (List[str], optional):
+                The labels for each stimulus or points. Defaults to None.
+            category_name_list (List[str], optional):
+                If there is coarse category labels, you can select categories to be used in the unsupervised alignment. Defaults to None.
+            num_category_list (List[int], optional):
+                The list of numbers of stimuli each coarse category contains. Defaults to None.
+            category_idx_list (List[int], optional):
+                The list of indices that represents which coarse category each stimulus belongs to. Defaults to None.
+            func_for_sort_sim_mat (Callable, optional):
+                A function to rearrange the matrix so that stimuli belonging to the same coarse category are arranged adjacent to each other.
+                Defaults to None.
         """
 
         self.name = name
@@ -292,7 +405,12 @@ class Representation:
         else:
             self.sorted_sim_mat = None
 
-    def _get_sim_mat(self):
+    def _get_sim_mat(self) -> np.ndarray:
+        """Compute the dissimilarity matrix based on the given metric.
+
+        Returns:
+            np.ndarray: The computed dissimilarity matrix.
+        """
         if self.metric == "dot":
             metric = "cosine"
         else:
@@ -300,29 +418,40 @@ class Representation:
 
         return distance.cdist(self.embedding, self.embedding, metric=metric)
 
-    def _get_embedding(self, dim):
+    def _get_embedding(self, dim: int) -> np.ndarray:
+        """Estimate embeddings from the dissimilarity matrix using the MDS method.
+
+        Args:
+            dim (int): The dimension of the embeddings to be computed.
+
+        Returns:
+            np.ndarray: The computed embeddings.
+        """
         MDS_embedding = manifold.MDS(n_components=dim, dissimilarity="precomputed", random_state=0)
         embedding = MDS_embedding.fit_transform(self.sim_mat)
         return embedding
 
     def show_sim_mat(
         self,
-        sim_mat_format:str="default",
+        sim_mat_format: str = "default",
         visualization_config: VisualizationConfig = VisualizationConfig(),
-        fig_dir:Optional[str]=None,
-        ticks:Optional[str]=None,
-    ):
-        """
-        Show the dissimilarity matrix of the representation.
+        fig_dir: Optional[str] = None,
+        ticks: Optional[str] = None,
+    ) -> None:
+        """Show the dissimilarity matrix of the representation.
 
         Args:
-            sim_mat_format (str, optional): "default", "sorted", or "both". If "sorted" is selected, the rearranged matrix is shown. Defaults to "default".
-            visualization_config (VisualizationConfig, optional): container of parameters used for figure. Defaults to VisualizationConfig().
-            fig_dir (_type_, optional): The directory for saving the figure. Defaults to None.
-            ticks (_type_, optional): "numbers", "objects", or "category". Defaults to None.
+            sim_mat_format (str, optional):
+                "default", "sorted", or "both". If "sorted" is selected, the rearranged matrix is shown. Defaults to "default".
+            visualization_config (VisualizationConfig, optional):
+                container of parameters used for figure. Defaults to VisualizationConfig().
+            fig_dir (Optional[str], optional):
+                The directory for saving the figure. Defaults to None.
+            ticks (Optional[str], optional):
+                "numbers", "objects", or "category". Defaults to None.
 
         Raises:
-            ValueError: _description_
+            ValueError: If an invalid `sim_mat_format` value is provided.
         """
 
         if fig_dir is not None:
@@ -333,7 +462,7 @@ class Representation:
         if sim_mat_format == "default" or sim_mat_format == "both":
             if sim_mat_format == "default":
                 assert self.category_name_list is None, "please set the 'sim_mat_format = sorted'. "
-            
+
             visualize_functions.show_heatmap(
                 self.sim_mat,
                 title=self.name,
@@ -361,16 +490,12 @@ class Representation:
         else:
             raise ValueError("sim_mat_format must be either 'default', 'sorted', or 'both'.")
 
-    def show_sim_mat_distribution(self, **kwargs):
+    def show_sim_mat_distribution(self, **kwargs) -> None:
+        """Show the distribution of the values of elements of the dissimilarity matrix.
         """
-        Show the distribution of the values of elements of the dissimilarity matrix.
-        """
+
         # figsize = kwargs.get('figsize', (4, 3))
-        xticks_rotation = kwargs.get("xticks_rotation", 90)
-        yticks_rotation = kwargs.get("yticks_rotation", 0)
         title_size = kwargs.get("title_size", 60)
-        xlabel_size = kwargs.get("xlabel_size", 40)
-        ylabel_size = kwargs.get("ylabel_size", 40)
         color = kwargs.get("color", "C0")
 
         lower_triangular = np.tril(self.sim_mat)
@@ -388,29 +513,42 @@ class Representation:
 
     def show_embedding(
         self,
-        dim=3,
+        dim: int = 3,
         visualization_config: VisualizationConfig = VisualizationConfig(),
-        category_name_list=None,
-        num_category_list=None,
-        category_idx_list=None,
-        title=None,
-        legend=True,
-        fig_dir=None,
-        fig_name="Aligned_embedding.png",
-    ):
-        """
-        Show the embeddings.
+        category_name_list: Optional[List[str]] = None,
+        num_category_list: Optional[List[int]] = None,
+        category_idx_list: Optional[List[int]] = None,
+        title: Optional[str] = None,
+        legend: bool = True,
+        fig_dir: Optional[str] = None,
+        fig_name: str ="Aligned_embedding.png"
+    ) -> None:
+        """Show the embeddings.
+
+        Depending on the provided "dim", this function visualizes the embeddings in 2D or 3D space.
+        If the original dimensionality of the embeddings exceeds the specified "dim", a dimensionality
+        reduction method (e.g., PCA) is applied.
 
         Args:
-            dim (int, optional): The dimension of the embedding space for visualization. If the original dimensions of the embeddings are higher than "dim", the dimension reduction method(PCA) is applied. Defaults to 3.
-            visualization_config (VisualizationConfig, optional): . Defaults to VisualizationConfig().
-            category_name_list (_type_, optional): Select the coarse category labels to be visualized in the embedding space. Defaults to None.
-            num_category_list (_type_, optional):  Defaults to None.
-            category_idx_list (_type_, optional):  Defaults to None.
-            title (_type_, optional): The title of the figure. Defaults to None.
-            legend (bool, optional): If True, the legend is shown. Defaults to True.
-            fig_dir (_type_, optional): The directory for saving the figure. Defaults to None.
-            fig_name (str, optional): The name of the figure. Defaults to "Aligned_embedding.png".
+            dim (int, optional):
+                The dimension of the embedding space for visualization. If the original dimensions of the embeddings are
+                higher than "dim", the dimension reduction method(PCA) is applied. Defaults to 3.
+            visualization_config (VisualizationConfig, optional):
+                Configuration for visualization details. Defaults to VisualizationConfig().
+            category_name_list (Optional[List[str]:, optional):
+                Select the coarse category labels to be visualized in the embedding space. Defaults to None.
+            num_category_list (Optional[List[int]], optional):
+                List of numbers of stimuli each coarse category contains. Defaults to None.
+            category_idx_list (Optional[List[int]], optional):
+                List of category indices. Defaults to None.
+            title (Optional[str], optional):
+                The title of the figure. Defaults to None.
+            legend (bool, optional):
+                If True, the legend is shown. Defaults to True.
+            fig_dir (Optional[str], optional):
+                The directory for saving the figure. Defaults to None.
+            fig_name (str, optional):
+                The name of the figure. Defaults to "Aligned_embedding.png".
         """
 
         if fig_dir is not None:
@@ -436,37 +574,58 @@ class Representation:
             name_list=[self.name], title=title, legend=legend, save_dir=fig_path, **visualization_config()
         )
 
+
 class PairwiseAnalysis:
+    """A class object that has methods conducting gw-alignment and corresponding results.
+
+    This class provides functionalities to handle the alignment and comparison between a pair of Representations,
+    typically referred to as source and target.
+
+    Attributes:
+        source (Representation): Instance of the source representation.
+        target (Representation): Instance of the target representation.
+        config (OptimizationConfig): Parameters to compute the GWOT.
+        pair_name (str): Name of this instance. Derived from source and target if not provided.
+        data_name (str): Folder name directly under `result_dir`.
+        filename (str): Folder name under `result_dir/data_name` and name of the database file or table.
+        results_dir (str): Path to save the various result data.
+        save_path (str): Complete path to save the results.
+        figure_path (str): Path to save figures.
+        data_path (str): Path to save data.
+        storage (str): URL for the database storage.
+    """
+
     def __init__(
         self,
-        results_dir:str,
+        results_dir: str,
         config: OptimizationConfig,
         source: Representation,
         target: Representation,
-        pair_name:str=None,
-        data_name:str="no_defined",
-        filename:str=None,
+        pair_name: Optional[str] = None,
+        data_name: str = "no_defined",
+        filename: Optional[str] = None,
     ) -> None:
-        """
-        A class object that has methods conducting gw-alignment and corresponding results
-        This object has information of a pair of Representations.
+        """Initializes the PairwiseAnalysis class.
 
         Args:
-            results_dir (str): the path to save the result data. 
-            config (OptimizationConfig): all the parameters to compute the GWOT.
-            source (Representation): instance of source represenation
-            target (Representation): instance of target represenation
-            
-            pair_name (str, optional): Defaults to None. 
-                                       If None, the name of this instance will be made by the names of two representations 
-            
-            data_name (str): the folder name directly under the `result_dir`. 
-                             Defaults is "no_defined". If None, the results cannot be saved.
-            
-            filename (str, optional): the folder name directly under the `result_dir/data_name`, 
-                                      and the name of database file or database table.   
-                                      Defaults to None. If None, this will be automatically defined 
-                                      from `data_name` and the names of two representations.
+            results_dir (str):
+                the path to save the result data.
+            config (OptimizationConfig):
+                all the parameters to compute the GWOT.
+            source (Representation):
+                instance of source represenation
+            target (Representation):
+                instance of target represenation
+            pair_name (Optional[str], optional):
+                If None, the name of this instance will be made by the names of two representations. Defaults to None.
+            data_name (str):
+                The folder name directly under the `result_dir`. Defaults is "no_defined". If None, the results cannot be saved.
+            filename (Optional[str], optional):
+                The folder name directly under the `result_dir/data_name`, and the name of database file or database table.
+                Defaults to None. If None, this will be automatically defined from `data_name` and the names of two representations.
+
+        Raises:
+            AssertionError: If the label information from source and target representations is not the same.
         """
 
         self.source = source
@@ -508,25 +667,25 @@ class PairwiseAnalysis:
                 **self.config.db_params).render_as_string(hide_password=False)
 
     def _change_types_to_numpy(self, *var):
-        ret = []     
+        ret = []
         for a in var:
             if isinstance(a, torch.Tensor):
                 a = a.to('cpu').numpy()
 
             ret.append(a)
-        
+
         return ret
-    
+
     def show_both_sim_mats(self):
         """
         visualize the two sim_mat.
         """
-    
+
         a = self.source.sim_mat
         b = self.target.sim_mat
-        
+
         a, b = self._change_types_to_numpy(a, b)
-    
+
         plt.figure()
         plt.subplot(121)
 
@@ -556,13 +715,12 @@ class PairwiseAnalysis:
         plt.clf()
         plt.close()
 
-    def RSA(self, metric="spearman", method="normal"):
-        """
-        Conventional representation similarity analysis (RSA).
+    def RSA(self, metric: str = "spearman", method: str = "normal") -> float:
+        """Conventional representation similarity analysis (RSA).
 
         Args:
             metric (str, optional): spearman or pearson. Defaults to "spearman".
-            method (str, optional): compute RSA from all ("all") or upper tri ("normal") 
+            method (str, optional): compute RSA from all ("all") or upper tri ("normal")
                                     of the element in the matrices. Defaults to "normal".
 
         Returns:
@@ -570,9 +728,9 @@ class PairwiseAnalysis:
         """
         a = self.source.sim_mat
         b = self.target.sim_mat
-        
+
         a, b = self._change_types_to_numpy(a, b)
-        
+
         if method == "normal":
             upper_tri_a = a[np.triu_indices(a.shape[0], k=1)]
             upper_tri_b = b[np.triu_indices(b.shape[0], k=1)]
@@ -590,14 +748,13 @@ class PairwiseAnalysis:
 
         return corr
 
-    def match_sim_mat_distribution(self, return_data=False, method="target"):
-        """
-        Performs simple histogram matching between two matrices.
-        
+    def match_sim_mat_distribution(self, return_data: bool = False, method: str = "target") -> np.ndarray:
+        """Performs simple histogram matching between two matrices.
+
         Args:
-            return_data (bool, optional): If True, this method will return the matched result. 
+            return_data (bool, optional): If True, this method will return the matched result.
                                           If False, self.target.sim_mat will be re-written. Defaults to False.
-                                          
+
             method (str) : change the sim_mat of which representations, source or target. Defaults to "target".
 
         Returns:
@@ -605,9 +762,9 @@ class PairwiseAnalysis:
         """
         a = self.source.sim_mat
         b = self.target.sim_mat
-        
+
         a, b = self._change_types_to_numpy(a, b)
-        
+
         matching = SimpleHistogramMatching(a, b)
 
         new_target = matching.simple_histogram_matching(method=method)
@@ -619,58 +776,57 @@ class PairwiseAnalysis:
 
     def run_entropic_gwot(
         self,
-        compute_OT:bool=False,
-        delete_results:bool=False,
-        OT_format:str="default",
-        return_data:bool=False,
-        return_figure:bool=True,
+        compute_OT: bool = False,
+        delete_results: bool = False,
+        OT_format: str = "default",
+        return_data: bool = False,
+        return_figure: bool = True,
         visualization_config: VisualizationConfig = VisualizationConfig(),
-        show_log:bool=False,
-        fig_dir:str=None,
-        ticks:str=None,
-        save_dataframe:bool=False,
-        target_device:Optional[str]=None,
-        sampler_seed=42,
+        show_log: bool = False,
+        fig_dir: str = None,
+        ticks: str = None,
+        save_dataframe: bool = False,
+        target_device: Optional[str] = None,
+        sampler_seed: int = 42,
     ):
-        """
-        compute entropic GWOT.
+        """Compute entropic GWOT.
 
         Args:
-            compute_OT (bool, optional): 
-                If True, the GWOT will be computed. 
+            compute_OT (bool, optional):
+                If True, the GWOT will be computed.
                 If False, the saved results will be loaded. Defaults to False.
-            
-            delete_results (bool, optional): 
+
+            delete_results (bool, optional):
                 If True, all the saved results will be deleted. Defaults to False.
-            
+
             OT_format (str, optional):
-                format of sim_mat to visualize. 
+                format of sim_mat to visualize.
                 Options are "default", "sorted", and "both". Defaults to "default".
-            
-            return_data (bool, optional): 
+
+            return_data (bool, optional):
                 return the computed OT. Defaults to False.
-            
-            return_figure (bool, optional): 
+
+            return_figure (bool, optional):
                 make the result figures or not. Defaults to True.
-            
-            visualization_config (VisualizationConfig, optional): 
+
+            visualization_config (VisualizationConfig, optional):
                 container of parameters used for figure. Defaults to VisualizationConfig().
-            
-            show_log (bool, optional): 
+
+            show_log (bool, optional):
                 If True, the evaluation figure of GWOT will be made. Defaults to False.
-            
-            fig_dir (str, optional): 
-                you can define the path to which you save the figures (.png).  
-                If None, the figures will be saved in the same subfolder in "results_dir".   
+
+            fig_dir (str, optional):
+                you can define the path to which you save the figures (.png).
+                If None, the figures will be saved in the same subfolder in "results_dir".
                 Defaults to None.
-            
-            ticks (str, optional): 
+
+            ticks (str, optional):
                 you can use "objects" or "category (if existed)" or "None". Defaults to None.
-            
-            save_dataframe (bool, optional): 
-                If True, you can save all the computed data stored in SQlite or PyMySQL in csv 
+
+            save_dataframe (bool, optional):
+                If True, you can save all the computed data stored in SQlite or PyMySQL in csv
                 format (pandas.DataFrame) in the result folder.  Defaults to False.
-            
+
             target_device (str, optional): the device to compute GWOT. Defaults to None.
 
         Returns:
@@ -715,7 +871,7 @@ class PairwiseAnalysis:
 
         return OT
 
-    def delete_prev_results(self):
+    def delete_prev_results(self) -> None:
         """
         Delete the previous computed results of GWOT.
         """
@@ -733,7 +889,30 @@ class PairwiseAnalysis:
                     os.rmdir(dir_path)
             shutil.rmtree(self.save_path)
 
-    def _entropic_gw_alignment(self, compute_OT, target_device=None, sampler_seed=42):
+    def _entropic_gw_alignment(
+        self,
+        compute_OT: bool,
+        target_device: Optional[str] = None,
+        sampler_seed: int = 42
+    ) -> Tuple[np.ndarray, pd.DataFrame]:
+        """Computes or loads the entropic Gromov-Wasserstein Optimal Transport (GWOT).
+
+        This method either computes the GW alignment or loads it from a saved path,
+        depending on the provided arguments.
+
+        Args:
+            compute_OT (bool):
+                If True, GWOT will be computed.
+            target_device (Optional[str], optional):
+                The device to be used for computation. Defaults to None.
+            sampler_seed (int, optional):
+                Seed for the sampler. Defaults to 42.
+
+        Returns:
+            OT (np.ndarray): GWOT
+            df_trial (pd.DataFrame): dataframe of the optimization log
+        """
+
         if not os.path.exists(self.save_path):
             if compute_OT == False:
                 warnings.simplefilter("always")
@@ -766,11 +945,29 @@ class PairwiseAnalysis:
 
     def _run_optimization(
         self,
-        compute_OT=False,
-        target_device = None,
-        sampler_seed = 42,
-        n_jobs_for_pairwise_analysis=1,
-    ):
+        compute_OT: bool = False,
+        target_device: Optional[str] = None,
+        sampler_seed: int = 42,
+        n_jobs_for_pairwise_analysis: int = 1
+    ) -> optuna.study.Study:
+        """Run or load an optimization study for Gromov-Wasserstein Optimal Transport (GWOT).
+
+        Args:
+            compute_OT (bool, optional):
+                If True, runs the optimization study to compute GWOT. If False, loads an existing study.
+                Defaults to False.
+            target_device (Optional[str], optional):
+                The device to compute GWOT. If not provided, defaults to the device specified in the configuration.
+            sampler_seed (int, optional):
+                Seed for the sampler. Defaults to 42.
+            n_jobs_for_pairwise_analysis (int, optional):
+                Number of jobs to run in parallel for pairwise analysis. Defaults to 1.
+
+        Returns:
+            study (optuna.study.Study):
+                The result of the optimization study, typically an instance of a study object.
+        """
+
         # generate instance optimize gw_alignment
         opt = gw_optimizer.load_optimizer(
             save_path=self.save_path,
@@ -829,15 +1026,17 @@ class PairwiseAnalysis:
 
         return study
 
-    def get_optimization_log(self, fig_dir=None, **kwargs):
-        """
-        show both the relationships between epsilons and GWD, and between accuracy and GWD
+    def get_optimization_log(self, fig_dir: Optional[str] = None, **kwargs) -> pd.DataFrame:
+        """Show both the relationships between epsilons and GWD, and between accuracy and GWD
 
         Args:
-            fig_dir (_type_, optional): 
-                you can define the path to which you save the figures (.png). 
+            fig_dir (_type_, optional):
+                you can define the path to which you save the figures (.png).
                 If None, the figures will be saved in the same subfolder in "results_dir". Defaults to None.
-            
+
+        Returns:
+            df_trial (pd.DataFrame):
+                dataframe of the optimization log
         """
         figsize = kwargs.get('figsize', (8,6))
         marker_size = kwargs.get('marker_size', 20)
@@ -856,7 +1055,7 @@ class PairwiseAnalysis:
         # figure plotting epsilon as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
         plt.scatter(df_trial["params_eps"], df_trial["value"], c = 100 * df_trial["user_attrs_best_acc"], s = marker_size, cmap=cmap)
-        
+
         if lim_eps is not None:
             plt.xlim(lim_eps)
 
@@ -870,12 +1069,12 @@ class PairwiseAnalysis:
 
         plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
         plt.gca().xaxis.set_minor_formatter(plt.FormatStrFormatter('%.1e'))
-        
+
         plt.tick_params(axis = 'x', rotation = 30, which="both", labelsize=ticks_size)
         plt.tick_params(axis = 'y', rotation = 0, which="both", labelsize=ticks_size)
         plt.xlabel("$\epsilon$")
         plt.ylabel("GWD")
-        
+
         plt.grid(True, which = 'both')
         plt.colorbar(label='accuracy (%)')
         plt.tight_layout()
@@ -919,50 +1118,51 @@ class PairwiseAnalysis:
 
     def show_OT(
         self,
-        ot_to_plot:Optional[np.ndarray]=None,
-        title:Optional[str]=None,
-        OT_format="default",
-        return_data=False,
-        return_figure=True,
-        visualization_config: VisualizationConfig = VisualizationConfig(),
-        fig_dir=None,
-        ticks=None,
-    ):
-        """
-        
-        visualize the OT
+        ot_to_plot: Optional[np.ndarray] = None,
+        title: Optional[str] = None,
+        OT_format: str = "default",
+        return_data: bool = False,
+        return_figure: bool = True,
+        visualization_config: 'VisualizationConfig' = VisualizationConfig(),
+        fig_dir: Optional[str] = None,
+        ticks: Optional[str] = None
+    ) -> Any:
+        """Visualize the OT.
 
         Args:
-            ot_to_plot (Optional[np.ndarray], optional): 
-                the OT to visualize. Defaults to None. 
+            ot_to_plot (Optional[np.ndarray], optional):
+                the OT to visualize. Defaults to None.
                 If None, the OT computed as GWOT will be used.
-            
-            title (str, optional): 
-                the title of OT figure. 
+
+            title (str, optional):
+                the title of OT figure.
                 Defaults to None. If None, this will be automatically defined.
-            
+
             OT_format (str, optional):
-                format of sim_mat to visualize. 
+                format of sim_mat to visualize.
                 Options are "default", "sorted", and "both". Defaults to "default".
-        
-             return_data (bool, optional): 
+
+             return_data (bool, optional):
                 return the computed OT. Defaults to False.
-            
-            return_figure (bool, optional): 
+
+            return_figure (bool, optional):
                 make the result figures or not. Defaults to True.
-            
-            visualization_config (VisualizationConfig, optional): 
+
+            visualization_config (VisualizationConfig, optional):
                 container of parameters used for figure. Defaults to VisualizationConfig().
-                
-            fig_dir (_type_, optional): 
-                you can define the path to which you save the figures (.png). 
+
+            fig_dir (Optional[str], optional):
+                you can define the path to which you save the figures (.png).
                 If None, the figures will be saved in the same subfolder in "results_dir". Defaults to None.
-                
-            ticks (str, optional): 
+
+            ticks (Optional[str], optional):
                 you can use "objects" or "category (if existed)" or "None". Defaults to None.
 
         Returns:
             OT : the result of GWOT or sorted OT. This depends on OT_format.
+
+        Raises:
+            ValueError: If an invalid OT_format is provided.
         """
         if ot_to_plot is None:
             ot_to_plot = self.OT
@@ -981,7 +1181,7 @@ class PairwiseAnalysis:
             if OT_format == "default" or OT_format == "both":
                 if OT_format == "default":
                     assert self.source.category_name_list is None, "please set the 'sim_mat_format = sorted'. "
-               
+
                 visualize_functions.show_heatmap(
                     ot_to_plot,
                     title=title,
@@ -1023,50 +1223,53 @@ class PairwiseAnalysis:
 
     def eval_accuracy(
         self,
-        top_k_list,
-        ot_to_evaluate = None,
-        eval_type="ot_plan",
-        metric="cosine",
-        barycenter=False,
-        supervised=False,
-        category_mat=None
-    ):
-        """
-        Evaluation of the accuracy of the unsupervised alignment
-        
-        There are two ways to evaluate the accuracy.  
-        1. Calculate the accuracy based on the OT plan.  
-        For using this method, please set the parameter `eval_type = "ot_plan"` in "calc_accuracy()".   
-        
-        2. Calculate the matching rate based on the k-nearest neighbors of the embeddings.   
-        For using this method, please set the parameter `eval_type = "k_nearest"` in "calc_accuracy()".   
+        top_k_list: List[int],
+        ot_to_evaluate: Optional[np.ndarray] = None,
+        eval_type: str = "ot_plan",
+        metric: str = "cosine",
+        barycenter: bool = False,
+        supervised: bool = False,
+        category_mat: Optional[np.ndarray] = None
+    ) -> pd.DataFrame:
+        """Evaluation of the accuracy of the unsupervised alignment
 
-        For both cases, the accuracy evaluation criterion can be adjusted by setting `top_k_list`.  
+        There are two ways to evaluate the accuracy.
+        1. Calculate the accuracy based on the OT plan.
+        For using this method, please set the parameter `eval_type = "ot_plan"` in "calc_accuracy()".
+
+        2. Calculate the matching rate based on the k-nearest neighbors of the embeddings.
+        For using this method, please set the parameter `eval_type = "k_nearest"` in "calc_accuracy()".
+
+        For both cases, the accuracy evaluation criterion can be adjusted by setting `top_k_list`.
 
         Args:
-            top_k_list (_type_): _description_
-            
-            ot_to_evaluate (_type_, optional): 
+            top_k_list (List[int]):
+                the list of k for the accuracy evaluation.
+
+            ot_to_evaluate (Optional[np.ndarray], optional):
                 the OT to evaluate. Defaults to None.
                 If None, the optimzed GWOT will be used.
-            
-            eval_type (str, optional): 
+
+            eval_type (str, optional):
                 two ways to evaluate the accuracy as above. Defaults to "ot_plan".
-            
-            metric (str, optional): 
+
+            metric (str, optional):
                 Please set the metric that can be used in "scipy.spatical.distance.cdist()". Defaults to "cosine".
-            
-            barycenter (bool, optional): _description_. Defaults to False.
-            
-            supervised (bool, optional): 
+
+            barycenter (bool, optional):
+                Indicates if the accuracy should be evaluated with respect to a barycenter representation.
+                Defaults to False.
+
+            supervised (bool, optional):
                 define the accuracy based on a diagnoal matrix. Defaults to False.
-            
-            category_mat (_type_, optional): 
+
+            category_mat (Optional[np.ndarray], optional):
                 This will be used for the category info. Defaults to None.
 
         Returns:
-            df : dataframe which has accuracies for top_k. 
+            df : dataframe which has accuracies for top_k.
         """
+
         df = pd.DataFrame()
         df["top_n"] = top_k_list
 
@@ -1139,18 +1342,28 @@ class PairwiseAnalysis:
 
         return accuracy
 
-    def procrustes(self, embedding_target, embedding_source, OT):
-        """
-        Function that brings embedding_source closest to embedding_target by orthogonal matrix
+    def procrustes(
+        self,
+        embedding_target: np.ndarray,
+        embedding_source: np.ndarray,
+        OT: np.ndarray
+    ) -> np.ndarray:
+        """Function that brings embedding_source closest to embedding_target by orthogonal matrix
 
         Args:
-            embedding_target : shape (n_target, m)
-            embedding_source : shape (n_source, m)
-            OT : shape (n_source, n_target)
-                Transportation matrix of sourse→target
+            embedding_target (np.ndarray):
+                Target embeddings with shape (n_target, m).
+
+            embedding_source (np.ndarray):
+                Source embeddings with shape (n_source, m).
+
+            OT (np.ndarray):
+                Transportation matrix from source to target with shape (n_source, n_target).
+
 
         Returns:
-            new_embedding_source : shape (n_source, m)
+            new_embedding_source (np.ndarray):
+                Transformed source embeddings with shape (n_source, m).
         """
         # assert self.source.shuffle == False, "you cannot use procrustes method if 'shuffle' is True."
 
@@ -1174,18 +1387,36 @@ class PairwiseAnalysis:
 
     def _simulated(
         self,
-        trials,
-        top_k=None,
-        device=None,
-        to_types=None,
-        data_type=None,
-    ):
-        """
-        By using optimal transportation plan obtained with entropic GW
-        as an initial transportation matrix, we run the optimization of GWOT without entropy.
+        trials: pd.DataFrame,
+        top_k: Optional[int] = None,
+        device: Optional[str] = None,
+        to_types: Optional[str] = None,
+        data_type: Optional[str] = None
+    ) -> Tuple[List[float], List[np.ndarray], pd.DataFrame]:
+        """By using optimal transportation plan obtained with entropic GW as an initial transportation matrix, we run the optimization of GWOT without entropy.
 
         This procedure further minimizes GWD and enables us to fairly compare GWD values
         obtained with different entropy regularization values.
+
+        Args:
+            trials (pd.DataFrame):
+                DataFrame containing trial results.
+            top_k (Optional[int], optional):
+                Number of top trials to consider. If None, all trials are considered. Defaults to None.
+            device (Optional[str], optional):
+                Device for computations. Defaults to None.
+            to_types (Optional[str], optional):
+                Type conversion for data. Defaults to None.
+            data_type (Optional[str], optional):
+                Type of data being used. Defaults to None.
+
+        Returns:
+            GWD0_list (List[float]):
+                List of GWD values obtained with entropic GW.
+            OT0_list (List[np.ndarray]):
+                List of optimal transportation plans obtained with entropic GW.
+            trials (pd.DataFrame):
+                DataFrame containing trial results.
         """
 
         GWD0_list = list()
@@ -1239,37 +1470,37 @@ class PairwiseAnalysis:
 
     def run_gwot_without_entropic(
         self,
-        ot_mat = None,
-        max_iter = 10000,
-        device:str=None,
-        to_types:str=None,
-        data_type:str=None,
-    ):
-        """
-        comnpute GWOT without entropy
-        
+        ot_mat: Optional[np.ndarray] = None,
+        max_iter: int = 10000,
+        device: Optional[str] = None,
+        to_types: Optional[str] = None,
+        data_type: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Comnpute GWOT without entropy
+
         Args:
-            ot_mat (_type_, optional): 
+            ot_mat (Optional[np.ndarray], optional):
                 initial OT Plan. Defaults to None.
                 If None, uniform matrix will be used.
-            
-            max_iter (int, optional): 
-                Maximum number of iterations for the Sinkhorn algorithm. 
+
+            max_iter (int, optional):
+                Maximum number of iterations for the Sinkhorn algorithm.
                 Defaults to 1000.
-            
-            device (str, optional): 
+
+            device (Optional[str], optional):
                 the device to compute. Defaults to None.
-            
-            to_types (str, optional):
+
+            to_types (Optional[str], optional):
                 Specifies the type of data structure to be used,
                 either "torch" or "numpy". Defaults to None.
-            
-            data_type (str, optional):  
-                Specifies the type of data to be used in computation. 
+
+            data_type (Optional[str], optional):
+                Specifies the type of data to be used in computation.
                 Defaults to None.
 
         Returns:
-            log0 : results of GWOT without entropy
+            log0 (Dict[str, Any]):
+                Dictionary containing the results of GWOT without entropy.
         """
 
         if ot_mat is not None:
@@ -1311,51 +1542,49 @@ class PairwiseAnalysis:
 
     def run_test_after_entropic_gwot(
         self,
-        top_k:int=None,
-        OT_format = "default",
-        eval_type = "ot_plan",
-        device=None,
-        to_types=None,
-        data_type=None,
-        ticks=None,
-        category_mat = None,
-        visualization_config: VisualizationConfig = VisualizationConfig(),
-    ):
-        """
-        run GWOT without entropy by setting the optimized entropic GWOT as the initial plan.
- 
+        top_k: Optional[int] = None,
+        OT_format: str = "default",
+        eval_type: str = "ot_plan",
+        device: Optional[str] = None,
+        to_types: Optional[str] = None,
+        data_type: Optional[str] = None,
+        ticks: Optional[str] = None,
+        category_mat: Optional[np.ndarray] = None,
+        visualization_config: VisualizationConfig = VisualizationConfig()
+    ) -> None:
+        """Run GWOT without entropy by setting the optimized entropic GWOT as the initial plan.
+
         Args:
-            top_k (int, optional): 
+            top_k (Optional[int], optional):
                 this will be used for loading the optimized OT from the bottom k of lowest GWD (= top_k) value.
                 Defaults to None. If None, all the computed OT will be used for GWOT without entropy.
-                
+
             OT_format (str, optional):
-                format of sim_mat to visualize. 
+                format of sim_mat to visualize.
                 Options are "default", "sorted", and "both". Defaults to "default".
-            
-            eval_type (str, optional): 
+
+            eval_type (str, optional):
                 two ways to evaluate the accuracy. Defaults to "ot_plan".
-            
-            device (str, optional): 
+
+            device (Optional[str], optional):
                 the device to compute. Defaults to None.
-            
-            to_types (str, optional):
+
+            to_types (Optional[str], optional):
                 Specifies the type of data structure to be used,
                 either "torch" or "numpy". Defaults to None.
-            
-            data_type (str, optional):  
-                Specifies the type of data to be used in computation. 
+
+            data_type (Optional[str], optional):
+                Specifies the type of data to be used in computation.
                 Defaults to None.
-            
-            ticks (str, optional): 
+
+            ticks (Optional[str], optional):
                 you can use "objects" or "category (if existed)" or "None". Defaults to None.
-            
-            category_mat (_type_, optional): 
+
+            category_mat (Optional[np.ndarray], optional):
                 This will be used for the category info. Defaults to None.
-            
-            visualization_config (VisualizationConfig, optional): 
+
+            visualization_config (VisualizationConfig, optional):
                 container of parameters used for figure. Defaults to VisualizationConfig().
-            
         """
 
         self.OT, df_trial = self._entropic_gw_alignment(compute_OT=False)
@@ -1458,45 +1687,74 @@ class PairwiseAnalysis:
         plt.clf()
         plt.close()
 
+
 class AlignRepresentations:
+    """This object has methods for conducting N groups level analysis and corresponding results.
+
+    This class has information of all pairs of representations. The class provides functionality
+    to conduct group-level analysis across various representations and compute pairwise alignments between them.
+
+    Attributes:
+        config (OptimizationConfig):
+            all the essential parameters for GWOT.
+        data_name (str, optional):
+            The name of the folder to save the result for each pair. Defaults to "NoDefined".
+        metric (str, optional):
+            Please set the metric that can be used in "scipy.spatical.distance.cdist()". Defaults to "cosine".
+        representations_list (List[Representation]):
+            List of Representation.
+        histogram_matching (bool, optional):
+            This will adjust the histogram of target to that of source. Defaults to False.
+        main_results_dir (Optional[str], optional):
+            The main folder directory to save the results. Defaults to None.
+        main_pair_name (str):
+            Name identifier for the main representation pair. (Set internally)
+        main_file_name (str):
+            Filename identifier for the main results. (Set internally)
+        RSA_corr (dict):
+            Dictionary to store RSA correlation values. (Set internally)
+        name_list (List[str]):
+            List of names from the provided representations.
+        all_pair_list (List[Tuple[int, int]]):
+            All possible pairwise combinations of representations.
+    """
+
     def __init__(
         self,
         config: OptimizationConfig,
-        representations_list:List[Representation],
-        pairs_computed:List[str]=None,
-        specific_eps_list:dict=None,
-        histogram_matching=False,
-        metric="cosine",
-        main_results_dir:str = None,
-        data_name:str = "NoDefined",
+        representations_list: List[Representation],
+        pairs_computed: Optional[List[str]] = None,
+        specific_eps_list: Optional[dict] = None,
+        histogram_matching: bool = False,
+        metric: str = "cosine",
+        main_results_dir: Optional[str] = None,
+        data_name: str = "NoDefined",
     ) -> None:
-        """
-        This object has methods for conducting N groups level analysis and corresponding results.
-        This has information of all pairs of representations.
+        """Initialize the AlignRepresentations object.
 
         Args:
-            config (OptimizationConfig): 
+            config (OptimizationConfig):
                 all the essential parameters for GWOT.
-            
-            representations_list (List[Representation]): 
+
+            representations_list (List[Representation]):
                 List of Representation.
-            
-            pairs_computed (List[str], optional):
+
+            pairs_computed (Optional[List[str]], optional):
                 You can change the specific pairs to be computed by setting `pair_computed` . Defaults to None.
-            
-            specific_eps_list (dict, optional): 
+
+            specific_eps_list (Optional[dict], optional):
                 You can also change the epsilon range `specific_eps_list`. Defaults to None.
-            
-            histogram_matching (bool, optional): 
+
+            histogram_matching (bool, optional):
                 This will adjust the histogram of target to that of source. Defaults to False.
-            
-            metric (str, optional): 
+
+            metric (str, optional):
                 Please set the metric that can be used in "scipy.spatical.distance.cdist()". Defaults to "cosine".
-            
-            main_results_dir (str, optional): 
+
+            main_results_dir (Optional[str], optional):
                 The main folder directory to save the results. Defaults to None.
-                
-            data_name (str, optional): 
+
+            data_name (str, optional):
                 The name of the folder to save the result for each pair. Defaults to "NoDefined".
         """
 
@@ -1522,13 +1780,17 @@ class AlignRepresentations:
 
         self.set_pair_computed(pairs_computed)
 
-    def set_pair_computed(self, pairs_computed:Optional[List]):
-        """
-        User can only re-run the optimization for specific pairs by using `set_pair_computed`.
+    def set_pair_computed(self, pairs_computed: Optional[List[str]]) -> None:
+        """User can only re-run the optimization for specific pairs by using `set_pair_computed`.
 
-        (examples)
-        >>> pairs_computed = ["Group1", "Group2_vs_Group4"] 
-        >>> align_representation.set_pair_computed(pairs_computed)
+        Args:
+            pairs_computed (Optional[List[str]]):
+                List of specific representation pairs to compute.  If not provided, optimization will be
+                run for all pairs. Example values in the list might be: ["Group1", "Group2_vs_Group4"]
+
+        Examples:
+            >>> pairs_computed = ["Group1", "Group2_vs_Group4"]
+            >>> align_representation.set_pair_computed(pairs_computed)
         """
         self.pairs_computed = pairs_computed
 
@@ -1543,19 +1805,24 @@ class AlignRepresentations:
 
     def set_specific_eps_list(
         self,
-        specific_eps_list:Optional[dict],
-        specific_only:bool = False,
-    ):
-        """
-        Also, user can re-define the epsilon range for some pairs by using `set_specific_eps_list`. 
-        
-        The rest of them will be computed with `config.eps_list`. 
-        
+        specific_eps_list: Optional[Dict[str, List[float]]],
+        specific_only: bool = False
+    ) -> None:
+        """Also, user can re-define the epsilon range for some pairs by using `set_specific_eps_list`.
+
+        The rest of them will be computed with `config.eps_list`.
         If `specific_only` is True (default is False), only these pairs will be computed and the rest of them were skipped.
 
-        (examples) 
-        >>> specific_eps_list = {'Group1': [0.02, 0.1], "Group2_vs_Group4":[0.1, 0.2]}
-        >>> align_representation.set_specific_eps_list(specific_eps_list, specific_only=False)
+        Args:
+            specific_eps_list (Optional[Dict[str, List[float]]]):
+                A dictionary specifying custom epsilon values for particular representation pairs.
+                Key is the representation pair name and value is a list of epsilon values.
+            specific_only (bool):
+                If True, only pairs specified in `specific_eps_list` will be computed. Defaults to False.
+
+        Examples:
+            >>> specific_eps_list = {'Group1': [0.02, 0.1], "Group2_vs_Group4":[0.1, 0.2]}
+            >>> align_representation.set_specific_eps_list(specific_eps_list, specific_only=False)
         """
 
         self.specific_eps_list = specific_eps_list
@@ -1630,14 +1897,15 @@ class AlignRepresentations:
 
         return pairwise_list
 
-    def RSA_get_corr(self, metric="spearman", method="normal"):
-        """
-        Conventional representation similarity analysis (RSA).
+    def RSA_get_corr(self, metric: str = "spearman", method: str = "normal") -> None:
+        """Conventional representation similarity analysis (RSA).
 
         Args:
-            metric (str, optional): spearman or pearson. Defaults to "spearman".
-            method (str, optional): compute RSA from all ("all") or upper tri ("normal") 
-                                    of the element in the matrices. Defaults to "normal".
+            metric (str, optional):
+                spearman or pearson. Defaults to "spearman".
+            method (str, optional):
+                compute RSA from all ("all") or upper tri ("normal") of the element in the matrices.
+                Defaults to "normal".
         """
         for pairwise in self.pairwise_list:
             corr = pairwise.RSA(metric=metric, method=method)
@@ -1646,26 +1914,28 @@ class AlignRepresentations:
 
     def show_sim_mat(
         self,
-        sim_mat_format="default",
+        sim_mat_format: str = "default",
         visualization_config: VisualizationConfig = VisualizationConfig(),
         visualization_config_hist: VisualizationConfig = VisualizationConfig(),
-        fig_dir=None,
-        show_distribution=True,
-        ticks=None,
-    ):
-        """
-        Show the dissimilarity matrix of the representation.
+        fig_dir: Optional[str] = None,
+        show_distribution: bool = True,
+        ticks: Optional[str] = None,
+    ) -> None:
+        """Show the dissimilarity matrix of the representation.
 
         Args:
-            sim_mat_format (str, optional): "default", "sorted", or "both". If "sorted" is selected, the rearranged matrix is shown. Defaults to "default".
-            visualization_config (VisualizationConfig, optional): container of parameters used for figure. Defaults to VisualizationConfig().
-            visualization_config_hist (VisualizationConfig, optional): container of parameters used for histogram figure. Defaults to VisualizationConfig().
-            fig_dir (_type_, optional): The directory for saving the figure. Defaults to None.
-            show_distribution : show the histogram figures. Defaults to True.
-            ticks (_type_, optional): "numbers", "objects", or "category". Defaults to None.
-
-        Raises:
-            ValueError: _description_
+            sim_mat_format (str, optional):
+                "default", "sorted", or "both". If "sorted" is selected, the rearranged matrix is shown. Defaults to "default".
+            visualization_config (VisualizationConfig, optional):
+                container of parameters used for figure. Defaults to VisualizationConfig().
+            visualization_config_hist (VisualizationConfig, optional):
+                container of parameters used for histogram figure. Defaults to VisualizationConfig().
+            fig_dir (Optional[str], optional):
+                The directory for saving the figure. Defaults to None.
+            show_distribution (bool, optional):
+                show the histogram figures. Defaults to True.
+            ticks (Optional[str], optional):
+                "numbers", "objects", or "category". Defaults to None.
         """
         for representation in self.representations_list:
             representation.show_sim_mat(
@@ -1722,69 +1992,71 @@ class AlignRepresentations:
 
     def gw_alignment(
         self,
-        compute_OT=False,
-        delete_results=False,
-        return_data=False,
-        return_figure=True,
-        OT_format="default",
+        compute_OT: bool = False,
+        delete_results: bool = False,
+        return_data: bool = False,
+        return_figure: bool = True,
+        OT_format: str = "default",
         visualization_config: VisualizationConfig = VisualizationConfig(),
-        show_log=False,
-        fig_dir=None,
-        ticks=None,
-        save_dataframe=False,
-        change_sampler_seed=False,
-        fix_sampler_seed=42,
-        parallel_method="multithread",
-    ):
-        """
-        compute GWOT for each pair.
+        show_log: bool = False,
+        fig_dir: Optional[str] = None,
+        ticks: Optional[str] = None,
+        save_dataframe: bool = False,
+        change_sampler_seed: bool = False,
+        fix_sampler_seed: int = 42,
+        parallel_method: str = "multithread",
+    ) -> Optional[List[np.ndarray]]:
+        """compute GWOT for each pair.
 
         Args:
-            compute_OT (bool, optional): 
-                If True, the GWOT will be computed. 
+            compute_OT (bool, optional):
+                If True, the GWOT will be computed.
                 If False, the saved results will be loaded. Defaults to False.
-            
-            delete_results (bool, optional): 
+
+            delete_results (bool, optional):
                 If True, all the saved results will be deleted. Defaults to False.
-            
-            return_data (bool, optional): 
+
+            return_data (bool, optional):
                 return the computed OT. Defaults to False.
-            
-            return_figure (bool, optional): 
+
+            return_figure (bool, optional):
                 make the result figures or not. Defaults to True.
-            
+
             OT_format (str, optional):
-                format of sim_mat to visualize. 
+                format of sim_mat to visualize.
                 Options are "default", "sorted", and "both". Defaults to "default".
-            
-            visualization_config (VisualizationConfig, optional): 
+
+            visualization_config (VisualizationConfig, optional):
                 container of parameters used for figure. Defaults to VisualizationConfig().
-            
-            show_log (bool, optional): 
+
+            show_log (bool, optional):
                 If True, the evaluation figure of GWOT will be made. Defaults to False.
-            
-            fig_dir (str, optional): 
-                you can define the path to which you save the figures (.png).  
-                If None, the figures will be saved in the same subfolder in "results_dir".   
+
+            fig_dir (Optional[str], optional):
+                you can define the path to which you save the figures (.png).
+                If None, the figures will be saved in the same subfolder in "results_dir".
                 Defaults to None.
-            
-            ticks (str, optional): 
+
+            ticks (Optional[str], optional):
                 you can use "objects" or "category (if existed)" or "None". Defaults to None.
-            
-            save_dataframe (bool, optional): 
-                If True, you can save all the computed data stored in SQlite or PyMySQL in csv 
+
+            save_dataframe (bool, optional):
+                If True, you can save all the computed data stored in SQlite or PyMySQL in csv
                 format (pandas.DataFrame) in the result folder.  Defaults to False.
-            
+
             change_sampler_seed (bool, optional):
                 If True, the random seed will be different for each pair. Defaults to False.
-            
-            fix_sampler_seed (int, optional): 
+
+            fix_sampler_seed (int, optional):
                 The random seed value for optuna sampler. Defaults to 42.
-            
-            parallel_method (str, optional): 
+
+            parallel_method (str, optional):
                 parallel method to compute GWOT. Defaults to "multithread".
                 perhaps, multithread may be better to compute fast, because of Optuna's regulations.
-            
+
+        Returns:
+            OT_list (Optional[List[np.ndarray]]):
+                Returns a list of computed Optimal Transport matrices if `return_data` is True. Otherwise, returns None.
         """
 
         if isinstance(fix_sampler_seed, int) and fix_sampler_seed > -1:
@@ -1887,38 +2159,40 @@ class AlignRepresentations:
 
     def gwot_after_entropic(
         self,
-        top_k=None,
-        parallel_method=None,
-        OT_format="default",
-        ticks=None,
-        category_mat=None,
+        top_k: Optional[int] = None,
+        parallel_method: Optional[str] = None,
+        OT_format: str = "default",
+        ticks: Optional[str] = None,
+        category_mat: Optional[Any] = None,
         visualization_config: VisualizationConfig = VisualizationConfig(),
-    ):
-        """
-        run GWOT without entropy by setting the optimized entropic GWOT as the initial plan.
- 
+    ) -> None:
+        """Run GWOT without entropy by setting the optimized entropic GWOT as the initial plan.
+
+        This method computes the GWOT for each pair of representations without entropy regularization
+        by initializing the transport plan with the result obtained from entropic GWOT.
+
         Args:
-            top_k (int, optional): 
+            top_k (int, optional):
                 this will be used for loading the optimized OT from the bottom k of lowest GWD (= top_k) value.
                 Defaults to None. If None, all the computed OT will be used for GWOT without entropy.
-            
-            parallel_method (str, optional): 
+
+            parallel_method (Optional[str], optional):
                 parallel method to compute GWOT. Defaults to "multithread".
-                
+
             OT_format (str, optional):
-                format of sim_mat to visualize. 
+                format of sim_mat to visualize.
                 Options are "default", "sorted", and "both". Defaults to "default".
 
-            ticks (str, optional): 
+            ticks (Optional[str], optional):
                 you can use "objects" or "category (if existed)" or "None". Defaults to None.
-            
-            category_mat (_type_, optional): 
+
+            category_mat (Optional[Any], optional):
                 This will be used for the category info. Defaults to None.
-            
-            visualization_config (VisualizationConfig, optional): 
+
+            visualization_config (VisualizationConfig, optional):
                 container of parameters used for figure. Defaults to VisualizationConfig().
-            
         """
+
         if parallel_method == "multiprocess":
             pool = ProcessPoolExecutor(self.config.n_jobs)
 
@@ -1973,15 +2247,23 @@ class AlignRepresentations:
             for future in as_completed(processes):
                 future.result()
 
-
-
-
-    def drop_gw_alignment_files(self, drop_filenames: Optional[List[str]] = None, drop_all: bool = False):
+    def drop_gw_alignment_files(
+        self,
+        drop_filenames: Optional[List[str]] = None,
+        drop_all: bool = False
+    ) -> None:
         """Delete the specified database and directory with the given filename
 
         Args:
-            drop_filenames (Optional[List[str]], optional): [description]. Defaults to None.
-            drop_all (bool, optional): [description]. Defaults to False.
+            drop_filenames (Optional[List[str]], optional):
+                A list of filenames corresponding to the results that are to be deleted.
+                If `drop_all` is set to True, this parameter is ignored. Defaults to None.
+            drop_all (bool, optional):
+                If set to True, all results will be deleted regardless of the `drop_filenames` parameter.
+                Defaults to False.
+
+        Raises:
+            ValueError: If neither `drop_filenames` is specified nor `drop_all` is set to True.
         """
         if drop_all:
             drop_filenames = [pairwise.filename for pairwise in self.pairwise_list]
@@ -1996,18 +2278,19 @@ class AlignRepresentations:
 
     def show_optimization_log(
         self,
-        fig_dir=None,
-        visualization_config=VisualizationConfig(),
-    ):
-        """
-        show both the relationships between epsilons and GWD, and between accuracy and GWD
+        fig_dir: Optional[str] = None,
+        visualization_config: VisualizationConfig = VisualizationConfig()
+    ) -> None:
+        """Show both the relationships between epsilons and GWD, and between accuracy and GWD
 
         Args:
-            fig_dir (_type_, optional): 
-                you can define the path to which you save the figures (.png). 
+            fig_dir (Optional[str], optional):
+                you can define the path to which you save the figures (.png).
                 If None, the figures will be saved in the same subfolder in "results_dir". Defaults to None.
-            
+            visualization_config (VisualizationConfig, optional):
+                Container of parameters used for figure. Defaults to VisualizationConfig().
         """
+
         # default setting
         plt.rcParams.update(plt.rcParamsDefault)
         plt.style.use("seaborn-darkgrid")
@@ -2038,37 +2321,48 @@ class AlignRepresentations:
 
     def barycenter_alignment(
         self,
-        pivot,
-        n_iter,
-        compute_OT=False,
-        delete_results=False,
-        return_data=False,
-        return_figure=True,
-        OT_format="default",
+        pivot: int,
+        n_iter: int,
+        compute_OT: bool = False,
+        delete_results: bool = False,
+        return_data: bool = False,
+        return_figure: bool = True,
+        OT_format: str = "default",
         visualization_config: VisualizationConfig = VisualizationConfig(),
-        show_log=False,
-        fig_dir=None,
-        ticks=None,
-    ):
-        """
-        The unuspervised alignment method using Wasserstein barycenter proposed by Lian et al. (2021).
-        
+        show_log: bool = False,
+        fig_dir: Optional[str] = None,
+        ticks: Optional[str] = None
+    ) -> Optional[List[np.ndarray]]:
+        """The unuspervised alignment method using Wasserstein barycenter proposed by Lian et al. (2021).
 
         Args:
-            pivot (_type_): The representation to which the other representations are aligned initially using gw alignment
-            n_iter (_type_): The number of iterations to calculate the location of the barycenter.
-            compute_OT (bool, optional): _description_. Defaults to False.
-            delete_results (bool, optional): _description_. Defaults to False.
-            return_data (bool, optional): _description_. Defaults to False.
-            return_figure (bool, optional): _description_. Defaults to True.
-            OT_format (str, optional): _description_. Defaults to "default".
-            visualization_config (VisualizationConfig, optional): _description_. Defaults to VisualizationConfig().
-            show_log (bool, optional): _description_. Defaults to False.
-            fig_dir (_type_, optional): _description_. Defaults to None.
-            ticks (_type_, optional): _description_. Defaults to None.
+            pivot (int):
+                The representation to which the other representations are aligned initially using gw alignment
+            n_iter (int):
+                The number of iterations to calculate the location of the barycenter.
+            compute_OT (bool, optional):
+                If True, the GWOT will be computed. If False, saved results will be loaded. Defaults to False.
+            delete_results (bool, optional):
+                If True, all saved results will be deleted. Defaults to False.
+            return_data (bool, optional):
+                If True, returns the computed OT. Defaults to False.
+            return_figure (bool, optional):
+                If True, visualizes the results. Defaults to True.
+            OT_format (str, optional):
+                Format of similarity matrix to visualize. Options include "default", "sorted", and "both".
+                Defaults to "default".
+            visualization_config (VisualizationConfig, optional):
+                Container of parameters used for figure. Defaults to VisualizationConfig().
+            show_log (bool, optional):
+                If True, displays the evaluation figure of GWOT. Defaults to False.
+            fig_dir (Optional[str], optional):
+                Directory where figures are saved. Defaults to None.
+            ticks (Optional[str], optional):
+                Specifies the labels for the ticks.. Defaults to None.
 
         Returns:
-            _type_: _description_
+            Optional[List[np.ndarray]]:
+                If return_data is True, returns the computed OT.
         """
 
         #assert self.all_pair_list == range(len(self.pairwise_list))
@@ -2113,7 +2407,7 @@ class AlignRepresentations:
             num_category_list=self.representations_list[0].num_category_list,
             category_idx_list=self.representations_list[0].category_idx_list,
             func_for_sort_sim_mat=self.representations_list[0].func_for_sort_sim_mat
-            
+
         )
 
         # Set pairwises whose target are the barycenter
@@ -2186,31 +2480,36 @@ class AlignRepresentations:
 
     def calc_accuracy(
         self,
-        top_k_list,
-        eval_type="ot_plan",
-        category_mat=None,
-        barycenter=False,
-        return_dataframe:bool=False,
-    ):
-        """
-        Evaluation of the accuracy of the unsupervised alignment
+        top_k_list: List[int],
+        eval_type: str = "ot_plan",
+        category_mat: Optional[Any] = None,
+        barycenter: bool = False,
+        return_dataframe: bool = False
+    ) -> Optional[pd.DataFrame]:
+        """Evaluation of the accuracy of the unsupervised alignment
 
         Args:
-            top_k_list (list): define the top k accuracy in list 
-            
-            eval_type (str, optional): 
+            top_k_list (List[int]):
+                define the top k accuracy in list
+
+            eval_type (str, optional):
                 two ways to evaluate the accuracy as above. Defaults to "ot_plan".
-       
-            category_mat (_type_, optional): 
+
+            category_mat (Optional[Any], optional):
                 This will be used for the category info. Defaults to None.
-            
-            barycenter (bool, optional): 
-                _description_. Defaults to False.
-            
-            return_dataframe (bool, optional): 
+
+            barycenter (bool, optional):
+                Indicates if the accuracy should be evaluated with respect to a barycenter representation.
+                Defaults to False.
+
+            return_dataframe (bool, optional):
                 If True, the accuracy result will be returned in pandas.DataFrame format. Defaults to False.
-            
+
+        Returns:
+            accuracy (Optional[pd.DataFrame]):
+                A DataFrame containing accuracy metrics. Only returned if `return_dataframe` is True.
         """
+
         accuracy = pd.DataFrame()
         accuracy["top_n"] = top_k_list
 
@@ -2234,7 +2533,7 @@ class AlignRepresentations:
             print("category level accuracy : \n", accuracy)
 
         print("Mean : \n", accuracy.iloc[:, 1:].mean(axis="columns"))
-    
+
         if return_dataframe:
             return accuracy
 
@@ -2256,13 +2555,28 @@ class AlignRepresentations:
 
     def plot_accuracy(
         self,
-        eval_type="ot_plan",
-        fig_dir=None,
-        fig_name="Accuracy_ot_plan.png",
-        scatter=True,
-    ):
-        """
-        plot the accuracy of the unsupervised alignment for each top_k
+        eval_type: str = "ot_plan",
+        fig_dir: Optional[str] = None,
+        fig_name: str = "Accuracy_ot_plan.png",
+        scatter: bool = True
+    ) -> None:
+        """Plot the accuracy of the unsupervised alignment for each top_k
+
+        Args:
+            eval_type (str, optional):
+                Specifies the method used to evaluate accuracy. Can be "ot_plan", "k_nearest", or "category".
+                Defaults to "ot_plan".
+
+            fig_dir (Optional[str], optional):
+                Directory path where the generated figure will be saved. If None, the figure will not be saved
+                but displayed. Defaults to None.
+
+            fig_name (str, optional):
+                Name of the saved figure if `fig_dir` is specified. Defaults to "Accuracy_ot_plan.png".
+
+            scatter (bool, optional):
+                If True, the accuracy will be visualized as a swarm plot. Otherwise, a line plot will be used.
+                Defaults to True.
         """
         # default setting
         plt.rcParams.update(plt.rcParamsDefault)
@@ -2330,35 +2644,48 @@ class AlignRepresentations:
 
     def visualize_embedding(
         self,
-        dim,
-        pivot=0,
-        returned="figure",
+        dim: int,
+        pivot: Union[int, str] = 0,
+        returned: str = "figure",
         visualization_config: VisualizationConfig = VisualizationConfig(),
-        category_name_list=None,
-        num_category_list=None,
-        category_idx_list=None,
-        title=None,
-        legend=True,
-        fig_dir=None,
-        fig_name="Aligned_embedding.png",
-    ):
-        """_summary_
+        category_name_list: Optional[List[str]] = None,
+        num_category_list: Optional[List[int]] = None,
+        category_idx_list: Optional[List[int]] = None,
+        title: Optional[str] = None,
+        legend: bool = True,
+        fig_dir: Optional[str] = None,
+        fig_name: str = "Aligned_embedding.png",
+    ) -> Optional[Union[plt.Figure, List[np.ndarray]]]:
+        """Visualizes the aligned embedding in the specified number of dimensions.
 
         Args:
-            dim (_type_): The number of dimensions the points are embedded.
-            pivot (str, optional) : The pivot or "barycenter" to which all embeddings are aligned. Defaults to 0.
-            returned (str, optional): "figure" or "row_data. Defaults to "figure".
-            visualization_config (VisualizationConfig, optional): _description_. Defaults to VisualizationConfig().
-            category_name_list (_type_, optional): _description_. Defaults to None.
-            num_category_list (_type_, optional): _description_. Defaults to None.
-            category_idx_list (_type_, optional): _description_. Defaults to None.
-            title (_type_, optional): _description_. Defaults to None.
-            legend (bool, optional): _description_. Defaults to True.
-            fig_dir (_type_, optional): _description_. Defaults to None.
-            fig_name (str, optional): _description_. Defaults to "Aligned_embedding.png".
+            dim (int):
+                The number of dimensions in which the points are embedded.
+            pivot (Union[int, str], optional):
+                The index of the pivot Representation or the name of the pivot Representation. Defaults to 0.
+            returned (str, optional):
+                "figure" or "row_data. Defaults to "figure".
+            visualization_config (VisualizationConfig, optional):
+                Container of parameters used for figure. Defaults to VisualizationConfig().
+            category_name_list (Optional[List[str]], optional):
+                List of category names. Defaults to None.
+            num_category_list (Optional[List[int]], optional):
+                List of the number of categories. Defaults to None.
+            category_idx_list (Optional[List[int]], optional):
+                List of the indices of the categories. Defaults to None.
+            title (Optional[str], optional):
+                Title of the figure. Defaults to None.
+            legend (bool, optional):
+                If True, the legend will be displayed. Defaults to True.
+            fig_dir (Optional[str], optional):
+                Directory path where the generated figure will be saved. If None, the figure will not be saved. Defaults to None.
+            fig_name (str, optional):
+                Name of the saved figure if `fig_dir` is specified. Defaults to "Aligned_embedding.png".
 
         Returns:
-            _type_: _description_
+            Optional[Union[plt.Figure, List[np.ndarray]]]:
+            If `returned` is "figure", the function visualizes the plot and optionally saves it based
+            on the `fig_dir` parameter. If `returned` is "row_data", a list of embeddings is returned.
         """
 
         if fig_dir is not None:
