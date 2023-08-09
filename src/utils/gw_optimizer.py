@@ -22,7 +22,7 @@ class RunOptuna:
         filename (str): The filename to save the results.
         storage (str): Storage URL for the database. For SQLite, this is a file path.
         init_mat_plan (str): The method to be used for the initial plan.
-        num_trial (int): Number of trials for optimization.
+        num_trial (int): Number of trials for the optimization.
         n_iter (int): Number of initial plans evaluated during a single optimization.
         n_jobs (int): Number of jobs to run in parallel.
         sampler_name (str): Name of the sampler used in optimization. Options are "random", "grid", and "tpe".
