@@ -246,8 +246,12 @@ def plot_lower_triangular_histogram(matrix: Any, title: str) -> None:
 
 
 class VisualizeEmbedding():
-    """
-    A class to visualize embeddings in either 2D or 3D using PCA.
+    """A class to visualize embeddings in either 2D or 3D using PCA.
+
+    This class provides functions to visualize embeddings in a 2D or 3D space. Through the use of PCA, this class allows for
+    the reduction of high-dimensional embeddings down to 2 or 3 dimensions for visualization purposes. The class offers various
+    customization options, including the ability to color-code and differentiate multiple embeddings based on categories using
+    distinct markers and colors.
 
     Attributes:
         embedding_list (List[np.ndarray]): A list of embeddings to be visualized.
