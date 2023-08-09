@@ -6,6 +6,18 @@ import numpy as np
 
 #%%
 class SimpleHistogramMatching():
+    """A class to perform simple histogram matching between two dissimilarity matrices.
+
+    The SimpleHistogramMatching class provides a mechanism to align the histograms of two given dissimilarity
+    matrices (source and target). The histogram matching can be performed in two directions, either adjusting the
+    source to match the target's histogram or vice versa. The class uses a sorting-based approach to achieve the
+    histogram matching between the matrices.
+
+    Args:
+        source (np.ndarray): Source's dissimilarity matrix.
+        target (np.ndarray): Target's dissimilarity matrix.
+    """
+
     def __init__(self, source:np.ndarray, target:np.ndarray) -> None:
         """Simple Histogram Matching
 
