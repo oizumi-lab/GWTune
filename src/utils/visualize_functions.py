@@ -1,16 +1,29 @@
-import numpy as np
-import pandas as pd
+import colorsys
+from typing import Any, List, Tuple, Optional
+
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-import colorsys
-from sklearn.decomposition import PCA
-import seaborn as sns
-from typing import List
+import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from sklearn.decomposition import PCA
 
-def get_color_labels(n, hue = None, show_labels = True):
+
+def get_color_labels(
+    n: int,
+    hue: Optional[str] = None,
+    show_labels: bool = True
+) -> List[Tuple[float, float, float]]:
     """Create color labels for n objects
+
+    Args:
+        n (int): number of objects
+        hue (str): "warm", "cool", or None
+        show_labels (bool): whether to show color labels
+
+    Returns:
+        color_labels (List): color labels for each objects
     """
+
     # Set the saturation and lightness values to maximum
     saturation = 1.0
     lightness = 0.5
@@ -41,12 +54,17 @@ def get_color_labels(n, hue = None, show_labels = True):
 
     return color_labels
 
-def get_color_labels_for_category(n_category_list, min_saturation, show_labels = True):
+
+def get_color_labels_for_category(
+    n_category_list: List[int],
+    min_saturation: int,
+    show_labels: bool = True
+) -> Tuple[List[Tuple[float, float, float]], List[Tuple[float, float, float]]]:
     """Create color labels for n categoris
 
     Args:
-        n_category_list (list): list of the numbers of n concepts
-        min_saturation : minimum saturation
+        n_category_list (List): number of objects in each category
+        min_saturation (int): minimum saturation
 
     Returns:
         color_labels : color labels for each objects
@@ -86,15 +104,34 @@ def get_color_labels_for_category(n_category_list, min_saturation, show_labels =
 
 
 def show_heatmap(
-    matrix,
-    title,
-    save_file_name = None,
-    ticks = None,
-    category_name_list = None,
-    num_category_list = None,
-    object_labels = None,
+    matrix: Any,
+    title: Optional[str],
+    save_file_name: Optional[str] = None,
+    ticks: Optional[str] = None,
+    category_name_list: Optional[List[str]] = None,
+    num_category_list: Optional[List[int]] = None,
+    object_labels: Optional[List[str]] = None,
     **kwargs
-):
+) -> None:
+    """Display a heatmap of the given matrix with various customization options.
+
+    Args:
+        matrix (Any): The matrix to be visualized as a heatmap.
+        title (str, optional): The title of the heatmap.
+        save_file_name (str, optional): File name to save the heatmap. If None, the heatmap won't be saved.
+        ticks (str, optional): Determines how ticks should be displayed. Options are "objects", "category", or "numbers".
+        category_name_list (List[str], optional): List of category names if `ot_category_tick` is True.
+        num_category_list (List[int], optional): List of the number of items in each category.
+        object_labels (List[str], optional): Labels for individual objects, used if `ot_object_tick` is True.
+        **kwargs: Other keyword arguments for customizing the heatmap.
+
+    Raises:
+        ValueError: If both `ot_object_tick` and `ot_category_tick` are True.
+        ValueError: If `ticks` is "category" but `ot_category_tick` is False.
+
+    Returns:
+        None: Displays or saves the heatmap.
+    """
     figsize = kwargs.get('figsize', (8, 6))
     title_size = kwargs.get('title_size', 60)
 
@@ -124,7 +161,7 @@ def show_heatmap(
 
     plt.style.use("default")
     plt.rcParams["grid.color"] = "black"
-    
+
     fig, ax = plt.subplots(figsize = figsize)
 
     if title is not None:
@@ -190,7 +227,17 @@ def show_heatmap(
     plt.close()
 
 
-def plot_lower_triangular_histogram(matrix, title):
+def plot_lower_triangular_histogram(matrix: Any, title: str) -> None:
+    """Plot a histogram of the values in the lower triangular part of the given matrix.
+
+    Args:
+        matrix (Any): The matrix whose lower triangular values will be used for the histogram.
+        title (str): The title of the histogram.
+
+    Returns:
+        None: Displays the histogram.
+    """
+
     lower_triangular = np.tril(matrix)
     lower_triangular = lower_triangular.flatten()
     plt.hist(lower_triangular)
@@ -199,7 +246,39 @@ def plot_lower_triangular_histogram(matrix, title):
 
 
 class VisualizeEmbedding():
-    def __init__(self, embedding_list : List[np.ndarray], dim, category_name_list = None, num_category_list = None, category_idx_list = None) -> None:
+    """A class to visualize embeddings in either 2D or 3D using PCA.
+
+    This class provides functions to visualize embeddings in a 2D or 3D space. Through the use of PCA, this class allows for
+    the reduction of high-dimensional embeddings down to 2 or 3 dimensions for visualization purposes. The class offers various
+    customization options, including the ability to color-code and differentiate multiple embeddings based on categories using
+    distinct markers and colors.
+
+    Attributes:
+        embedding_list (List[np.ndarray]): A list of embeddings to be visualized.
+        dim (int): Dimension (either 2 or 3) for the visualization after applying PCA.
+        category_name_list (Optional[List[str]]): List of category names.
+        num_category_list (Optional[List[int]]): List of the number of items in each category.
+        category_idx_list (Optional[List[int]]): Index list for categories.
+    """
+
+    def __init__(
+        self,
+        embedding_list : List[np.ndarray],
+        dim: int,
+        category_name_list: Optional[List[str]] = None,
+        num_category_list: Optional[List[int]] = None,
+        category_idx_list: Optional[List[int]] = None
+    ) -> None:
+        """Initialize the VisualizeEmbedding class.
+
+        Args:
+            embedding_list (List[np.ndarray]): A list of embeddings.
+            dim (int): Dimension (either 2 or 3) for the visualization after applying PCA.
+            category_name_list (Optional[List[str]]): List of category names. Defaults to None.
+            num_category_list (Optional[List[int]]): List of the number of items in each category. Defaults to None.
+            category_idx_list (Optional[List[int]]): Index list for categories. Defaults to None.
+        """
+
         self.embedding_list = embedding_list
         if category_idx_list is not None:
             category_concat_embedding_list = []
@@ -216,17 +295,18 @@ class VisualizeEmbedding():
         self.num_category_list = num_category_list
         self.category_idx_list = category_idx_list
 
-    def apply_pca_to_embedding_list(self, n_dim_pca, show_result = True):
-        """apply pca to the embedding list
+    def apply_pca_to_embedding_list(self, n_dim_pca: int, show_result: bool = True) -> List[np.ndarray]:
+        """Apply pca to the embedding list.
 
         Args:
-            embedding_list (list): list of embeddings
-            n_dim_pca (int): dimmension after pca
+            embedding_list (list): A list of embeddings.
+            n_dim_pca (int): Dimmension after PCA.
             show_result (bool, optional): If true, show the cumulative contibution rate. Defaults to True.
 
         Returns:
-            embedding_list_pca: list of embeddings after pca was applied
+            embedding_list_pca (list): A list of embeddings after PCA.
         """
+
         pca = PCA(n_components = n_dim_pca)
         n_object = self.embedding_list[0].shape[0]
         embedding_list_cat = np.concatenate([self.embedding_list[i] for i in range(len(self.embedding_list))], axis = 0)
@@ -248,12 +328,24 @@ class VisualizeEmbedding():
 
     def plot_embedding(
         self,
-        name_list = None,
-        legend = True,
-        title = None,
-        save_dir = None,
+        name_list: Optional[List[str]] = None,
+        legend: bool = True,
+        title: Optional[str] = None,
+        save_dir: Optional[str] = None,
         **kwargs
-    ):
+    ) -> None:
+        """Plot the embeddings in 2D or 3D space.
+
+        Args:
+            name_list (Optional[List[str]]): Names for each embedding. Defaults to None.
+            legend (bool): Whether or not to show the legend. Defaults to True.
+            title (Optional[str]): Title for the plot. Defaults to None.
+            save_dir (Optional[str]): Directory to save the plot. If None, the plot won't be saved. Defaults to None.
+            **kwargs: Other keyword arguments for customizing the plot.
+
+        Returns:
+            None: Displays or saves the plot.
+        """
         figsize = kwargs.get('figsize', (15, 15))
         xlabel = kwargs.get('xlabel', "PC1")
         xlabel_size = kwargs.get('xlabel_size', 25)
@@ -271,7 +363,6 @@ class VisualizeEmbedding():
         markers_list = kwargs.get('markers_list', None)
         marker_size = kwargs.get('marker_size', 30)
         cmap = kwargs.get('cmap', "viridis")
-        
         show_figure = kwargs.get('show_figure', True)
 
         if color_labels is None:
@@ -312,6 +403,7 @@ class VisualizeEmbedding():
 
         else:
             raise ValueError("'dim' is either 2 or 3")
+
         ax.grid(True)
         ax.xaxis.set_ticklabels([])
         ax.yaxis.set_ticklabels([])
@@ -368,12 +460,12 @@ class VisualizeEmbedding():
             cbar.set_label(colorbar_label, size=xlabel_size)
             cbar.ax.tick_params(labelsize=xlabel_size)
             cbar.mappable.set_clim(colorbar_range[0], colorbar_range[1])
-        
+
         if save_dir is not None:
             plt.savefig(save_dir)
 
         if show_figure:
             plt.show()
-        
+
         plt.clf()
         plt.close()
