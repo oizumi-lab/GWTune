@@ -37,7 +37,7 @@ class GW_Alignment:
         source_size (int): Size of the source distribution.
         target_size (int): Size of the target distribution.
         data_path (str): Directory to save the computation results.
-        n_iter (int): Number of trials or initial plans evaluated in optimization.
+        n_iter (int): Number of initial plans evaluated in optimization.
         main_compute (MainGromovWasserstainComputation): Main computation object for GW alignment.
     """
 
@@ -66,9 +66,7 @@ class GW_Alignment:
                                         Defaults to 1000.
             numItermax (int, optional): Maximum number of iterations for the
                                         Sinkhorn algorithm. Defaults to 1000.
-            n_iter (int, optional):  Number of trials, i.e., the number of
-                                        initial plans evaluated in optimization.
-                                        Defaults to 20.
+            n_iter (int, optional): Number of initial plans evaluated in optimization. Defaults to 20.
             to_types (str, optional):   Specifies the type of data structure to be used,
                                         either "torch" or "numpy". Defaults to "torch".
             data_type (str, optional):  Specifies the type of data to be used
