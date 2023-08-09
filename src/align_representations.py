@@ -856,11 +856,7 @@ class PairwiseAnalysis:
         # figure plotting epsilon as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
         plt.scatter(df_trial["params_eps"], df_trial["value"], c = 100 * df_trial["user_attrs_best_acc"], s = marker_size, cmap=cmap)
-        plt.xlabel("$\epsilon$")
-        plt.xticks(fontsize=ticks_size)
-        plt.ylabel("GWD")
-        plt.yticks(fontsize=ticks_size)
-
+        
         if lim_eps is not None:
             plt.xlim(lim_eps)
 
@@ -871,12 +867,17 @@ class PairwiseAnalysis:
             plt.xscale('log')
 
         plt.title(f"$\epsilon$ - GWD ({self.pair_name.replace('_', ' ')})")
-        plt.grid(True, which = 'both')
 
         plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
-        plt.tick_params(axis = 'x', rotation = 30,  which="both")
+        plt.gca().xaxis.set_minor_formatter(plt.FormatStrFormatter('%.1e'))
+        
+        plt.tick_params(axis = 'x', rotation = 30, which="both", labelsize=ticks_size)
+        plt.tick_params(axis = 'y', rotation = 0, which="both", labelsize=ticks_size)
+        plt.xlabel("$\epsilon$")
+        plt.ylabel("GWD")
+        
+        plt.grid(True, which = 'both')
         plt.colorbar(label='accuracy (%)')
-
         plt.tight_layout()
 
         if fig_dir is None:
