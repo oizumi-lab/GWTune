@@ -198,8 +198,21 @@ class Representation:
         category_idx_list=None,
         func_for_sort_sim_mat=None,
     ) -> None:
+        """
+        Args:
+            name (_type_): The name of the representation. 
+            metric (str, optional): The metric for computing distances between embeddings. Defaults to "cosine".
+            sim_mat (np.ndarray, optional): Representational dissimilarity matrix. Defaults to None.
+            embedding (np.ndarray, optional): The array of N-dimensional embeddings of all stimuli. Defaults to None.
+            get_embedding (bool, optional): If True, the embeddings are automatically computed from the sim_mat using MDS method. Defaults to True.
+            MDS_dim (int, optional): The dimension of the embeddings computed automatically from the sim_mat using MDS. Defaults to 3.
+            object_labels (_type_, optional): The labels for each stimulus or points. Defaults to None.
+            category_name_list (_type_, optional): If there is coarse category labels, you can select categories to be used in the unsupervised alignment. Defaults to None.
+            num_category_list (_type_, optional): The list of numbers of stimuli each coarse category contains. Defaults to None.
+            category_idx_list (_type_, optional): The list of indices that represents which coarse category each stimulus belongs to. Defaults to None.
+            func_for_sort_sim_mat (_type_, optional): A function to rearrange the matrix so that stimuli belonging to the same coarse category are arranged adjacent to each other. Defaults to None.
+        """
 
-        # meta data for the representation matrix (dis-similarity matrix).
         self.name = name
         self.metric = metric
 
@@ -212,7 +225,7 @@ class Representation:
         # define the function to sort the representation matrix by the label parameters above (Default is None). Users can define it by themselves.
         self.func_for_sort_sim_mat = func_for_sort_sim_mat
 
-        # computing the representation matrix (or embedding) from embedding (or representation matrix) if sim_mat is None.
+        # compute the dissimilarity matrix from embedding if sim_mat is None, or estimate embedding from the dissimilarity matrix using MDS if embedding is None.
         assert (sim_mat is not None) or (embedding is not None), "sim_mat and embedding are None."
 
         if sim_mat is None:
@@ -257,13 +270,14 @@ class Representation:
         fig_dir=None,
         ticks=None,
     ):
-        """_summary_
+        """
+        Show the dissimilarity matrix of the representation.
 
         Args:
-            sim_mat_format (str, optional): _description_. Defaults to "default".
-            visualization_config (VisualizationConfig, optional): _description_. Defaults to VisualizationConfig().
-            fig_dir (_type_, optional): _description_. Defaults to None.
-            ticks (_type_, optional): _description_. Defaults to None.
+            sim_mat_format (str, optional): "default" or "sorted". If "sorted" is selected, the rearranged matrix is shown. Defaults to "default".
+            visualization_config (VisualizationConfig, optional): . Defaults to VisualizationConfig().
+            fig_dir (_type_, optional): The directory for saving the figure. Defaults to None.
+            ticks (_type_, optional): "numbers", "objects", or "category". Defaults to None.
 
         Raises:
             ValueError: _description_
@@ -299,6 +313,9 @@ class Representation:
             raise ValueError("sim_mat_format must be either 'default', 'sorted', or 'both'.")
 
     def show_sim_mat_distribution(self, **kwargs):
+        """
+        Show the distribution of the values of elements of the dissimilarity matrix.
+        """
         # figsize = kwargs.get('figsize', (4, 3))
         xticks_rotation = kwargs.get("xticks_rotation", 90)
         yticks_rotation = kwargs.get("yticks_rotation", 0)
@@ -332,6 +349,20 @@ class Representation:
         fig_dir=None,
         fig_name="Aligned_embedding.png",
     ):
+        """
+        Show the embeddings.
+
+        Args:
+            dim (int, optional): The dimension of the embedding space for visualization. If the original dimensions of the embeddings are higher than "dim", the dimension reduction method(PCA) is applied. Defaults to 3.
+            visualization_config (VisualizationConfig, optional): . Defaults to VisualizationConfig().
+            category_name_list (_type_, optional): Select the coarse category labels to be visualized in the embedding space. Defaults to None.
+            num_category_list (_type_, optional):  Defaults to None.
+            category_idx_list (_type_, optional):  Defaults to None.
+            title (_type_, optional): The title of the figure. Defaults to None.
+            legend (bool, optional): If True, the legend is shown. Defaults to True.
+            fig_dir (_type_, optional): The directory for saving the figure. Defaults to None.
+            fig_name (str, optional): The name of the figure. Defaults to "Aligned_embedding.png".
+        """
 
         if fig_dir is not None:
             fig_path = os.path.join(fig_dir, fig_name)
