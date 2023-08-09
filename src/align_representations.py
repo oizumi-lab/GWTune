@@ -1051,7 +1051,7 @@ class PairwiseAnalysis:
                 This will be used for the category info. Defaults to None.
 
         Returns:
-            _type_: _description_
+            df : dataframe which has accuracies for top_k. 
         """
         df = pd.DataFrame()
         df["top_n"] = top_k_list
