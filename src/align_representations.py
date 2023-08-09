@@ -978,11 +978,17 @@ class PairwiseAnalysis:
                 fig_path = None
 
             if OT_format == "default" or OT_format == "both":
+                if OT_format == "default":
+                    assert self.source.category_name_list is None, "please set the 'sim_mat_format = sorted'. "
+               
                 visualize_functions.show_heatmap(
                     ot_to_plot,
                     title=title,
                     save_file_name=fig_path,
-                    object_labels = self.source.object_labels,
+                    ticks=ticks,
+                    category_name_list=None,
+                    num_category_list=None,
+                    object_labels=self.source.object_labels,
                     **visualization_config(),
                 )
 
