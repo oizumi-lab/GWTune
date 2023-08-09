@@ -16,3 +16,4 @@ pyproject.toml
 *.png
 *.svg
 */*.ipynb_checkpoints
+pyproject_copy.toml
