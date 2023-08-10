@@ -137,6 +137,7 @@ class VisualizationConfig:
         ticks_size: int = 5,
         xticks_rotation: int = 90,
         yticks_rotation: int = 0,
+        tick_format: str = '%.2f',
         title_size: int = 20,
         legend_size: int = 5,
         xlabel: Optional[str] = None,
@@ -182,6 +183,8 @@ class VisualizationConfig:
                 Rotation angle of the xticks. Defaults to 90.
             yticks_rotation (int, optional):
                 Rotation angle of the yticks. Defaults to 0.
+            tick_format (Optional[str]): 
+                Format of the ticks. Defaults to '%.2f'.
             title_size (int, optional):
                 Size of the title. Defaults to 20.
             legend_size (int, optional):
@@ -246,6 +249,7 @@ class VisualizationConfig:
             'ticks_size': ticks_size,
             'xticks_rotation': xticks_rotation,
             'yticks_rotation': yticks_rotation,
+            'tick_format': tick_format,
             'title_size': title_size,
             'legend_size': legend_size,
             'xlabel': xlabel,
@@ -1044,6 +1048,8 @@ class PairwiseAnalysis:
         plot_eps_log = kwargs.get('plot_eps_log', False)
         cmap = kwargs.get("cmap", 'viridis')
         ticks_size = kwargs.get("ticks_size", 5)
+        tick_format = kwargs.get("tick_format", "%.2f")
+        xticks_rotation = kwargs.get("xticks_rotation", 0)
 
         lim_eps = kwargs.get("lim_eps", None)
         lim_gwd = kwargs.get("lim_gwd", None)
@@ -1067,10 +1073,10 @@ class PairwiseAnalysis:
 
         plt.title(f"$\epsilon$ - GWD ({self.pair_name.replace('_', ' ')})")
 
-        plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter('%.1e'))
-        plt.gca().xaxis.set_minor_formatter(plt.FormatStrFormatter('%.1e'))
+        plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter(tick_format))
+        plt.gca().xaxis.set_minor_formatter(plt.FormatStrFormatter(tick_format))
 
-        plt.tick_params(axis = 'x', rotation = 30, which="both", labelsize=ticks_size)
+        plt.tick_params(axis = 'x', rotation = xticks_rotation, which="both", labelsize=ticks_size)
         plt.tick_params(axis = 'y', rotation = 0, which="both", labelsize=ticks_size)
         plt.xlabel("$\epsilon$")
         plt.ylabel("GWD")
