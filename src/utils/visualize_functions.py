@@ -205,6 +205,9 @@ def show_heatmap(
     if not ot_object_tick and not ot_category_tick:
         plt.xticks([])
         plt.yticks([])
+    
+    plt.xlabel(xlabel, size = xlabel_size)
+    plt.ylabel(ylabel, size = ylabel_size)
 
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.1)
@@ -212,9 +215,7 @@ def show_heatmap(
     cbar = fig.colorbar(aximg, cax=cax, format = cbar_format)
 
     cbar.ax.tick_params(axis='y', labelsize = cbar_ticks_size)
-
-    plt.xlabel(xlabel, size = xlabel_size)
-    plt.ylabel(ylabel, size = ylabel_size)
+    
     plt.tight_layout()
 
     if save_file_name is not None:
