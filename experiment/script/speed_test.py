@@ -173,7 +173,7 @@ class SpeedTest():
 
 # %%
 if __name__ == '__main__':
-    data_select = 'face'
+    data_select = 'color'
     tgw = SpeedTest(data_select)
     tgw.comparison()
 
