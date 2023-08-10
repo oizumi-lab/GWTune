@@ -464,9 +464,6 @@ class Representation:
             fig_path = None
 
         if sim_mat_format == "default" or sim_mat_format == "both":
-            if sim_mat_format == "default":
-                assert self.category_name_list is None, "please set the 'sim_mat_format = sorted'. "
-
             visualize_functions.show_heatmap(
                 self.sim_mat,
                 title=self.name,
