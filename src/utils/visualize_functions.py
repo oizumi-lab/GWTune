@@ -248,6 +248,7 @@ class VisualizeEmbedding():
         legend = True,
         title = None,
         save_dir = None,
+        plot_idx = None,
         **kwargs
     ):
         figsize = kwargs.get('figsize', (15, 15))
@@ -267,10 +268,12 @@ class VisualizeEmbedding():
         markers_list = kwargs.get('markers_list', None)
         marker_size = kwargs.get('marker_size', 30)
         cmap = kwargs.get('cmap', "viridis")
-
+        alpha = kwargs.get('alpha', 1)
+        if plot_idx is None:
+            plot_idx = np.arange(len(self.embedding_list[0]))
         if color_labels is None:
             if self.num_category_list is None:
-                color_labels = get_color_labels(self.embedding_list[0].shape[0], hue = color_hue, show_labels = False)
+                color_labels = get_color_labels(plot_idx.shape[0], hue = color_hue, show_labels = False)
             else:
                 color_labels, main_colors = get_color_labels_for_category(self.num_category_list, min_saturation = 1, show_labels = False)
 
@@ -314,15 +317,14 @@ class VisualizeEmbedding():
 
         for i in range(len(self.embedding_list)):
             coords_i = self.embedding_list[i]
+            coords_i = coords_i[plot_idx]
             if self.dim == 3:
-                im = ax.scatter(xs = coords_i[:, 0], ys = coords_i[:, 1], zs = coords_i[:, 2],
-                           marker = markers[i], color = color_labels, s = marker_size, alpha = 1, cmap=cmap)
-                ax.scatter([], [], [], marker = markers[i], color = "black", s = marker_size, alpha = 1, label = name_list[i].replace("_", " "))
+                im = ax.scatter(xs = coords_i[:, 0], ys = coords_i[:, 1], zs = coords_i[:, 2], marker = markers[i], color = color_labels, s = marker_size,  alpha=alpha, cmap=cmap)
+                ax.scatter([], [], [], marker = markers[i], color = "black", s = marker_size,  alpha=1, label = name_list[i].replace("_", " "))
 
             else:
-                im = ax.scatter(x = coords_i[:, 0], y = coords_i[:, 1],
-                           marker = markers[i], color = color_labels, s = marker_size, alpha = 1, cmap=cmap)
-                ax.scatter(x = [], y = [], marker = markers[i], color = "black", s = marker_size, alpha = 1, label = name_list[i].replace("_", " "))
+                im = ax.scatter(x = coords_i[:, 0], y = coords_i[:, 1], marker = markers[i], color = color_labels, s = marker_size, alpha = alpha, cmap=cmap)
+                ax.scatter(x = [], y = [], marker = markers[i], color = "black", s = marker_size,  alpha=1, label = name_list[i].replace("_", " "))
                 ax.set_aspect('equal')
 
         if self.category_name_list is not None:
@@ -336,6 +338,7 @@ class VisualizeEmbedding():
 
         if legend:
             ax.legend(fontsize = legend_size, loc = "best")
+            #ax.legend(fontsize = legend_size, loc='upper left', bbox_to_anchor=(1, 1))
 
         if title is not None:
             plt.title(title, fontsize = title_size)

@@ -7,7 +7,7 @@ import shutil
 import warnings
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from typing import List, Union, Optional
-
+from matplotlib.colors import LogNorm
 import matplotlib.pyplot as plt
 import numpy as np
 import ot
@@ -120,6 +120,7 @@ class VisualizationConfig:
         colorbar_label=None,
         colorbar_range=[0, 1],
         colorbar_shrink=1,
+        alpha=1,
         markers_list=None,
         marker_size=30,
         color = 'C0',
@@ -156,6 +157,7 @@ class VisualizationConfig:
             'colorbar_label': colorbar_label,
             'colorbar_range': colorbar_range,
             'colorbar_shrink': colorbar_shrink,
+            'alpha': alpha,
             'markers_list': markers_list,
             'marker_size': marker_size,
             'color':color,
@@ -794,8 +796,12 @@ class PairwiseAnalysis:
         plt.clf()
         plt.close()
 
+        # figure plotting accuracy as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
-        plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap)
+        if plot_eps_log:
+            plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap, norm=LogNorm())
+        else:
+            plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap)
         plt.title(self.pair_name.replace('_', ' '))
         plt.xlabel("accuracy (%)")
         plt.ylabel("GWD")
@@ -1583,6 +1589,7 @@ class AlignRepresentations:
         title=None,
         legend=True,
         fig_dir=None,
+        plot_idx=None,
         fig_name="Aligned_embedding.png",
     ):
         """_summary_
@@ -1640,7 +1647,7 @@ class AlignRepresentations:
             )
 
             visualize_embedding.plot_embedding(
-                name_list=name_list, title=title, legend=legend, save_dir=fig_path, **visualization_config()
+                name_list=name_list, title=title, legend=legend, save_dir=fig_path, plot_idx=plot_idx, **visualization_config()
             )
 
         elif returned == "row_data":
