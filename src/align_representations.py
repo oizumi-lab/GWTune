@@ -1054,6 +1054,7 @@ class PairwiseAnalysis:
         """
         figsize = kwargs.get('figsize', (8,6))
         fig_ext = kwargs.get('fig_ext', 'png')
+        title_size = kwargs.get('title_size', 20)
         marker_size = kwargs.get('marker_size', 20)
         show_figure = kwargs.get('show_figure', False)
         plot_eps_log = kwargs.get('plot_eps_log', False)
@@ -1080,7 +1081,7 @@ class PairwiseAnalysis:
 
         # figure plotting epsilon as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
-        plt.title(f"$\epsilon$ - GWD ({self.pair_name.replace('_', ' ')})")
+        plt.title(f"epsilon - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
         plt.scatter(df_trial["params_eps"], df_trial["value"], c = 100 * df_trial["user_attrs_best_acc"], s = marker_size, cmap=cmap)
         
         plt.xlabel("epsilon", fontsize=xlabel_size)
@@ -1118,7 +1119,7 @@ class PairwiseAnalysis:
 
         plt.figure(figsize=figsize)
         plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap)
-        plt.title(self.pair_name.replace('_', ' '))
+        plt.title(f"Matching Rate - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
         plt.xlabel("Matching Rate (%)", fontsize=xlabel_size)
         plt.xticks(fontsize=xticks_size)
         plt.ylabel("GWD", fontsize=ylabel_size)
