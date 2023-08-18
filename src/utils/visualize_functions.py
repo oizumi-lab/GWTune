@@ -145,7 +145,8 @@ def show_heatmap(
     yticks_rotation = kwargs.get('yticks_rotation', 0)
 
     cbar_ticks_size = kwargs.get("cbar_ticks_size", 20)
-    ticks_size = kwargs.get('ticks_size', 20)
+    xticks_size = kwargs.get('xticks_size', 20)
+    yticks_size = kwargs.get('yticks_size', 20)
     cbar_format = kwargs.get('cbar_format', None)#"%.2e"
     cmap = kwargs.get('cmap', 'cividis')
 
@@ -177,13 +178,13 @@ def show_heatmap(
         assert num_category_list is not None
 
         if ticks == "objects":
-            plt.xticks(np.arange(sum(num_category_list)) + 0.5, labels = object_labels, rotation = xticks_rotation, size = ticks_size)
-            plt.yticks(np.arange(sum(num_category_list)) + 0.5, labels = object_labels, rotation = yticks_rotation, size = ticks_size)
+            plt.xticks(np.arange(sum(num_category_list)) + 0.5, labels = object_labels, rotation = xticks_rotation, size = xticks_size)
+            plt.yticks(np.arange(sum(num_category_list)) + 0.5, labels = object_labels, rotation = yticks_rotation, size = yticks_size)
 
         elif ticks == "category":
             label_pos = [sum(num_category_list[:i + 1]) for i in range(len(category_name_list))]
-            plt.xticks(label_pos, labels = category_name_list, rotation = xticks_rotation, size = ticks_size, fontweight = "bold")
-            plt.yticks(label_pos, labels = category_name_list, rotation = yticks_rotation, size = ticks_size, fontweight = "bold")
+            plt.xticks(label_pos, labels = category_name_list, rotation = xticks_rotation, size = xticks_size, fontweight = "bold")
+            plt.yticks(label_pos, labels = category_name_list, rotation = yticks_rotation, size = yticks_size, fontweight = "bold")
 
             if draw_category_line:
                 for pos in label_pos:
@@ -193,12 +194,12 @@ def show_heatmap(
 
     if ot_object_tick and not ot_category_tick:
         if ticks == "numbers":
-            plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = ticks_size, rotation = xticks_rotation)
-            plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = ticks_size, rotation = yticks_rotation)
+            plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = xticks_size, rotation = xticks_rotation)
+            plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = yticks_size, rotation = yticks_rotation)
         elif ticks == "objects":
             assert object_labels is not None
-            plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = object_labels, size = ticks_size, rotation = xticks_rotation)
-            plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = object_labels, size = ticks_size, rotation = yticks_rotation)
+            plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = object_labels, size = xticks_size, rotation = xticks_rotation)
+            plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = object_labels, size = yticks_size, rotation = yticks_rotation)
         elif ticks == "category":
             raise(ValueError, "please use 'ot_category_tick = True'.")
 
