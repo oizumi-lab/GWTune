@@ -1,12 +1,14 @@
 # Toolbox for Gromov-Wasserstein Optimal Transport (GWOT)
 This toolbox supports an easy-to-use hyperparameter tuning of GWOT and the evaluation of unsupervised alignment based on GWOT.  
-To find good local minima in GWOT, hyperparameter tuning is important.  
+To find good local minima in GWOT, hyperparameter tuning is essential.  
 This toolbox uses [Optuna](https://optuna.org/) for hyperparameter tuning and [POT](https://pythonot.github.io/) for GWOT optimization.  
 
 ## Tutorials
-To use our toolbox, please run `tutorial.ipynb` in the `scripts` folder.  
-You can learn how to use this toolbox on two types of sample data.  
-By replacing the tutorial data with your data, you will be able to easily test GWOT for your data!  
+To use our toolbox, please first try out our main tutorial notebook `tutorial.ipynb` in the `scripts` folder.  
+You can learn how to use this toolbox on two examples of behavioral data (`color` and `THINGS`).   
+By replacing the tutorial data with your own data, you can easily test GWOT on your own data!  
+To further facilitate use cases of our toolbox, we also provide tutorials for other types of datasets, neural data (`AllenBrain`) and neural network models (`DNN`).   
+You can find these tutorials in the `tutorial_other_datasets` folder.   
 
 ## Requirements
 Please see `pyproject.toml` for required libraries.  
@@ -15,10 +17,10 @@ For compatibility information, see the [official pytorch page](https://pytorch.o
 
 ## Folders in this repository  
 
-`data`: Dataset for tutorials.  
-`scripts`: Scripts for the GWOT optimization tutorials.  
+`data`: Datasets for tutorials.  
+`scripts`: Scripts for GWOT optimization tutorials.  
 `src`: Core modules for GWOT hyperparameter optimization.  
-`src/utils`: Utility modules that are not specific for GWOT optimization but are useful for general purposes.  
+`src/utils`: Utility modules that are not specific to GWOT optimization but are useful for general purposes.  
 `experiment`: Folder for development and testing. 
 
 ## Core modules in src  
@@ -26,14 +28,19 @@ For compatibility information, see the [official pytorch page](https://pytorch.o
 `gw_alignment.py`  
 `align_representations.py`  
 
-## Data for tutorials
+## Datasets for the main tutorial
 
-1. Human color similarity judgment data (from Tsuchiya Lab)  
-2. [THINGS data](https://things-initiative.org/)  
+1. `color`: Human similarity judgements of 93 colors for 5 participant groups made from the data used in [Kawakita et al., 2023, PsyArxiv](https://psyarxiv.com/h3pqm/)
+2. `THINGS` : Human similarity judgments of 1854 objects for 4 participant groups made from [the THINGS dataset](https://things-initiative.org/)  
+
+### Other tutorials datasets 
+3. `AllenBrain`: Neuropixels recordings in the primary visual cortex of mice from [the Visual Coding - Neuropixels dataset](https://portal.brain-map.org/explore/circuits/visual-coding-neuropixels)    
+4. `DNN`: Internal representations of vision DNNs (ResNet50 and VGG19) for a subset of visual images from the ImageNet dataset   
+5. `simulation`: Synthetic data illustrating differences between supervised alignment and unsupervised alignment   
 
 ## References
-If you are interested in details of data in tutorials or GWOT, please refer to the paper below.  
+If you are interested in the details of dataset used in the main tutorials (`color` and `THINGS`) or in the mathematical details of GWOT, please refer to the paper below.  
 
 Is my "red" your "red"?: Unsupervised alignment of qualia structures via optimal transport.  
 Genji Kawakita, Ariel Zeleznikow-Johnston, Ken Takeda, Naotsugu Tsuchiya, Masafumi Oizumi  
-PsyArxiv: https://psyarxiv.com/h3pqm/
+PsyArxiv: https://psyarxiv.com/h3pqm/  
