@@ -472,15 +472,17 @@ class Representation:
 
         if fig_dir is not None:
             fig_ext=visualization_config.visualization_params["fig_ext"]
-            fig_path = os.path.join(fig_dir, f"RDM_{self.name}.{fig_ext}")
+            default_fig_path = os.path.join(fig_dir, f"RDM_{self.name}_default.{fig_ext}")
+            sorted_fig_path = os.path.join(fig_dir, f"RDM_{self.name}_sorted.{fig_ext}")
         else:
-            fig_path = None
+            default_fig_path = None
+            sorted_fig_path = None
 
         if sim_mat_format == "default" or sim_mat_format == "both":
             visualize_functions.show_heatmap(
                 self.sim_mat,
                 title=self.name,
-                save_file_name=fig_path,
+                save_file_name=default_fig_path,
                 ticks=ticks,
                 category_name_list=None,
                 num_category_list=None,
@@ -492,8 +494,8 @@ class Representation:
             assert self.category_idx_list is not None, "No label info to sort the 'sim_mat'."
             visualize_functions.show_heatmap(
                 self.sorted_sim_mat,
-                title=self.name + "_sorted",
-                save_file_name=fig_path,
+                title=self.name,
+                save_file_name=sorted_fig_path,
                 ticks=ticks,
                 category_name_list=self.category_name_list,
                 num_category_list=self.num_category_list,
