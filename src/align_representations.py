@@ -1103,8 +1103,9 @@ class PairwiseAnalysis:
         plt.colorbar(label='eps', format = "%.2e")
         plt.grid(True)
 
-        if lim_acc is not None:
-            plt.xlim(lim_acc)
+        ymin, ymax = plt.xlim(lim_acc)
+        if ymax > 100:
+            plt.xlim(lim_acc, 100)
 
         if lim_gwd is not None:
             plt.ylim(lim_gwd)

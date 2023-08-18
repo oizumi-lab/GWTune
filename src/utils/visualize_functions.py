@@ -161,6 +161,7 @@ def show_heatmap(
 
     plt.style.use("default")
     plt.rcParams["grid.color"] = "black"
+    plt.rcParams['font.family'] = 'Noto Sans CJK JP'
 
     fig, ax = plt.subplots(figsize = figsize)
 
@@ -197,8 +198,8 @@ def show_heatmap(
             plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = ticks_size, rotation = yticks_rotation)
         elif ticks == "objects":
             assert object_labels is not None
-            plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = object_labels, size = ticks_size, rotation = xticks_rotation)
-            plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = object_labels, size = ticks_size, rotation = yticks_rotation)
+            plt.xticks(ticks = np.arange(len(matrix)), labels = object_labels, size = ticks_size, rotation = xticks_rotation)
+            plt.yticks(ticks = np.arange(len(matrix)), labels = object_labels, size = ticks_size, rotation = yticks_rotation)
         elif ticks == "category":
             raise(ValueError, "please use 'ot_category_tick = True'.")
 
