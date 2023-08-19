@@ -136,6 +136,7 @@ class VisualizationConfig:
         cbar_label_size: int = 15,
         cbar_ticks_size: int = 10,
         cbar_format: Optional[str]=None,
+        cbar_label: Optional[str]=None,
         xticks_size: int = 10,
         yticks_size: int = 10,
         xticks_rotation: int = 90,
@@ -184,6 +185,8 @@ class VisualizationConfig:
                 Size of the colorbar ticks. Defaults to 10.
             cbar_format (Optional[str]):
                 Format of the colorbar. Defaults to None.
+            cbar_label (Optional[str]):
+                Title of the colorbar. Defaults to None.
             xticks_size (int, optional):
                 Size of the xticks. Defaults to 10.
             yticks_size (int, optional):
@@ -257,6 +260,7 @@ class VisualizationConfig:
             'cbar_label_size': cbar_label_size,
             'cbar_ticks_size': cbar_ticks_size,
             'cbar_format':cbar_format,
+            'cbar_label':cbar_label,
             'xticks_size': xticks_size,
             'yticks_size': yticks_size,
             'xticks_rotation': xticks_rotation,
