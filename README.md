@@ -36,11 +36,18 @@ For compatibility information, see the [official pytorch page](https://pytorch.o
 ### Other tutorials datasets 
 3. `AllenBrain`: Neuropixels recordings in the primary visual cortex of mice from [the Visual Coding - Neuropixels dataset](https://portal.brain-map.org/explore/circuits/visual-coding-neuropixels)    
 4. `DNN`: Internal representations of vision DNNs (ResNet50 and VGG19) for a subset of visual images from the ImageNet dataset   
-5. `simulation`: Synthetic data illustrating differences between supervised alignment and unsupervised alignment   
+5. `simulation`: Synthetic data illustrating differences between supervised alignment and unsupervised alignment
 
-## References
-If you are interested in the details of dataset used in the main tutorials (`color` and `THINGS`) or in the mathematical details of GWOT, please refer to the paper below.  
+### Using and Citing the toolbox
+If you use this toolbox in your research and find it useful, please cite the following papers.
 
-Is my "red" your "red"?: Unsupervised alignment of qualia structures via optimal transport.  
+[1] Toolbox for Gromov-Wasserstein Optimal Transportation with Hyperparameter Tuning
+Masaru Sasaki, Ken Takeda, Kota Abe, Masafumi Oizumi   
+bioRxiv: To be uploaded
+
+[2] Is my "red" your "red"?: Unsupervised alignment of qualia structures via optimal transport.  
 Genji Kawakita, Ariel Zeleznikow-Johnston, Ken Takeda, Naotsugu Tsuchiya, Masafumi Oizumi  
 PsyArxiv: https://psyarxiv.com/h3pqm/  
+
+## References
+If you are interested in the details of dataset used in the tutorials or in the mathematical details of GWOT, please refer to the papers above [1,2].  
