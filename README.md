@@ -41,9 +41,9 @@ For compatibility information, see the [official pytorch page](https://pytorch.o
 ### Using and Citing the toolbox
 If you use this toolbox in your research and find it useful, please cite the following papers.
 
-[1] Toolbox for Gromov-Wasserstein Optimal Transportation with Hyperparameter Tuning
-Masaru Sasaki, Ken Takeda, Kota Abe, Masafumi Oizumi   
-bioRxiv: To be uploaded
+[1] Toolbox for Gromov-Wasserstein Optimal Transportation with Hyperparameter Tuning   
+Masaru Sasaki, Ken Takeda, Kota Abe, Masafumi Oizumi    
+bioRxiv: To be uploaded   
 
 [2] Is my "red" your "red"?: Unsupervised alignment of qualia structures via optimal transport.  
 Genji Kawakita, Ariel Zeleznikow-Johnston, Ken Takeda, Naotsugu Tsuchiya, Masafumi Oizumi  
