@@ -164,7 +164,7 @@ class VisualizationConfig:
         plot_eps_log: bool = False,
         lim_eps: Optional[float] = None,
         lim_gwd: Optional[float] = None,
-        lim_acc: Optional[float] = None
+        lim_acc: Optional[float] = None,
     ) -> None:
         """Initializes the VisualizationConfig class with specified visualization parameters.
 
