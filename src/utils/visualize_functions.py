@@ -110,7 +110,8 @@ def show_heatmap(
     ticks: Optional[str] = None,
     category_name_list: Optional[List[str]] = None,
     num_category_list: Optional[List[int]] = None,
-    object_labels: Optional[List[str]] = None,
+    x_object_labels: Optional[List[str]] = None,
+    y_object_labels: Optional[List[str]] = None,
     **kwargs
 ) -> None:
     """Display a heatmap of the given matrix with various customization options.
@@ -178,8 +179,8 @@ def show_heatmap(
         assert num_category_list is not None
 
         if ticks == "objects":
-            plt.xticks(np.arange(sum(num_category_list)) + 0.5, labels = object_labels, rotation = xticks_rotation, size = ticks_size)
-            plt.yticks(np.arange(sum(num_category_list)) + 0.5, labels = object_labels, rotation = yticks_rotation, size = ticks_size)
+            plt.xticks(np.arange(sum(num_category_list)) + 0.5, labels = x_object_labels, rotation = xticks_rotation, size = ticks_size)
+            plt.yticks(np.arange(sum(num_category_list)) + 0.5, labels = y_object_labels, rotation = yticks_rotation, size = ticks_size)
 
         elif ticks == "category":
             label_pos = [sum(num_category_list[:i + 1]) for i in range(len(category_name_list))]
@@ -197,9 +198,9 @@ def show_heatmap(
             plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = ticks_size, rotation = xticks_rotation)
             plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = ticks_size, rotation = yticks_rotation)
         elif ticks == "objects":
-            assert object_labels is not None
-            plt.xticks(ticks = np.arange(len(matrix)), labels = object_labels, size = ticks_size, rotation = xticks_rotation)
-            plt.yticks(ticks = np.arange(len(matrix)), labels = object_labels, size = ticks_size, rotation = yticks_rotation)
+            # assert object_labels is not None
+            plt.xticks(ticks = np.arange(len(x_object_labels)), labels = x_object_labels, size = ticks_size, rotation = xticks_rotation)
+            plt.yticks(ticks = np.arange(len(y_object_labels)), labels = y_object_labels, size = ticks_size, rotation = yticks_rotation)
         elif ticks == "category":
             raise(ValueError, "please use 'ot_category_tick = True'.")
 
