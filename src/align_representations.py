@@ -647,8 +647,7 @@ class PairwiseAnalysis:
             self.filename = filename
 
         self.results_dir = results_dir
-        # self.save_path = os.path.join(results_dir, self.data_name, self.filename, self.config.init_mat_plan)
-        self.save_path = results_dir
+        self.save_path = os.path.join(results_dir, self.data_name, self.filename, self.config.init_mat_plan)
         self.figure_path = os.path.join(self.save_path, 'figure')
         self.data_path = os.path.join(self.save_path, 'data')
 
@@ -656,9 +655,9 @@ class PairwiseAnalysis:
             self.source.num_category_list, self.target.num_category_list
         ), "the label information doesn't seem to be the same."
 
-        # assert np.array_equal(
-        #     self.source.object_labels, self.target.object_labels
-        # ), "the label information doesn't seem to be the same."
+        assert np.array_equal(
+            self.source.object_labels, self.target.object_labels
+        ), "the label information doesn't seem to be the same."
 
         # Generate the URL for the database. Syntax differs for SQLite and others.
         if self.config.db_params["drivername"] == "sqlite":
