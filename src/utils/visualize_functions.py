@@ -148,6 +148,8 @@ def show_heatmap(
     xticks_size = kwargs.get('xticks_size', 20)
     yticks_size = kwargs.get('yticks_size', 20)
     cbar_format = kwargs.get('cbar_format', None)#"%.2e"
+    cbar_label = kwargs.get('cbar_label', None)
+    cbar_label_size = kwargs.get('cbar_label_size', 20)
     cmap = kwargs.get('cmap', 'cividis')
 
     ot_object_tick = kwargs.get("ot_object_tick", False)
@@ -214,7 +216,7 @@ def show_heatmap(
     cax = divider.append_axes("right", size="5%", pad=0.1)
 
     cbar = fig.colorbar(aximg, cax=cax, format = cbar_format)
-
+    cbar.set_label(cbar_label, size = cbar_label_size)
     cbar.ax.tick_params(axis='y', labelsize = cbar_ticks_size)
 
     plt.tight_layout()

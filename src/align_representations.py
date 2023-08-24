@@ -137,6 +137,7 @@ class VisualizationConfig:
         cbar_label_size: int = 15,
         cbar_ticks_size: int = 10,
         cbar_format: Optional[str]=None,
+        cbar_label: Optional[str]=None,
         xticks_size: int = 10,
         yticks_size: int = 10,
         xticks_rotation: int = 90,
@@ -186,6 +187,8 @@ class VisualizationConfig:
                 Size of the colorbar ticks. Defaults to 10.
             cbar_format (Optional[str]):
                 Format of the colorbar. Defaults to None.
+            cbar_label (Optional[str]):
+                Title of the colorbar. Defaults to None.
             xticks_size (int, optional):
                 Size of the xticks. Defaults to 10.
             yticks_size (int, optional):
@@ -261,6 +264,7 @@ class VisualizationConfig:
             'cbar_label_size': cbar_label_size,
             'cbar_ticks_size': cbar_ticks_size,
             'cbar_format':cbar_format,
+            'cbar_label':cbar_label,
             'xticks_size': xticks_size,
             'yticks_size': yticks_size,
             'xticks_rotation': xticks_rotation,
@@ -477,15 +481,17 @@ class Representation:
 
         if fig_dir is not None:
             fig_ext=visualization_config.visualization_params["fig_ext"]
-            fig_path = os.path.join(fig_dir, f"RDM_{self.name}.{fig_ext}")
+            default_fig_path = os.path.join(fig_dir, f"RDM_{self.name}_default.{fig_ext}")
+            sorted_fig_path = os.path.join(fig_dir, f"RDM_{self.name}_sorted.{fig_ext}")
         else:
-            fig_path = None
+            default_fig_path = None
+            sorted_fig_path = None
 
         if sim_mat_format == "default" or sim_mat_format == "both":
             visualize_functions.show_heatmap(
                 self.sim_mat,
                 title=self.name,
-                save_file_name=fig_path,
+                save_file_name=default_fig_path,
                 ticks=ticks,
                 category_name_list=None,
                 num_category_list=None,
@@ -497,8 +503,8 @@ class Representation:
             assert self.category_idx_list is not None, "No label info to sort the 'sim_mat'."
             visualize_functions.show_heatmap(
                 self.sorted_sim_mat,
-                title=self.name + "_sorted",
-                save_file_name=fig_path,
+                title=self.name,
+                save_file_name=sorted_fig_path,
                 ticks=ticks,
                 category_name_list=self.category_name_list,
                 num_category_list=self.num_category_list,
@@ -1059,6 +1065,7 @@ class PairwiseAnalysis:
         """
         figsize = kwargs.get('figsize', (8,6))
         fig_ext = kwargs.get('fig_ext', 'png')
+        title_size = kwargs.get('title_size', 20)
         marker_size = kwargs.get('marker_size', 20)
         show_figure = kwargs.get('show_figure', False)
         plot_eps_log = kwargs.get('plot_eps_log', False)
@@ -1085,7 +1092,7 @@ class PairwiseAnalysis:
 
         # figure plotting epsilon as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
-        plt.title(f"$\epsilon$ - GWD ({self.pair_name.replace('_', ' ')})")
+        plt.title(f"epsilon - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
         plt.scatter(df_trial["params_eps"], df_trial["value"], c = 100 * df_trial["user_attrs_best_acc"], s = marker_size, cmap=cmap)
 
         plt.xlabel("epsilon", fontsize=xlabel_size)
@@ -1123,11 +1130,8 @@ class PairwiseAnalysis:
 
         # figure plotting accuracy as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
-        if plot_eps_log:
-            plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap, norm=LogNorm())
-        else:
-            plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap)
-        plt.title(self.pair_name.replace('_', ' '))
+        plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap)
+        plt.title(f"Matching Rate - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
         plt.xlabel("Matching Rate (%)", fontsize=xlabel_size)
         plt.xticks(fontsize=xticks_size)
         plt.ylabel("GWD", fontsize=ylabel_size)
