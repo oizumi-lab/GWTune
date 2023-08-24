@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 import numpy as np
 import optuna
 import ot
@@ -131,10 +132,14 @@ class VisualizationConfig:
     def __init__(
         self,
         show_figure: bool = True,
+        fig_ext:str='png',
         figsize: Tuple[int, int] = (8, 6),
-        cbar_ticks_size: int = 5,
+        cbar_label_size: int = 15,
+        cbar_ticks_size: int = 10,
         cbar_format: Optional[str]=None,
-        ticks_size: int = 5,
+        cbar_label: Optional[str]=None,
+        xticks_size: int = 10,
+        yticks_size: int = 10,
         xticks_rotation: int = 90,
         yticks_rotation: int = 0,
         tick_format: str = '%.2f',
@@ -153,6 +158,7 @@ class VisualizationConfig:
         colorbar_shrink: float = 1.,
         markers_list: Optional[List[str]] = None,
         marker_size: int = 30,
+        alpha: int = 1,
         color: str = 'C0',
         cmap: str = 'cividis',
         ot_object_tick: bool = False,
@@ -171,19 +177,27 @@ class VisualizationConfig:
         Args:
             show_figure (bool, optional):
                 Whether to display the figure. Defaults to True.
+            fig_ext (str, optional):
+                The extension of the figure. Defaults to 'png'.
             figsize (Tuple[int, int], optional):
                 Size of the figure. Defaults to (8, 6).
+            cbar_label_size (int, optional):
+                Size of the colorbar label. Defaults to 15.
             cbar_ticks_size (int, optional):
-                Size of the colorbar ticks. Defaults to 5.
+                Size of the colorbar ticks. Defaults to 10.
             cbar_format (Optional[str]):
                 Format of the colorbar. Defaults to None.
-            ticks_size (int, optional):
-                Size of the ticks. Defaults to 5.
+            cbar_label (Optional[str]):
+                Title of the colorbar. Defaults to None.
+            xticks_size (int, optional):
+                Size of the xticks. Defaults to 10.
+            yticks_size (int, optional):
+                Size of the yticks. Defaults to 10.
             xticks_rotation (int, optional):
                 Rotation angle of the xticks. Defaults to 90.
             yticks_rotation (int, optional):
                 Rotation angle of the yticks. Defaults to 0.
-            tick_format (Optional[str]): 
+            tick_format (Optional[str]):
                 Format of the ticks. Defaults to '%.2f'.
             title_size (int, optional):
                 Size of the title. Defaults to 20.
@@ -215,6 +229,8 @@ class VisualizationConfig:
                 List of markers. Defaults to None.
             marker_size (int, optional):
                 Size of the marker. Defaults to 30.
+            alpha (int, optional):
+                Alpha of the marker. Defaults to 1.
             color (str, optional):
                 Color for plots. Defaults to 'C0'.
             cmap (str, optional):
@@ -243,10 +259,14 @@ class VisualizationConfig:
 
         self.visualization_params = {
             'show_figure':show_figure,
+            'fig_ext':fig_ext,
             'figsize': figsize,
+            'cbar_label_size': cbar_label_size,
             'cbar_ticks_size': cbar_ticks_size,
             'cbar_format':cbar_format,
-            'ticks_size': ticks_size,
+            'cbar_label':cbar_label,
+            'xticks_size': xticks_size,
+            'yticks_size': yticks_size,
             'xticks_rotation': xticks_rotation,
             'yticks_rotation': yticks_rotation,
             'tick_format': tick_format,
@@ -263,6 +283,7 @@ class VisualizationConfig:
             'colorbar_label': colorbar_label,
             'colorbar_range': colorbar_range,
             'colorbar_shrink': colorbar_shrink,
+            'alpha': alpha,
             'markers_list': markers_list,
             'marker_size': marker_size,
             'color':color,
@@ -459,15 +480,18 @@ class Representation:
         """
 
         if fig_dir is not None:
-            fig_path = os.path.join(fig_dir, f"RDM_{self.name}")
+            fig_ext=visualization_config.visualization_params["fig_ext"]
+            default_fig_path = os.path.join(fig_dir, f"RDM_{self.name}_default.{fig_ext}")
+            sorted_fig_path = os.path.join(fig_dir, f"RDM_{self.name}_sorted.{fig_ext}")
         else:
-            fig_path = None
+            default_fig_path = None
+            sorted_fig_path = None
 
         if sim_mat_format == "default" or sim_mat_format == "both":
             visualize_functions.show_heatmap(
                 self.sim_mat,
                 title=self.name,
-                save_file_name=fig_path,
+                save_file_name=default_fig_path,
                 ticks=ticks,
                 category_name_list=None,
                 num_category_list=None,
@@ -480,8 +504,8 @@ class Representation:
             assert self.category_idx_list is not None, "No label info to sort the 'sim_mat'."
             visualize_functions.show_heatmap(
                 self.sorted_sim_mat,
-                title=self.name + "_sorted",
-                save_file_name=fig_path,
+                title=self.name,
+                save_file_name=sorted_fig_path,
                 ticks=ticks,
                 category_name_list=self.category_name_list,
                 num_category_list=self.num_category_list,
@@ -1039,13 +1063,24 @@ class PairwiseAnalysis:
                 dataframe of the optimization log
         """
         figsize = kwargs.get('figsize', (8,6))
+        fig_ext = kwargs.get('fig_ext', 'png')
+        title_size = kwargs.get('title_size', 20)
         marker_size = kwargs.get('marker_size', 20)
         show_figure = kwargs.get('show_figure', False)
         plot_eps_log = kwargs.get('plot_eps_log', False)
+
         cmap = kwargs.get("cmap", 'viridis')
-        ticks_size = kwargs.get("ticks_size", 5)
-        tick_format = kwargs.get("tick_format", "%.2f")
+        cbar_label_size = kwargs.get("cbar_label_size", 20)
+        cbar_ticks_size = kwargs.get("cbar_ticks_size", 20)
+        cbar_format = kwargs.get('cbar_format', None)
+
         xticks_rotation = kwargs.get("xticks_rotation", 0)
+
+        xticks_size = kwargs.get("xticks_size", 10)
+        yticks_size = kwargs.get("yticks_size", 10)
+
+        xlabel_size = kwargs.get("xlabel_size", 20)
+        ylabel_size = kwargs.get("ylabel_size", 20)
 
         lim_eps = kwargs.get("lim_eps", None)
         lim_gwd = kwargs.get("lim_gwd", None)
@@ -1056,7 +1091,11 @@ class PairwiseAnalysis:
 
         # figure plotting epsilon as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
+        plt.title(f"epsilon - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
         plt.scatter(df_trial["params_eps"], df_trial["value"], c = 100 * df_trial["user_attrs_best_acc"], s = marker_size, cmap=cmap)
+
+        plt.xlabel("epsilon", fontsize=xlabel_size)
+        plt.ylabel("GWD", fontsize=ylabel_size)
 
         if lim_eps is not None:
             plt.xlim(lim_eps)
@@ -1067,24 +1106,20 @@ class PairwiseAnalysis:
         if plot_eps_log:
             plt.xscale('log')
 
-        plt.title(f"$\epsilon$ - GWD ({self.pair_name.replace('_', ' ')})")
-
-        plt.gca().xaxis.set_major_formatter(plt.FormatStrFormatter(tick_format))
-        plt.gca().xaxis.set_minor_formatter(plt.FormatStrFormatter(tick_format))
-
-        plt.tick_params(axis = 'x', rotation = xticks_rotation, which="both", labelsize=ticks_size)
-        plt.tick_params(axis = 'y', rotation = 0, which="both", labelsize=ticks_size)
-        plt.xlabel("$\epsilon$")
-        plt.ylabel("GWD")
+        plt.tick_params(axis='x', which='both', labelsize=xticks_size, rotation=xticks_rotation)
+        plt.tick_params(axis='y', which='major', labelsize=yticks_size)
 
         plt.grid(True, which = 'both')
-        plt.colorbar(label='accuracy (%)')
+        cbar = plt.colorbar()
+        cbar.set_label(label='Matching Rate (%)', size=cbar_label_size)
+        cbar.ax.tick_params(labelsize=cbar_ticks_size)
+
         plt.tight_layout()
 
         if fig_dir is None:
             fig_dir = self.figure_path
 
-        plt.savefig(os.path.join(fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.png"))
+        plt.savefig(os.path.join(fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.{fig_ext}"))
 
         if show_figure:
             plt.show()
@@ -1092,14 +1127,19 @@ class PairwiseAnalysis:
         plt.clf()
         plt.close()
 
+        # figure plotting accuracy as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
         plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap)
-        plt.title(self.pair_name.replace('_', ' '))
-        plt.xlabel("accuracy (%)")
-        plt.xticks(fontsize=ticks_size)
-        plt.ylabel("GWD")
-        plt.yticks(fontsize=ticks_size)
-        plt.colorbar(label='eps', format = "%.2e")
+        plt.title(f"Matching Rate - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
+        plt.xlabel("Matching Rate (%)", fontsize=xlabel_size)
+        plt.xticks(fontsize=xticks_size)
+        plt.ylabel("GWD", fontsize=ylabel_size)
+        plt.yticks(fontsize=yticks_size)
+
+        cbar =  plt.colorbar(format = cbar_format)
+        cbar.set_label(label='epsilon', size=cbar_label_size)
+        cbar.ax.tick_params(labelsize=cbar_ticks_size)
+
         plt.grid(True)
 
         ymin, ymax = plt.xlim(lim_acc)
@@ -1111,7 +1151,7 @@ class PairwiseAnalysis:
 
         plt.tight_layout()
 
-        plt.savefig(os.path.join(fig_dir, f"acc_gwd_eps({self.pair_name}).png"))
+        plt.savefig(os.path.join(fig_dir, f"acc_gwd_eps({self.pair_name}).{fig_ext}"))
 
         if show_figure:
             plt.show()
@@ -1177,7 +1217,8 @@ class PairwiseAnalysis:
         if return_figure:
             save_file = self.data_name + "_" + self.pair_name
             if fig_dir is not None:
-                fig_path = os.path.join(fig_dir, f"{save_file}.png")
+                fig_ext=visualization_config.visualization_params["fig_ext"]
+                fig_path = os.path.join(fig_dir, f"{save_file}.{fig_ext}")
             else:
                 fig_path = None
 
@@ -1370,8 +1411,6 @@ class PairwiseAnalysis:
             new_embedding_source (np.ndarray):
                 Transformed source embeddings with shape (n_source, m).
         """
-        # assert self.source.shuffle == False, "you cannot use procrustes method if 'shuffle' is True."
-
         U, S, Vt = np.linalg.svd(np.matmul(embedding_source.T, np.matmul(OT, embedding_target)))
         Q = np.matmul(U, Vt)
         new_embedding_source = np.matmul(embedding_source, Q)
@@ -1616,14 +1655,14 @@ class PairwiseAnalysis:
             ticks=ticks,
         )
 
-        self._evaluate_accuracy_and_plot(ot_no_ent, eval_type)
+        self._evaluate_accuracy_and_plot(ot_no_ent, eval_type,  **visualization_config())
 
         if category_mat is not None:
             self._evaluate_accuracy_and_plot(ot_no_ent, "category", category_mat=category_mat)
 
         self._plot_GWD_optimization(top_k_trials, GWD0_list, **visualization_config())
 
-    def _evaluate_accuracy_and_plot(self, ot_to_evaluate, eval_type, category_mat=None):
+    def _evaluate_accuracy_and_plot(self, ot_to_evaluate, eval_type, category_mat=None, **kwargs):
         top_k_list = [1, 5, 10]
         df_before = self.eval_accuracy(
             top_k_list = top_k_list,
@@ -1652,7 +1691,9 @@ class PairwiseAnalysis:
             rot=0,
         )
 
-        plt.savefig(os.path.join(self.figure_path, "accuracy_comparison_with_or_without.png"))
+        fig_ext = kwargs.get('fig_ext', 'png')
+
+        plt.savefig(os.path.join(self.figure_path, f"accuracy_comparison_with_or_without.{fig_ext}"))
         plt.show()
         plt.clf()
         plt.close()
@@ -1661,6 +1702,7 @@ class PairwiseAnalysis:
 
     def _plot_GWD_optimization(self, top_k_trials, GWD0_list, marker_size = 10, **kwargs):
         figsize = kwargs.get('figsize', (8, 6))
+        fig_ext = kwargs.get('fig_ext', 'png')
         title_size = kwargs.get('title_size', 15)
         plot_eps_log = kwargs.get('plot_eps_log', False)
         show_figure = kwargs.get('show_figure', True)
@@ -1684,7 +1726,7 @@ class PairwiseAnalysis:
         plt.grid(True, which = 'both')
         plt.legend()
         plt.tight_layout()
-        plt.savefig(os.path.join(self.figure_path, "eps_vs_gwd_comparison_with_or_without.png"))
+        plt.savefig(os.path.join(self.figure_path, f"eps_vs_gwd_comparison_with_or_without.{fig_ext}"))
 
         if show_figure:
             plt.show()
@@ -1942,6 +1984,11 @@ class AlignRepresentations:
             ticks (Optional[str], optional):
                 "numbers", "objects", or "category". Defaults to None.
         """
+
+        if fig_dir is None:
+            fig_dir = self.main_results_dir + "/" + self.data_name + "/individual_sim_mat/"
+            os.makedirs(fig_dir, exist_ok=True)
+
         for representation in self.representations_list:
             representation.show_sim_mat(
                 sim_mat_format=sim_mat_format,
@@ -2659,7 +2706,7 @@ class AlignRepresentations:
         title: Optional[str] = None,
         legend: bool = True,
         fig_dir: Optional[str] = None,
-        fig_name: str = "Aligned_embedding.png",
+        fig_name: str = "Aligned_embedding",
     ) -> Optional[Union[plt.Figure, List[np.ndarray]]]:
         """Visualizes the aligned embedding in the specified number of dimensions.
 
@@ -2693,10 +2740,11 @@ class AlignRepresentations:
             on the `fig_dir` parameter. If `returned` is "row_data", a list of embeddings is returned.
         """
 
-        if fig_dir is not None:
-            fig_path = os.path.join(fig_dir, fig_name)
-        else:
-            fig_path = None
+        if fig_dir is None:
+            fig_dir = self.main_results_dir + "/" + self.data_name + "/visualize_embedding/"
+            os.makedirs(fig_dir, exist_ok=True)
+
+        fig_path = os.path.join(fig_dir, f"{fig_name}.{visualization_config.visualization_params['fig_ext']}")
 
         if pivot != "barycenter":
             self._procrustes_to_pivot(pivot)

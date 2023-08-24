@@ -146,8 +146,11 @@ def show_heatmap(
     yticks_rotation = kwargs.get('yticks_rotation', 0)
 
     cbar_ticks_size = kwargs.get("cbar_ticks_size", 20)
-    ticks_size = kwargs.get('ticks_size', 20)
+    xticks_size = kwargs.get('xticks_size', 20)
+    yticks_size = kwargs.get('yticks_size', 20)
     cbar_format = kwargs.get('cbar_format', None)#"%.2e"
+    cbar_label = kwargs.get('cbar_label', None)
+    cbar_label_size = kwargs.get('cbar_label_size', 20)
     cmap = kwargs.get('cmap', 'cividis')
 
     ot_object_tick = kwargs.get("ot_object_tick", False)
@@ -179,13 +182,13 @@ def show_heatmap(
         assert num_category_list is not None
 
         if ticks == "objects":
-            plt.xticks(np.arange(sum(num_category_list)) + 0.5, labels = x_object_labels, rotation = xticks_rotation, size = ticks_size)
-            plt.yticks(np.arange(sum(num_category_list)) + 0.5, labels = y_object_labels, rotation = yticks_rotation, size = ticks_size)
+            plt.xticks(np.arange(sum(num_category_list)) + 0.5, labels = x_object_labels, rotation = xticks_rotation, size = xticks_size)
+            plt.yticks(np.arange(sum(num_category_list)) + 0.5, labels = y_object_labels, rotation = yticks_rotation, size = yticks_size)
 
         elif ticks == "category":
             label_pos = [sum(num_category_list[:i + 1]) for i in range(len(category_name_list))]
-            plt.xticks(label_pos, labels = category_name_list, rotation = xticks_rotation, size = ticks_size, fontweight = "bold")
-            plt.yticks(label_pos, labels = category_name_list, rotation = yticks_rotation, size = ticks_size, fontweight = "bold")
+            plt.xticks(label_pos, labels = category_name_list, rotation = xticks_rotation, size = xticks_size, fontweight = "bold")
+            plt.yticks(label_pos, labels = category_name_list, rotation = yticks_rotation, size = yticks_size, fontweight = "bold")
 
             if draw_category_line:
                 for pos in label_pos:
@@ -195,19 +198,19 @@ def show_heatmap(
 
     if ot_object_tick and not ot_category_tick:
         if ticks == "numbers":
-            plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = ticks_size, rotation = xticks_rotation)
-            plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = ticks_size, rotation = yticks_rotation)
+            plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = xticks_size, rotation = xticks_rotation)
+            plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = yticks_size, rotation = yticks_rotation)
         elif ticks == "objects":
             # assert object_labels is not None
-            plt.xticks(ticks = np.arange(len(x_object_labels)), labels = x_object_labels, size = ticks_size, rotation = xticks_rotation)
-            plt.yticks(ticks = np.arange(len(y_object_labels)), labels = y_object_labels, size = ticks_size, rotation = yticks_rotation)
+            plt.xticks(ticks = np.arange(len(x_object_labels)), labels = x_object_labels, size = xticks_size, rotation = xticks_rotation)
+            plt.yticks(ticks = np.arange(len(y_object_labels)), labels = y_object_labels, size = yticks_size, rotation = yticks_rotation)
         elif ticks == "category":
             raise(ValueError, "please use 'ot_category_tick = True'.")
 
     if not ot_object_tick and not ot_category_tick:
         plt.xticks([])
         plt.yticks([])
-    
+
     plt.xlabel(xlabel, size = xlabel_size)
     plt.ylabel(ylabel, size = ylabel_size)
 
@@ -215,9 +218,9 @@ def show_heatmap(
     cax = divider.append_axes("right", size="5%", pad=0.1)
 
     cbar = fig.colorbar(aximg, cax=cax, format = cbar_format)
-
+    cbar.set_label(cbar_label, size = cbar_label_size)
     cbar.ax.tick_params(axis='y', labelsize = cbar_ticks_size)
-    
+
     plt.tight_layout()
 
     if save_file_name is not None:
@@ -366,11 +369,12 @@ class VisualizeEmbedding():
         markers_list = kwargs.get('markers_list', None)
         marker_size = kwargs.get('marker_size', 30)
         cmap = kwargs.get('cmap', "viridis")
+        alpha = kwargs.get('alpha', 1)
         show_figure = kwargs.get('show_figure', True)
 
         if color_labels is None:
             if self.num_category_list is None:
-                color_labels = get_color_labels(self.embedding_list[0].shape[0], hue = color_hue, show_labels = False)
+                color_labels = get_color_labels(plot_idx.shape[0], hue = color_hue, show_labels = False)
             else:
                 color_labels, main_colors = get_color_labels_for_category(self.num_category_list, min_saturation = 1, show_labels = False)
 
@@ -415,6 +419,7 @@ class VisualizeEmbedding():
 
         for i in range(len(self.embedding_list)):
             coords_i = self.embedding_list[i]
+            coords_i = coords_i[plot_idx]
             if self.dim == 3:
                 im = ax.scatter(
                     xs = coords_i[:, 0],
@@ -453,6 +458,7 @@ class VisualizeEmbedding():
 
         if legend:
             ax.legend(fontsize = legend_size, loc = "best")
+            #ax.legend(fontsize = legend_size, loc='upper left', bbox_to_anchor=(1, 1))
 
         if title is not None:
             plt.title(title, fontsize = title_size)
