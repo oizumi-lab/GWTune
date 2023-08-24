@@ -372,7 +372,7 @@ class VisualizeEmbedding():
 
         if color_labels is None:
             if self.num_category_list is None:
-                color_labels = get_color_labels(plot_idx.shape[0], hue = color_hue, show_labels = False)
+                color_labels = get_color_labels(plot_idx.shape[0], hue = color_hue, show_labels = False) # ここに未定義の変数がある
             else:
                 color_labels, main_colors = get_color_labels_for_category(self.num_category_list, min_saturation = 1, show_labels = False)
 
