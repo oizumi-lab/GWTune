@@ -160,12 +160,13 @@ def show_heatmap(
     category_line_alpha = kwargs.get('category_line_alpha', 0.2)
     category_line_style = kwargs.get('category_line_style', 'dashed')
     category_line_color = kwargs.get('category_line_color', 'C2')
-
+    
+    font = kwargs.get('font', 'Noto Sans CJK JP')
     show_figure = kwargs.get('show_figure', True)
 
     plt.style.use("default")
     plt.rcParams["grid.color"] = "black"
-    plt.rcParams['font.family'] = 'Noto Sans CJK JP'
+    plt.rcParams['font.family'] = font
 
     fig, ax = plt.subplots(figsize = figsize)
 
