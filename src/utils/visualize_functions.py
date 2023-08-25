@@ -329,7 +329,6 @@ class VisualizeEmbedding():
 
         return embedding_list_pca
 
-
     def plot_embedding(
         self,
         name_list: Optional[List[str]] = None,
@@ -367,12 +366,11 @@ class VisualizeEmbedding():
         markers_list = kwargs.get('markers_list', None)
         marker_size = kwargs.get('marker_size', 30)
         cmap = kwargs.get('cmap', "viridis")
-        alpha = kwargs.get('alpha', 1)
         show_figure = kwargs.get('show_figure', True)
 
         if color_labels is None:
             if self.num_category_list is None:
-                color_labels = get_color_labels(plot_idx.shape[0], hue = color_hue, show_labels = False) # ここに未定義の変数がある
+                color_labels = get_color_labels(self.embedding_list[0].shape[0], hue = color_hue, show_labels = False)
             else:
                 color_labels, main_colors = get_color_labels_for_category(self.num_category_list, min_saturation = 1, show_labels = False)
 
@@ -417,7 +415,6 @@ class VisualizeEmbedding():
 
         for i in range(len(self.embedding_list)):
             coords_i = self.embedding_list[i]
-            coords_i = coords_i[plot_idx]
             if self.dim == 3:
                 im = ax.scatter(
                     xs = coords_i[:, 0],
@@ -456,7 +453,6 @@ class VisualizeEmbedding():
 
         if legend:
             ax.legend(fontsize = legend_size, loc = "best")
-            #ax.legend(fontsize = legend_size, loc='upper left', bbox_to_anchor=(1, 1))
 
         if title is not None:
             plt.title(title, fontsize = title_size)
