@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 import numpy as np
 import optuna
 import ot
@@ -157,6 +158,7 @@ class VisualizationConfig:
         colorbar_shrink: float = 1.,
         markers_list: Optional[List[str]] = None,
         marker_size: int = 30,
+        alpha: int = 1,
         color: str = 'C0',
         cmap: str = 'cividis',
         ot_object_tick: bool = False,
@@ -195,7 +197,7 @@ class VisualizationConfig:
                 Rotation angle of the xticks. Defaults to 90.
             yticks_rotation (int, optional):
                 Rotation angle of the yticks. Defaults to 0.
-            tick_format (Optional[str]): 
+            tick_format (Optional[str]):
                 Format of the ticks. Defaults to '%.2f'.
             title_size (int, optional):
                 Size of the title. Defaults to 20.
@@ -227,6 +229,8 @@ class VisualizationConfig:
                 List of markers. Defaults to None.
             marker_size (int, optional):
                 Size of the marker. Defaults to 30.
+            alpha (int, optional):
+                Alpha of the marker. Defaults to 1.
             color (str, optional):
                 Color for plots. Defaults to 'C0'.
             cmap (str, optional):
@@ -279,6 +283,7 @@ class VisualizationConfig:
             'colorbar_label': colorbar_label,
             'colorbar_range': colorbar_range,
             'colorbar_shrink': colorbar_shrink,
+            'alpha': alpha,
             'markers_list': markers_list,
             'marker_size': marker_size,
             'color':color,
@@ -1064,17 +1069,17 @@ class PairwiseAnalysis:
         marker_size = kwargs.get('marker_size', 20)
         show_figure = kwargs.get('show_figure', False)
         plot_eps_log = kwargs.get('plot_eps_log', False)
-        
+
         cmap = kwargs.get("cmap", 'viridis')
         cbar_label_size = kwargs.get("cbar_label_size", 20)
         cbar_ticks_size = kwargs.get("cbar_ticks_size", 20)
         cbar_format = kwargs.get('cbar_format', None)
-        
+
         xticks_rotation = kwargs.get("xticks_rotation", 0)
-        
+
         xticks_size = kwargs.get("xticks_size", 10)
         yticks_size = kwargs.get("yticks_size", 10)
-        
+
         xlabel_size = kwargs.get("xlabel_size", 20)
         ylabel_size = kwargs.get("ylabel_size", 20)
 
@@ -1089,10 +1094,10 @@ class PairwiseAnalysis:
         plt.figure(figsize=figsize)
         plt.title(f"epsilon - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
         plt.scatter(df_trial["params_eps"], df_trial["value"], c = 100 * df_trial["user_attrs_best_acc"], s = marker_size, cmap=cmap)
-        
+
         plt.xlabel("epsilon", fontsize=xlabel_size)
         plt.ylabel("GWD", fontsize=ylabel_size)
-        
+
         if lim_eps is not None:
             plt.xlim(lim_eps)
 
@@ -1101,7 +1106,7 @@ class PairwiseAnalysis:
 
         if plot_eps_log:
             plt.xscale('log')
-        
+
         plt.tick_params(axis='x', which='both', labelsize=xticks_size, rotation=xticks_rotation)
         plt.tick_params(axis='y', which='major', labelsize=yticks_size)
 
@@ -1109,7 +1114,7 @@ class PairwiseAnalysis:
         cbar = plt.colorbar()
         cbar.set_label(label='Matching Rate (%)', size=cbar_label_size)
         cbar.ax.tick_params(labelsize=cbar_ticks_size)
-        
+
         plt.tight_layout()
 
         if fig_dir is None:
@@ -1123,6 +1128,7 @@ class PairwiseAnalysis:
         plt.clf()
         plt.close()
 
+        # figure plotting accuracy as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
         plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap)
         plt.title(f"Matching Rate - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
@@ -1130,11 +1136,11 @@ class PairwiseAnalysis:
         plt.xticks(fontsize=xticks_size)
         plt.ylabel("GWD", fontsize=ylabel_size)
         plt.yticks(fontsize=yticks_size)
-        
+
         cbar =  plt.colorbar(format = cbar_format)
         cbar.set_label(label='epsilon', size=cbar_label_size)
         cbar.ax.tick_params(labelsize=cbar_ticks_size)
-        
+
         plt.grid(True)
 
         if lim_acc is not None:
@@ -1682,7 +1688,7 @@ class PairwiseAnalysis:
             grid=True,
             rot=0,
         )
-        
+
         fig_ext = kwargs.get('fig_ext', 'png')
 
         plt.savefig(os.path.join(self.figure_path, f"accuracy_comparison_with_or_without.{fig_ext}"))
@@ -1976,11 +1982,11 @@ class AlignRepresentations:
             ticks (Optional[str], optional):
                 "numbers", "objects", or "category". Defaults to None.
         """
-        
+
         if fig_dir is None:
-            fig_dir = self.main_results_dir + "/" + self.data_name + "/individual_sim_mat/"
+            fig_dir = os.path.join(self.main_results_dir, self.data_name, "individual_sim_mat", self.config.init_mat_plan)
             os.makedirs(fig_dir, exist_ok=True)
-            
+
         for representation in self.representations_list:
             representation.show_sim_mat(
                 sim_mat_format=sim_mat_format,
@@ -2733,9 +2739,9 @@ class AlignRepresentations:
         """
 
         if fig_dir is None:
-            fig_dir = self.main_results_dir + "/" + self.data_name + "/visualize_embedding/"
+            fig_dir = os.path.join(self.main_results_dir, self.data_name, "visualize_embedding", self.config.init_mat_plan)
             os.makedirs(fig_dir, exist_ok=True)
-        
+
         fig_path = os.path.join(fig_dir, f"{fig_name}.{visualization_config.visualization_params['fig_ext']}")
 
         if pivot != "barycenter":

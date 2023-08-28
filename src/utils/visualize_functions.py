@@ -208,7 +208,7 @@ def show_heatmap(
     if not ot_object_tick and not ot_category_tick:
         plt.xticks([])
         plt.yticks([])
-    
+
     plt.xlabel(xlabel, size = xlabel_size)
     plt.ylabel(ylabel, size = ylabel_size)
 
@@ -218,7 +218,7 @@ def show_heatmap(
     cbar = fig.colorbar(aximg, cax=cax, format = cbar_format)
     cbar.set_label(cbar_label, size = cbar_label_size)
     cbar.ax.tick_params(axis='y', labelsize = cbar_ticks_size)
-    
+
     plt.tight_layout()
 
     if save_file_name is not None:
@@ -328,7 +328,6 @@ class VisualizeEmbedding():
             plt.show()
 
         return embedding_list_pca
-
 
     def plot_embedding(
         self,
