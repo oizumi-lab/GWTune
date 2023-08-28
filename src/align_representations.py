@@ -1984,7 +1984,7 @@ class AlignRepresentations:
         """
 
         if fig_dir is None:
-            fig_dir = self.main_results_dir + "/" + self.data_name + "/individual_sim_mat/"
+            fig_dir = os.path.join(self.main_results_dir, self.data_name, "individual_sim_mat", self.config.init_mat_plan)
             os.makedirs(fig_dir, exist_ok=True)
 
         for representation in self.representations_list:
@@ -2739,7 +2739,7 @@ class AlignRepresentations:
         """
 
         if fig_dir is None:
-            fig_dir = self.main_results_dir + "/" + self.data_name + "/visualize_embedding/"
+            fig_dir = os.path.join(self.main_results_dir, self.data_name, "visualize_embedding", self.config.init_mat_plan)
             os.makedirs(fig_dir, exist_ok=True)
 
         fig_path = os.path.join(fig_dir, f"{fig_name}.{visualization_config.visualization_params['fig_ext']}")
