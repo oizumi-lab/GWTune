@@ -6,18 +6,19 @@ import os
 import shutil
 import sys
 import warnings
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from concurrent.futures import (ProcessPoolExecutor, ThreadPoolExecutor,
+                                as_completed)
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
 import numpy as np
 import optuna
 import ot
 import pandas as pd
 import seaborn as sns
 import torch
+from matplotlib.colors import LogNorm
 from scipy.spatial import distance
 from scipy.stats import pearsonr, spearmanr
 from sklearn import manifold
