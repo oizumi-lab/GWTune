@@ -1,8 +1,9 @@
 # %%
-from typing import List, Union
+from typing import List, Optional, Union
 
 import numpy as np
 import ot
+
 
 # %%
 class InitMatrix():
@@ -17,7 +18,13 @@ class InitMatrix():
         user_define_init_mat_list (List[np.ndarray], optional): User-defined initial matrix or matrices.
     """
 
-    def __init__(self, source_size: int, target_size: int) -> None:
+    def __init__(
+        self,
+        source_size: int,
+        target_size: int,
+        p: Optional[np.ndarray] = None,
+        q: Optional[np.ndarray] = None,
+    ) -> None:
         """Initializes the InitMatrix class with given source and target sizes.
 
         Args:
@@ -27,6 +34,21 @@ class InitMatrix():
 
         self.source_size = source_size
         self.target_size = target_size
+
+        # initialize p and q
+        if p is None:
+            p = ot.unif(self.source_size).reshape(-1, 1)
+        if q is None:
+            q = ot.unif(self.target_size).reshape(1, -1)
+
+        # check the dimension of p and q
+        if p.ndim < 2:
+            p = p.reshape(-1, 1)
+        if q.ndim < 2:
+            q = q.reshape(1, -1)
+
+        self.p = p
+        self.q = q
 
     def set_user_define_init_mat_list(self, mat: Union[np.ndarray, List[np.ndarray]]) -> None:
         """Sets the user-defined initial matrix or matrices.
@@ -50,8 +72,7 @@ class InitMatrix():
         else:
             raise ValueError('The provided input should either be a numpy array or a list of numpy arrays.')
 
-
-    def make_initial_T(self, init_mat_plan: str, seed: int = 42) -> np.ndarray:
+    def make_initial_T(self, init_mat_plan: str, seed: int = 42, **kwargs) -> np.ndarray:
         """Generates the initial matrix for Gromov-Wasserstein alignment.
 
         Users can specify the initialization method for the matrix, choosing from options such as
@@ -68,10 +89,10 @@ class InitMatrix():
             ValueError: If the provided initialization method is not implemented.
         """
 
-        np.random.seed(seed) # fix the seed of numpy.random, seed can be changed by user.
+        np.random.seed(seed)  # fix the seed of numpy.random, seed can be changed by user.
 
         if init_mat_plan == 'random':
-            T = self.make_random_init_plan()
+            T = self.make_random_init_plan(self.p, self.q, **kwargs)
 
         elif init_mat_plan == 'uniform':
             T = np.outer(ot.unif(self.source_size), ot.unif(self.target_size))
@@ -84,34 +105,50 @@ class InitMatrix():
 
         return T
 
-    def make_random_init_plan(self) -> np.ndarray:
+    def make_random_init_plan(
+        self,
+        p: np.ndarray,
+        q: np.ndarray,
+        tol: float = 1e-3,
+        max_iter: int = 1000,
+    ) -> np.ndarray:
         """Generates a random initial matrix for Gromov-Wasserstein alignment.
 
-        The method creates a random matrix and normalizes it to ensure that the sum of each row and column forms a uniform distribution.
+        The method creates a random matrix and normalizes it to ensure that the sum of each row and column forms an input distribution.
+        If no input distribution is provided, uniform distribution is used.
         This normalization process is repeated multiple times to obtain a doubly stochastic matrix.
 
+        Args:
+            p (np.ndarray): source distribution. Defaults to None. If None, uniform distribution is used.
+            q (np.ndarray): target distribution. Defaults to None. If None, uniform distribution is used.
+            tol (float, optional): stop condition. Defaults to 1e-3.
+            max_iter (int, optional): maximum number of iterations. Defaults to 1000.
+
         Returns:
-            np.ndarray: The initialized transportation plan matrix.
+            T (np.ndarray): initial matrix
         """
-        T = np.random.rand(self.source_size, self.target_size) # create a random matrix
-        rep = 100 # number of repetitions
 
-        for _ in range(rep):
-            # normalize each row so that the sum is 1
-            p = T.sum(axis=1, keepdims=True)
-            T = T / p
+        # create a random matrix
+        T = np.random.rand(self.source_size, self.target_size)
 
-            # normalize each column so that the sum is 1
-            q = T.sum(axis=0, keepdims=True)
-            T = T / q
+        for _ in range(max_iter):
+            # normalize each row so that the sum corresponds to the source distribution
+            T = (T * p) / T.sum(axis=1, keepdims=True)
 
-        T = T / T.sum()
+            # normalize each column so that the sum corresponds to the target distribution
+            T = (T * q) / T.sum(axis=0, keepdims=True)
+
+            # check the stop condition
+            if np.linalg.norm(T.sum(axis=1, keepdims=True) - p) < tol:
+                if np.linalg.norm(T.sum(axis=0, keepdims=True) - q) < tol:
+                    break
 
         return T
 
+
 # %%
 if __name__ == '__main__':
-    test_builder = InitMatrix(2000)
+    test_builder = InitMatrix(2000, 1000)
     t = test_builder.make_initial_T('diag')
 
 # %%
