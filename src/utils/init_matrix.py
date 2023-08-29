@@ -1,5 +1,5 @@
 # %%
-from typing import List, Union, Optional
+from typing import List, Optional, Union
 
 import numpy as np
 import ot
@@ -18,7 +18,13 @@ class InitMatrix():
         user_define_init_mat_list (List[np.ndarray], optional): User-defined initial matrix or matrices.
     """
 
-    def __init__(self, source_size: int, target_size: int) -> None:
+    def __init__(
+        self,
+        source_size: int,
+        target_size: int,
+        p: Optional[np.ndarray] = None,
+        q: Optional[np.ndarray] = None,
+    ) -> None:
         """Initializes the InitMatrix class with given source and target sizes.
 
         Args:
@@ -28,6 +34,21 @@ class InitMatrix():
 
         self.source_size = source_size
         self.target_size = target_size
+
+        # initialize p and q
+        if p is None:
+            p = ot.unif(self.source_size).reshape(-1, 1)
+        if q is None:
+            q = ot.unif(self.target_size).reshape(1, -1)
+
+        # check the dimension of p and q
+        if p.ndim < 2:
+            p = p.reshape(-1, 1)
+        if q.ndim < 2:
+            q = q.reshape(1, -1)
+
+        self.p = p
+        self.q = q
 
     def set_user_define_init_mat_list(self, mat: Union[np.ndarray, List[np.ndarray]]) -> None:
         """Sets the user-defined initial matrix or matrices.
@@ -68,10 +89,10 @@ class InitMatrix():
             ValueError: If the provided initialization method is not implemented.
         """
 
-        np.random.seed(seed) # fix the seed of numpy.random, seed can be changed by user.
+        np.random.seed(seed)  # fix the seed of numpy.random, seed can be changed by user.
 
         if init_mat_plan == 'random':
-            T = self.make_random_init_plan(**kwargs)
+            T = self.make_random_init_plan(self.p, self.q, **kwargs)
 
         elif init_mat_plan == 'uniform':
             T = np.outer(ot.unif(self.source_size), ot.unif(self.target_size))
@@ -86,11 +107,11 @@ class InitMatrix():
 
     def make_random_init_plan(
         self,
-        p: Optional[np.ndarray] = None,
-        q: Optional[np.ndarray] = None,
+        p: np.ndarray,
+        q: np.ndarray,
         tol: float = 1e-3,
         max_iter: int = 1000,
-    )-> np.ndarray:
+    ) -> np.ndarray:
         """Generates a random initial matrix for Gromov-Wasserstein alignment.
 
         The method creates a random matrix and normalizes it to ensure that the sum of each row and column forms an input distribution.
@@ -106,18 +127,6 @@ class InitMatrix():
         Returns:
             T (np.ndarray): initial matrix
         """
-
-        # initialize p and q
-        if p is None:
-            p = ot.unif(self.source_size).reshape(-1, 1)
-        if q is None:
-            q = ot.unif(self.target_size).reshape(1, -1)
-
-        # check the dimension of p and q
-        if p.ndim < 2:
-            p = p.reshape(-1, 1)
-        if q.ndim < 2:
-            q = q.reshape(1, -1)
 
         # create a random matrix
         T = np.random.rand(self.source_size, self.target_size)
@@ -139,7 +148,7 @@ class InitMatrix():
 
 # %%
 if __name__ == '__main__':
-    test_builder = InitMatrix(2000)
+    test_builder = InitMatrix(2000, 1000)
     t = test_builder.make_initial_T('diag')
 
 # %%
