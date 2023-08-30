@@ -627,9 +627,9 @@ class PairwiseAnalysis:
         config: OptimizationConfig,
         source: Representation,
         target: Representation,
-        pair_name: Optional[str] = None,
         data_name: str = "no_defined",
-        filename: Optional[str] = None,
+        pair_name: Optional[str] = None,
+        instance_name: Optional[str] = None,
     ) -> None:
         """Initializes the PairwiseAnalysis class.
 
@@ -654,28 +654,27 @@ class PairwiseAnalysis:
             AssertionError: If the label information from source and target representations is not the same.
         """
 
+        # information of the representations and optimization
+        self.config = config
         self.source = source
         self.target = target
-        self.config = config
 
-        if pair_name is None:
-            self.pair_name = f"{source.name}_vs_{target.name}"
-        else:
-            self.pair_name = pair_name
-
-        assert data_name is not None, "please define the `data_name` to save the result."
+        # information of the data
         self.data_name = data_name
+        self.pair_name = f"{source.name}_vs_{target.name}" if pair_name is None else pair_name
+        self.instance_name = self.data_name + "_" + self.pair_name  if instance_name is None else instance_name
 
-        if filename is None:
-            self.filename = self.data_name + "_" + self.pair_name
-        else:
-            self.filename = filename
-
+        # path setting
         self.results_dir = results_dir
-        self.save_path = os.path.join(results_dir, self.data_name, self.filename, self.config.init_mat_plan)
+        self.save_path = os.path.join(results_dir, self.config.init_mat_plan)
         self.figure_path = os.path.join(self.save_path, 'figure')
         self.data_path = os.path.join(self.save_path, 'data')
 
+        for p in [self.results_dir, self.save_path, self.figure_path, self.data_path]:
+            if not os.path.exists(p):
+                os.makedirs(p)
+
+        # check label information is the same
         assert np.array_equal(
             self.source.num_category_list, self.target.num_category_list
         ), "the label information doesn't seem to be the same."
@@ -686,10 +685,10 @@ class PairwiseAnalysis:
 
         # Generate the URL for the database. Syntax differs for SQLite and others.
         if self.config.db_params["drivername"] == "sqlite":
-            self.storage = "sqlite:///" + self.save_path + "/" + self.filename + "_" + self.config.init_mat_plan + ".db"
+            self.storage = "sqlite:///" + self.save_path + "/" + self.instance_name + "_" + self.config.init_mat_plan + ".db"
         else:
             self.storage = URL.create(
-                database=self.filename + "_" + self.config.init_mat_plan,
+                database=self.instance_name + "_" + self.config.init_mat_plan,
                 **self.config.db_params).render_as_string(hide_password=False)
 
     def _change_types_to_numpy(self, *var):
@@ -1811,8 +1810,6 @@ class AlignRepresentations:
         self.histogram_matching = histogram_matching
 
         self.main_results_dir = main_results_dir
-        self.main_pair_name = None
-        self.main_file_name = None
 
         self.RSA_corr = dict()
 
@@ -1911,27 +1908,25 @@ class AlignRepresentations:
     def _get_pairwise_list(self, pair_list):
         pairwise_list = []
 
-        for pair in pair_list:
+        for source_idx, target_idx in pair_list:
             config_copy = copy.deepcopy(self.config)
 
-            s = self.representations_list[pair[0]]
-            t = self.representations_list[pair[1]]
+            source = self.representations_list[source_idx]
+            target = self.representations_list[target_idx]
 
             if self.specific_eps_list is not None:
-                pair_name = f"{s.name}_vs_{t.name}"
-                if s.name in self.specific_eps_list.keys():
-                    config_copy.eps_list = self.specific_eps_list[s.name]
+                pair_name = f"{source.name}_vs_{target.name}"
+
+                if source.name in self.specific_eps_list.keys():
+                    config_copy.eps_list = self.specific_eps_list[source.name]
+
                 elif pair_name in self.specific_eps_list.keys():
                     config_copy.eps_list = self.specific_eps_list[pair_name]
 
-            pairwise = PairwiseAnalysis(
-                results_dir=self.main_results_dir,
+            pairwise = self._pairwise_from_representations(
                 config=config_copy,
-                source=s,
-                target=t,
-                data_name=self.data_name,
-                pair_name=self.main_pair_name,
-                filename=self.main_file_name,
+                source=source,
+                target=target,
             )
 
             print('pair:', pairwise.pair_name, 'eps_list:', config_copy.eps_list)
@@ -1942,6 +1937,47 @@ class AlignRepresentations:
             pairwise_list.append(pairwise)
 
         return pairwise_list
+
+    def _pairwise_from_representations(
+        self,
+        config: OptimizationConfig,
+        source: Representation,
+        target: Representation,
+    ) -> PairwiseAnalysis:
+        """Create a PairwiseAnalysis object from two representations.
+
+        pair_name will be automatically generated as "source_name_vs_target_name".
+        pairwise_name will be automatically generated as "data_name_pair_name".
+        directory of PairwiseAnalysis will be automatically generated as "main_results_dir/pairwise_name".
+
+        Args:
+            config (OptimizationConfig): configuration for GWOT.
+            source (Representation): source representation
+            target (Representation): target representation
+
+        Returns:
+            pairwise (PairwiseAnalysis): PairwiseAnalysis object.
+        """
+
+        # set information for the pair
+        pair_name = f"{source.name}_vs_{target.name}"
+        pairwise_name = self.data_name + "_" + pair_name
+        pair_results_dir = self.main_results_dir + "/" + pairwise_name
+
+        if not os.path.exists(pair_results_dir):
+            os.makedirs(pair_results_dir)
+
+        # create PairwiseAnalysis object
+        pairwise = PairwiseAnalysis(
+            results_dir=pair_results_dir,
+            config=config,
+            source=source,
+            target=target,
+            data_name=self.data_name,
+            pair_name=pair_name,
+            instance_name=pairwise_name,
+        )
+        return pairwise
 
     def RSA_get_corr(self, metric: str = "spearman", method: str = "normal") -> None:
         """Conventional representation similarity analysis (RSA).
@@ -2424,14 +2460,11 @@ class AlignRepresentations:
 
         # GW alignment to the pivot
         for representation in others_representaions:
-            pairwise = PairwiseAnalysis(
-                results_dir=self.main_results_dir,
+
+            pairwise = self._pairwise_from_representations(
                 config=self.config,
                 source=representation,
                 target=pivot_representation,
-                data_name=self.data_name,
-                pair_name=self.main_pair_name,
-                filename=self.main_file_name,
             )
 
             pairwise.run_entropic_gwot(
@@ -2464,14 +2497,11 @@ class AlignRepresentations:
         # Set pairwises whose target are the barycenter
         pairwise_barycenters = []
         for representation in self.representations_list:
-            pairwise = PairwiseAnalysis(
-                results_dir=self.main_results_dir,
+
+            pairwise = self._pairwise_from_representations(
                 config=self.config,
                 source=representation,
                 target=self.barycenter,
-                data_name=self.data_name,
-                pair_name=self.main_pair_name,
-                filename=self.main_file_name,
             )
             pairwise_barycenters.append(pairwise)
 
