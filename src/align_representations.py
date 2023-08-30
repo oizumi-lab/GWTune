@@ -495,7 +495,8 @@ class Representation:
                 ticks=ticks,
                 category_name_list=None,
                 num_category_list=None,
-                object_labels=self.object_labels,
+                x_object_labels=self.object_labels,
+                y_object_labels=self.object_labels,
                 **visualization_config(),
             )
 
@@ -508,7 +509,8 @@ class Representation:
                 ticks=ticks,
                 category_name_list=self.category_name_list,
                 num_category_list=self.num_category_list,
-                object_labels=self.object_labels,
+                x_object_labels=self.object_labels,
+                y_object_labels=self.object_labels,
                 **visualization_config(),
             )
 
@@ -679,9 +681,6 @@ class PairwiseAnalysis:
             self.source.num_category_list, self.target.num_category_list
         ), "the label information doesn't seem to be the same."
 
-        assert np.array_equal(
-            self.source.object_labels, self.target.object_labels
-        ), "the label information doesn't seem to be the same."
 
         # Generate the URL for the database. Syntax differs for SQLite and others.
         if self.config.db_params["drivername"] == "sqlite":
@@ -1143,8 +1142,9 @@ class PairwiseAnalysis:
 
         plt.grid(True)
 
-        if lim_acc is not None:
-            plt.xlim(lim_acc)
+        ymin, ymax = plt.xlim(lim_acc)
+        if ymax > 100:
+            plt.xlim(lim_acc, 100)
 
         if lim_gwd is not None:
             plt.ylim(lim_gwd)
@@ -1233,7 +1233,8 @@ class PairwiseAnalysis:
                     ticks=ticks,
                     category_name_list=None,
                     num_category_list=None,
-                    object_labels=self.source.object_labels,
+                    x_object_labels=self.target.object_labels,
+                    y_object_labels=self.source.object_labels,
                     **visualization_config(),
                 )
 
@@ -1245,7 +1246,8 @@ class PairwiseAnalysis:
                     ticks=ticks,
                     category_name_list=self.source.category_name_list,
                     num_category_list=self.source.num_category_list,
-                    object_labels=self.source.object_labels,
+                    x_object_labels=self.target.object_labels,
+                    y_object_labels=self.source.object_labels,
                     **visualization_config(),
                 )
 
