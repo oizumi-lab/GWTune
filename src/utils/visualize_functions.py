@@ -370,6 +370,7 @@ class VisualizeEmbedding():
         marker_size = kwargs.get('marker_size', 30)
         cmap = kwargs.get('cmap', "viridis")
         show_figure = kwargs.get('show_figure', True)
+        font = kwargs.get('font', 'Noto Sans CJK JP')
 
         if color_labels is None:
             if self.num_category_list is None:
@@ -382,6 +383,7 @@ class VisualizeEmbedding():
 
         plt.style.use("default")
         plt.rcParams["grid.color"] = "black"
+        plt.rcParams['font.family'] = font
         fig = plt.figure(figsize = figsize)
 
         if self.dim == 3:
