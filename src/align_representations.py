@@ -133,7 +133,7 @@ class VisualizationConfig:
         self,
         show_figure: bool = True,
         fig_ext:str='png',
-        font:str='Arial',#'Noto Sans CJK JP'
+        font:str='DejaVu Sans',#'Noto Sans CJK JP'
         figsize: Tuple[int, int] = (8, 6),
         cbar_label_size: int = 15,
         cbar_ticks_size: int = 10,
@@ -181,7 +181,7 @@ class VisualizationConfig:
             fig_ext (str, optional):
                 The extension of the figure. Defaults to 'png'.
             fonmt (str, optional):
-                The font of the figure. Defaults to 'Arial'.
+                The font of the figure. Defaults to 'DejaVu Sans'.
             figsize (Tuple[int, int], optional):
                 Size of the figure. Defaults to (8, 6).
             cbar_label_size (int, optional):
