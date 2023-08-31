@@ -42,9 +42,9 @@ def show_distribution_rep(
     fig_dir: Optional[str] = None,
     *,
     figsize: Tuple[int, int] = (4, 3),
-    title_size: int = 60,
-    xlabel_size: int = 40,
-    ylabel_size: int = 40,
+    title_size: int = 20,
+    xlabel_size: int = 15,
+    ylabel_size: int = 15,
     alpha: float = 1.,
     bins: int = 100,
     color: str = "C0",
@@ -61,7 +61,7 @@ def show_distribution_rep(
     plt.rcParams["font.size"] = font_size
 
     # plot
-    _, ax = plt.subplots(111, figsize=figsize)
+    _, ax = plt.subplots(figsize=figsize)
     sns.histplot(sim_vector, alpha=alpha, bins=bins, color=color)
 
     ax.set_title(title, fontsize=title_size)

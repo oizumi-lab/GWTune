@@ -1,5 +1,6 @@
 # %%
 import copy
+import json
 import glob
 import itertools
 import os
@@ -54,7 +55,8 @@ class OptimizationConfig:
         data_type: str = "double",
         n_jobs: int = 1,
         multi_gpu: Union[bool, List[int]] = False,
-        db_params: Dict[str, Union[str, int]] = {"drivername": "mysql", "username": "root", "password": "", "host": "localhost", "port": 3306},
+        storage: Optional[str] = None,
+        db_params: Optional[Dict[str, Union[str, int]]] = {"drivername": "mysql", "username": "root", "password": "", "host": "localhost", "port": 3306},
         init_mat_plan: str = "random",
         user_define_init_mat_list: Union[List, None] = None,
         n_iter: int = 1,
@@ -115,7 +117,9 @@ class OptimizationConfig:
         self.n_jobs = n_jobs
         self.multi_gpu = multi_gpu
 
+        self.storage = storage
         self.db_params = db_params
+        assert storage is not None or db_params is not None, "storage or db_params must be provided."
 
         self.init_mat_plan = init_mat_plan
         self.n_iter = n_iter
@@ -468,7 +472,7 @@ class PairwiseAnalysis:
         self.target = target
 
         # information of the data
-        self.data_name = data_name
+        self.data_name = data_name  # name of align representations
         self.pair_name = f"{source.name}_vs_{target.name}" if pair_name is None else pair_name
         self.instance_name = self.data_name + "_" + self.pair_name  if instance_name is None else instance_name
 
@@ -492,12 +496,15 @@ class PairwiseAnalysis:
         ), "the label information doesn't seem to be the same."
 
         # Generate the URL for the database. Syntax differs for SQLite and others.
-        if self.config.db_params["drivername"] == "sqlite":
-            self.storage = "sqlite:///" + self.save_path + "/" + self.instance_name + "_" + self.config.init_mat_plan + ".db"
-        else:
-            self.storage = URL.create(
-                database=self.instance_name + "_" + self.config.init_mat_plan,
-                **self.config.db_params).render_as_string(hide_password=False)
+        self.storage = self.config.storage
+        if self.storage is None:
+            if self.config.db_params["drivername"] == "sqlite":
+                self.storage = "sqlite:///" + self.save_path + "/" + self.instance_name + "_" + self.config.init_mat_plan + ".db"
+
+            else:
+                self.storage = URL.create(
+                    database=self.instance_name + "_" + self.config.init_mat_plan,
+                    **self.config.db_params).render_as_string(hide_password=False)
 
     def _change_types_to_numpy(self, *var):
         ret = []
@@ -614,7 +621,6 @@ class PairwiseAnalysis:
         OT_format: str = "default",
         return_data: bool = False,
         return_figure: bool = True,
-        visualization_config: VisualizationConfig = VisualizationConfig(),
         show_log: bool = False,
         fig_dir: str = None,
         ticks: str = None,
@@ -682,27 +688,57 @@ class PairwiseAnalysis:
             if not os.path.exists(fig_dir):
                 os.makedirs(fig_dir, exist_ok=True)
 
-        OT = self.show_OT(
+        OT = self.sort_OT(
             ot_to_plot = None,
-            title=f"$\Gamma$ ({self.pair_name.replace('_', ' ')})",
-            return_data=return_data,
-            return_figure=return_figure,
-            OT_format=OT_format,
-            visualization_config=visualization_config,
-            fig_dir=fig_dir,
-            ticks=ticks,
+            OT_format = OT_format,
         )
 
-        if show_log:
-            self.get_optimization_log(
-                fig_dir=fig_dir,
-                **visualization_config(),
-            )
+        # OT = self.show_OT(
+        #     ot_to_plot = None,
+        #     title=f"$\Gamma$ ({self.pair_name.replace('_', ' ')})",
+        #     return_data=return_data,
+        #     return_figure=return_figure,
+        #     OT_format=OT_format,
+        #     visualization_config=visualization_config,
+        #     fig_dir=fig_dir,
+        #     ticks=ticks,
+        # )
+
+        # if show_log:
+        #     self.get_optimization_log(
+        #         fig_dir=fig_dir,
+        #         **visualization_config(),
+        #     )
 
         if save_dataframe:
             df_trial.to_csv(self.save_path + '/' + self.filename + '.csv')
 
         return OT
+
+    def sort_OT(
+        self,
+        ot_to_plot: Optional[np.ndarray] = None,
+        OT_format: str = "default",
+    ) -> Any:
+        if ot_to_plot is None:
+            ot_to_plot = self.OT
+
+        if OT_format == "sorted" or OT_format == "both":
+            assert self.source.sorted_sim_mat is not None, "No label info to sort the 'sim_mat'."
+            OT_sorted = self.source.func_for_sort_sim_mat(ot_to_plot, category_idx_list=self.source.category_idx_list)
+
+        if OT_format == "default":
+            return ot_to_plot
+
+        elif OT_format == "sorted":
+            return OT_sorted
+
+        elif OT_format == "both":
+            return ot_to_plot, OT_sorted
+
+        else:
+            raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
+
 
     def delete_prev_results(self) -> None:
         """
@@ -804,7 +840,7 @@ class PairwiseAnalysis:
         # generate instance optimize gw_alignment
         opt = gw_optimizer.load_optimizer(
             save_path=self.save_path,
-            filename=self.filename,
+            filename=self.instance_name,
             storage=self.storage,
             init_mat_plan=self.config.init_mat_plan,
             n_iter=self.config.n_iter,
@@ -853,6 +889,14 @@ class PairwiseAnalysis:
                 eps_log=self.config.eps_log,
                 search_space=search_space,
             )
+
+            # 3. save study information
+            study_info = {
+                "storage": self.storage,
+                "study_name": study.study_name,
+            }
+            with open(self.save_path + "/study_info.json", "w") as f:
+                json.dump(study_info, f)
 
         else:
             study = opt.load_study()
@@ -1851,7 +1895,6 @@ class AlignRepresentations:
         return_data=False,
         return_figure=True,
         OT_format="default",
-        visualization_config: VisualizationConfig = VisualizationConfig(),
         show_log=False,
         fig_dir=None,
         ticks=None,
@@ -1872,7 +1915,6 @@ class AlignRepresentations:
                 return_data=return_data,
                 return_figure=return_figure,
                 OT_format=OT_format,
-                visualization_config=visualization_config,
                 show_log=show_log,
                 fig_dir=fig_dir,
                 ticks=ticks,
@@ -1892,7 +1934,6 @@ class AlignRepresentations:
         return_data: bool = False,
         return_figure: bool = True,
         OT_format: str = "default",
-        visualization_config: VisualizationConfig = VisualizationConfig(),
         show_log: bool = False,
         fig_dir: Optional[str] = None,
         ticks: Optional[str] = None,
@@ -2001,7 +2042,6 @@ class AlignRepresentations:
                         return_data=False,
                         return_figure=False,
                         OT_format="default",
-                        visualization_config=visualization_config,
                         show_log=False,
                         fig_dir=None,
                         ticks=None,
@@ -2022,7 +2062,6 @@ class AlignRepresentations:
                     return_data=return_data,
                     return_figure=return_figure,
                     OT_format=OT_format,
-                    visualization_config=visualization_config,
                     show_log=show_log,
                     fig_dir=fig_dir,
                     ticks=ticks,
@@ -2036,7 +2075,6 @@ class AlignRepresentations:
                 return_data=return_data,
                 return_figure=return_figure,
                 OT_format=OT_format,
-                visualization_config=visualization_config,
                 show_log=show_log,
                 fig_dir=fig_dir,
                 ticks=ticks,
