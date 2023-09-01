@@ -141,7 +141,7 @@ class VisualizationConfig:
         cbar_label: Optional[str]=None,
         xticks_size: int = 10,
         yticks_size: int = 10,
-        xticks_rotation: int = 90,
+        xticks_rotation: int = 0,
         yticks_rotation: int = 0,
         tick_format: str = '%.2f',
         title_size: int = 20,
@@ -197,7 +197,7 @@ class VisualizationConfig:
             yticks_size (int, optional):
                 Size of the yticks. Defaults to 10.
             xticks_rotation (int, optional):
-                Rotation angle of the xticks. Defaults to 90.
+                Rotation angle of the xticks. Defaults to 0.
             yticks_rotation (int, optional):
                 Rotation angle of the yticks. Defaults to 0.
             tick_format (Optional[str]):
