@@ -7,13 +7,15 @@ import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from ..align_representations import AlignRepresentations, PairwiseAnalysis
+from ..visualization import show_heatmap
 
 
 def show_OT(
     align_representation: AlignRepresentations,
     OT_format: str = "default",
-    fig_dir: Optional[str] = None,
-    ticks: Optional[str] = None
+    ticks: Optional[str] = None,
+    fig_dirs: Optional[List[str]] = None,
+    **kwargs
 ) -> matplotlib.axes.Axes :
     """Visualize the OT.
 
@@ -53,23 +55,19 @@ def show_OT(
         ValueError: If an invalid OT_format is provided.
      """
 
-    # get ot list
-    if OT_format == "default":
-        ot_to_plot_list = align_representation.OT_list
-    elif OT_format == "sorted":
-        ot_to_plot_list = align_representation.OT_sorted_list
-
-    if fig_dir is None:
-        fig_dir = align_representation.figure_path
-
-    # get cate
-
     # plot OTs
+    if fig_dirs is None:
+        fig_dirs = [None] * len(align_representation.pairwise_list)
+
     axes = []
-    for OT in ot_to_plot_list:
+    for pairwise, fig_dir in zip(align_representation.pairwise_list, fig_dirs):
         ax = show_OT_single(
-            OT,
+            pairwise,
+            OT_format=OT_format,
+            title=f"$\Gamma$ ({pairwise.pair_name.replace('_', ' ')})",
+            ticks=ticks,
             fig_dir=fig_dir,
+            **kwargs
             )
         axes.append(ax)
 
@@ -78,69 +76,49 @@ def show_OT(
 
 def show_OT_single(
     pairwise: PairwiseAnalysis,
+    OT_format: str = "default",
     title: Optional[str] = None,
-    fig_dir: Optional[str] = None,
     ticks: Optional[str] = None,
-):
+    fig_dir: Optional[str] = None,
+    **kwargs
+) -> matplotlib.axes.Axes:
+    # figure path setting
+    if fig_dir is None:
+        fig_dir = pairwise.figure_path
 
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir, exist_ok=True)
 
-    for pairwise, OT in zip(align_representation.pairwise_list, align_representation.OT_list):
-        if OT_format == "sorted" or OT_format == "both":
-        assert pairwise.source.sorted_sim_mat is not None, "No label info to sort the 'sim_mat'."
-        OT_sorted = pairwise.source.func_for_sort_sim_mat(
-            OT,
-            category_idx_list=pairwise.source.category_idx_list
+    # plot OT
+    fig_name = pairwise.data_name + "_" + pairwise.pair_name
+
+    if OT_format == "default":
+        ax = show_heatmap(
+            pairwise.OT,
+            title=title,
+            ticks=ticks,
+            category_name_list=None,
+            num_category_list=None,
+            object_labels=pairwise.source.object_labels,
+            fig_name=fig_name,
+            fig_dir=fig_dir,
+            **kwargs,
         )
 
-    if return_figure:
-        save_file = self.data_name + "_" + self.pair_name
-        if fig_dir is not None:
-            fig_ext=visualization_config.visualization_params["fig_ext"]
-            fig_path = os.path.join(fig_dir, f"{save_file}.{fig_ext}")
-        else:
-            fig_path = None
+    elif OT_format == "sorted":
+        ax = show_heatmap(
+            pairwise.OT_sorted,
+            title=title,
+            ticks=ticks,
+            category_name_list=pairwise.source.category_name_list,
+            num_category_list=pairwise.source.num_category_list,
+            object_labels=pairwise.source.object_labels,
+            fig_name=fig_name,
+            fig_dir=fig_dir,
+            **kwargs,
+        )
 
-        if OT_format == "default" or OT_format == "both":
-            if OT_format == "default":
-                assert self.source.category_name_list is None, "please set the 'sim_mat_format = sorted'. "
+    else:
+        raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
 
-            visualize_functions.show_heatmap(
-                ot_to_plot,
-                title=title,
-                save_file_name=fig_path,
-                ticks=ticks,
-                category_name_list=None,
-                num_category_list=None,
-                object_labels=self.source.object_labels,
-                **visualization_config(),
-            )
-
-        elif OT_format == "sorted" or OT_format == "both":
-            visualize_functions.show_heatmap(
-                OT_sorted,
-                title=title,
-                save_file_name=fig_path,
-                ticks=ticks,
-                category_name_list=self.source.category_name_list,
-                num_category_list=self.source.num_category_list,
-                object_labels=self.source.object_labels,
-                **visualization_config(),
-            )
-
-        else:
-            raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
-
-    if return_data:
-        if OT_format == "default":
-            return ot_to_plot
-
-        elif OT_format == "sorted":
-            return OT_sorted
-
-        elif OT_format == "both":
-            return ot_to_plot, OT_sorted
-
-        else:
-            raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
+    return ax

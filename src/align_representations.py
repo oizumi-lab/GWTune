@@ -1,8 +1,8 @@
 # %%
 import copy
-import json
 import glob
 import itertools
+import json
 import os
 import shutil
 import sys
@@ -31,6 +31,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
 from .gw_alignment import GW_Alignment
 from .histogram_matching import SimpleHistogramMatching
 from .utils import backend, gw_optimizer, visualize_functions
+
 
 class VisualizationConfig:
     def __init__(self) -> None:
@@ -243,19 +244,6 @@ class Representation:
         else:
             self.sorted_sim_mat = None
 
-    def _get_sim_mat(self) -> np.ndarray:
-        """Compute the dissimilarity matrix based on the given metric.
-
-        Returns:
-            np.ndarray: The computed dissimilarity matrix.
-        """
-        if self.metric == "dot":
-            metric = "cosine"
-        else:
-            metric = self.metric
-
-        return distance.cdist(self.embedding, self.embedding, metric=metric)
-
     def _get_embedding(self, dim: int) -> np.ndarray:
         """Estimate embeddings from the dissimilarity matrix using the MDS method.
 
@@ -269,87 +257,18 @@ class Representation:
         embedding = MDS_embedding.fit_transform(self.sim_mat)
         return embedding
 
-    # delete tag
-    # def show_sim_mat(
-    #     self,
-    #     sim_mat_format: str = "default",
-    #     visualization_config: VisualizationConfig = VisualizationConfig(),
-    #     fig_dir: Optional[str] = None,
-    #     ticks: Optional[str] = None,
-    # ) -> None:
-    #     """Show the dissimilarity matrix of the representation.
+    def _get_sim_mat(self) -> np.ndarray:
+        """Compute the dissimilarity matrix based on the given metric.
 
-    #     Args:
-    #         sim_mat_format (str, optional):
-    #             "default", "sorted", or "both". If "sorted" is selected, the rearranged matrix is shown. Defaults to "default".
-    #         visualization_config (VisualizationConfig, optional):
-    #             container of parameters used for figure. Defaults to VisualizationConfig().
-    #         fig_dir (Optional[str], optional):
-    #             The directory for saving the figure. Defaults to None.
-    #         ticks (Optional[str], optional):
-    #             "numbers", "objects", or "category". Defaults to None.
+        Returns:
+            np.ndarray: The computed dissimilarity matrix.
+        """
+        if self.metric == "dot":
+            metric = "cosine"
+        else:
+            metric = self.metric
 
-    #     Raises:
-    #         ValueError: If an invalid `sim_mat_format` value is provided.
-    #     """
-
-    #     if fig_dir is not None:
-    #         fig_ext=visualization_config.visualization_params["fig_ext"]
-    #         default_fig_path = os.path.join(fig_dir, f"RDM_{self.name}_default.{fig_ext}")
-    #         sorted_fig_path = os.path.join(fig_dir, f"RDM_{self.name}_sorted.{fig_ext}")
-    #     else:
-    #         default_fig_path = None
-    #         sorted_fig_path = None
-
-    #     if sim_mat_format == "default" or sim_mat_format == "both":
-    #         visualize_functions.show_heatmap(
-    #             self.sim_mat,
-    #             title=self.name,
-    #             save_file_name=default_fig_path,
-    #             ticks=ticks,
-    #             category_name_list=None,
-    #             num_category_list=None,
-    #             object_labels=self.object_labels,
-    #             **visualization_config(),
-    #         )
-
-    #     elif sim_mat_format == "sorted" or sim_mat_format == "both":
-    #         assert self.category_idx_list is not None, "No label info to sort the 'sim_mat'."
-    #         visualize_functions.show_heatmap(
-    #             self.sorted_sim_mat,
-    #             title=self.name,
-    #             save_file_name=sorted_fig_path,
-    #             ticks=ticks,
-    #             category_name_list=self.category_name_list,
-    #             num_category_list=self.num_category_list,
-    #             object_labels=self.object_labels,
-    #             **visualization_config(),
-    #         )
-
-    #     else:
-    #         raise ValueError("sim_mat_format must be either 'default', 'sorted', or 'both'.")
-
-    # delete tag
-    # def show_sim_mat_distribution(self, **kwargs) -> None:
-    #     """Show the distribution of the values of elements of the dissimilarity matrix.
-    #     """
-
-    #     # figsize = kwargs.get('figsize', (4, 3))
-    #     title_size = kwargs.get("title_size", 60)
-    #     color = kwargs.get("color", "C0")
-
-    #     lower_triangular = np.tril(self.sim_mat)
-    #     lower_triangular = lower_triangular.flatten()
-
-    #     plt.figure()
-    #     plt.hist(lower_triangular, bins=100, color=color)
-    #     plt.title(f"Distribution of RDM ({self.name})", fontsize=title_size)
-    #     plt.xlabel("RDM value")
-    #     plt.ylabel("Count")
-    #     plt.grid(True)
-    #     plt.show()
-    #     plt.clf()
-    #     plt.close()
+        return distance.cdist(self.embedding, self.embedding, metric=metric)
 
     def show_embedding(
         self,
@@ -477,6 +396,7 @@ class PairwiseAnalysis:
         self.data_name = data_name  # name of align representations
         self.pair_name = f"{source.name}_vs_{target.name}" if pair_name is None else pair_name
         self.instance_name = self.data_name + "_" + self.pair_name  if instance_name is None else instance_name
+        self.study_name = self.instance_name + "_" + self.config.init_mat_plan
 
         # path setting
         self.results_dir = results_dir
@@ -521,6 +441,151 @@ class PairwiseAnalysis:
             ret.append(a)
 
         return ret
+
+    def _entropic_gw_alignment(
+        self,
+        compute_OT: bool,
+        target_device: Optional[str] = None,
+        sampler_seed: int = 42
+    ) -> Tuple[np.ndarray, pd.DataFrame]:
+        """Computes or loads the entropic Gromov-Wasserstein Optimal Transport (GWOT).
+
+        This method either computes the GW alignment or loads it from a saved path,
+        depending on the provided arguments.
+
+        Args:
+            compute_OT (bool):
+                If True, GWOT will be computed.
+            target_device (Optional[str], optional):
+                The device to be used for computation. Defaults to None.
+            sampler_seed (int, optional):
+                Seed for the sampler. Defaults to 42.
+
+        Returns:
+            OT (np.ndarray): GWOT
+            df_trial (pd.DataFrame): dataframe of the optimization log
+        """
+
+        if not os.path.exists(self.save_path):
+            if compute_OT == False:
+                warnings.simplefilter("always")
+                warnings.warn(
+                    "compute_OT is False, but this computing is running for the first time in the 'results_dir'.",
+                    UserWarning
+                )
+                warnings.simplefilter("ignore")
+
+            compute_OT = True
+
+        study = self._run_optimization(
+            compute_OT = compute_OT,
+            target_device = target_device,
+            sampler_seed = sampler_seed,
+        )
+
+        best_trial = study.best_trial
+        df_trial = study.trials_dataframe()
+
+        ot_path = glob.glob(self.data_path + f"/gw_{best_trial.number}.*")[0]
+
+        if '.npy' in ot_path:
+            OT = np.load(ot_path)
+
+        elif '.pt' in ot_path:
+            OT = torch.load(ot_path).to("cpu").numpy()
+
+        return OT, df_trial
+
+    def _run_optimization(
+        self,
+        compute_OT: bool = False,
+        target_device: Optional[str] = None,
+        sampler_seed: int = 42,
+        n_jobs_for_pairwise_analysis: int = 1
+    ) -> optuna.study.Study:
+        """Run or load an optimization study for Gromov-Wasserstein Optimal Transport (GWOT).
+
+        Args:
+            compute_OT (bool, optional):
+                If True, runs the optimization study to compute GWOT. If False, loads an existing study.
+                Defaults to False.
+            target_device (Optional[str], optional):
+                The device to compute GWOT. If not provided, defaults to the device specified in the configuration.
+            sampler_seed (int, optional):
+                Seed for the sampler. Defaults to 42.
+            n_jobs_for_pairwise_analysis (int, optional):
+                Number of jobs to run in parallel for pairwise analysis. Defaults to 1.
+
+        Returns:
+            study (optuna.study.Study):
+                The result of the optimization study, typically an instance of a study object.
+        """
+
+        # generate instance optimize gw_alignment
+        opt = gw_optimizer.load_optimizer(
+            save_path=self.save_path,
+            filename=self.instance_name,
+            storage=self.storage,
+            init_mat_plan=self.config.init_mat_plan,
+            n_iter=self.config.n_iter,
+            num_trial=self.config.num_trial,
+            n_jobs=n_jobs_for_pairwise_analysis,
+            method="optuna",
+            sampler_name=self.config.sampler_name,
+            pruner_name=self.config.pruner_name,
+            pruner_params=self.config.pruner_params,
+        )
+
+        if compute_OT:
+            # generate instance solves gw_alignment
+            gw = GW_Alignment(
+                self.source.sim_mat,
+                self.target.sim_mat,
+                self.data_path,
+                max_iter=self.config.max_iter,
+                n_iter=self.config.n_iter,
+                to_types=self.config.to_types,
+                data_type=self.config.data_type,
+                sinkhorn_method=self.config.sinkhorn_method,
+            )
+
+            # setting for optimization
+            if self.config.init_mat_plan == "user_define":
+                gw.main_compute.init_mat_builder.set_user_define_init_mat_list(self.config.user_define_init_mat_list)
+
+            if self.config.sampler_name == "grid":
+                # used only in grid search sampler below the two lines
+                eps_space = opt.define_eps_space(self.config.eps_list, self.config.eps_log, self.config.num_trial)
+                search_space = {"eps": eps_space}
+            else:
+                search_space = None
+
+            if target_device == None:
+                target_device = self.config.device
+
+            # 2. run optimzation
+            study = opt.run_study(
+                gw,
+                target_device,
+                seed=sampler_seed,
+                init_mat_plan=self.config.init_mat_plan,
+                eps_list=self.config.eps_list,
+                eps_log=self.config.eps_log,
+                search_space=search_space,
+            )
+
+            # 3. save study information
+            study_info = {
+                "storage": self.storage,
+                "study_name": study.study_name,
+            }
+            with open(self.save_path + "/study_info.json", "w") as f:
+                json.dump(study_info, f)
+
+        else:
+            study = opt.load_study()
+
+        return study
 
     def show_both_sim_mats(self):
         """
@@ -689,14 +754,14 @@ class PairwiseAnalysis:
 
         # sort OT
         if OT_format == "default":
-            return self.OT
+            return self.OT, None
 
         else:
             assert self.source.sorted_sim_mat is not None, "No label info to sort the 'sim_mat'."
             self.OT_sorted = self.source.func_for_sort_sim_mat(self.OT, category_idx_list=self.source.category_idx_list)
 
             if OT_format == "sorted":
-                return self.OT_sorted
+                return None, self.OT_sorted
 
             elif OT_format == "both":
                 return self.OT, self.OT_sorted
@@ -708,9 +773,13 @@ class PairwiseAnalysis:
         """
         Delete the previous computed results of GWOT.
         """
-        # drop database
+        # delete study
         if database_exists(self.storage):
-            drop_database(self.storage)
+            try:
+                optuna.delete_study(study_name=self.study_name, storage=self.storage)
+            except KeyError:
+                print(f"study {self.study_name} doesn't exist in {self.storage}")
+
         # delete directory
         if os.path.exists(self.save_path):
             for root, dirs, files in os.walk(self.save_path, topdown=False):
@@ -721,151 +790,6 @@ class PairwiseAnalysis:
                     dir_path = os.path.join(root, name)
                     os.rmdir(dir_path)
             shutil.rmtree(self.save_path)
-
-    def _entropic_gw_alignment(
-        self,
-        compute_OT: bool,
-        target_device: Optional[str] = None,
-        sampler_seed: int = 42
-    ) -> Tuple[np.ndarray, pd.DataFrame]:
-        """Computes or loads the entropic Gromov-Wasserstein Optimal Transport (GWOT).
-
-        This method either computes the GW alignment or loads it from a saved path,
-        depending on the provided arguments.
-
-        Args:
-            compute_OT (bool):
-                If True, GWOT will be computed.
-            target_device (Optional[str], optional):
-                The device to be used for computation. Defaults to None.
-            sampler_seed (int, optional):
-                Seed for the sampler. Defaults to 42.
-
-        Returns:
-            OT (np.ndarray): GWOT
-            df_trial (pd.DataFrame): dataframe of the optimization log
-        """
-
-        if not os.path.exists(self.save_path):
-            if compute_OT == False:
-                warnings.simplefilter("always")
-                warnings.warn(
-                    "compute_OT is False, but this computing is running for the first time in the 'results_dir'.",
-                    UserWarning
-                )
-                warnings.simplefilter("ignore")
-
-            compute_OT = True
-
-        study = self._run_optimization(
-            compute_OT = compute_OT,
-            target_device = target_device,
-            sampler_seed = sampler_seed,
-        )
-
-        best_trial = study.best_trial
-        df_trial = study.trials_dataframe()
-
-        ot_path = glob.glob(self.data_path + f"/gw_{best_trial.number}.*")[0]
-
-        if '.npy' in ot_path:
-            OT = np.load(ot_path)
-
-        elif '.pt' in ot_path:
-            OT = torch.load(ot_path).to("cpu").numpy()
-
-        return OT, df_trial
-
-    def _run_optimization(
-        self,
-        compute_OT: bool = False,
-        target_device: Optional[str] = None,
-        sampler_seed: int = 42,
-        n_jobs_for_pairwise_analysis: int = 1
-    ) -> optuna.study.Study:
-        """Run or load an optimization study for Gromov-Wasserstein Optimal Transport (GWOT).
-
-        Args:
-            compute_OT (bool, optional):
-                If True, runs the optimization study to compute GWOT. If False, loads an existing study.
-                Defaults to False.
-            target_device (Optional[str], optional):
-                The device to compute GWOT. If not provided, defaults to the device specified in the configuration.
-            sampler_seed (int, optional):
-                Seed for the sampler. Defaults to 42.
-            n_jobs_for_pairwise_analysis (int, optional):
-                Number of jobs to run in parallel for pairwise analysis. Defaults to 1.
-
-        Returns:
-            study (optuna.study.Study):
-                The result of the optimization study, typically an instance of a study object.
-        """
-
-        # generate instance optimize gw_alignment
-        opt = gw_optimizer.load_optimizer(
-            save_path=self.save_path,
-            filename=self.instance_name,
-            storage=self.storage,
-            init_mat_plan=self.config.init_mat_plan,
-            n_iter=self.config.n_iter,
-            num_trial=self.config.num_trial,
-            n_jobs=n_jobs_for_pairwise_analysis,
-            method="optuna",
-            sampler_name=self.config.sampler_name,
-            pruner_name=self.config.pruner_name,
-            pruner_params=self.config.pruner_params,
-        )
-
-        if compute_OT:
-            # generate instance solves gw_alignment
-            gw = GW_Alignment(
-                self.source.sim_mat,
-                self.target.sim_mat,
-                self.data_path,
-                max_iter=self.config.max_iter,
-                n_iter=self.config.n_iter,
-                to_types=self.config.to_types,
-                data_type=self.config.data_type,
-                sinkhorn_method=self.config.sinkhorn_method,
-            )
-
-            # setting for optimization
-            if self.config.init_mat_plan == "user_define":
-                gw.main_compute.init_mat_builder.set_user_define_init_mat_list(self.config.user_define_init_mat_list)
-
-            if self.config.sampler_name == "grid":
-                # used only in grid search sampler below the two lines
-                eps_space = opt.define_eps_space(self.config.eps_list, self.config.eps_log, self.config.num_trial)
-                search_space = {"eps": eps_space}
-            else:
-                search_space = None
-
-            if target_device == None:
-                target_device = self.config.device
-
-            # 2. run optimzation
-            study = opt.run_study(
-                gw,
-                target_device,
-                seed=sampler_seed,
-                init_mat_plan=self.config.init_mat_plan,
-                eps_list=self.config.eps_list,
-                eps_log=self.config.eps_log,
-                search_space=search_space,
-            )
-
-            # 3. save study information
-            study_info = {
-                "storage": self.storage,
-                "study_name": study.study_name,
-            }
-            with open(self.save_path + "/study_info.json", "w") as f:
-                json.dump(study_info, f)
-
-        else:
-            study = opt.load_study()
-
-        return study
 
     def get_optimization_log(self, fig_dir: Optional[str] = None, **kwargs) -> pd.DataFrame:
         """Show both the relationships between epsilons and GWD, and between accuracy and GWD
@@ -1442,138 +1366,6 @@ class PairwiseAnalysis:
         plt.clf()
         plt.close()
 
-    # delete tag
-    # def sort_OT(
-    #     self,
-    #     ot_to_plot: Optional[np.ndarray] = None,
-    #     OT_format: str = "default",
-    # ) -> Any:
-    #     if ot_to_plot is None:
-    #         ot_to_plot = self.OT
-
-    #     if OT_format == "sorted" or OT_format == "both":
-    #         assert self.source.sorted_sim_mat is not None, "No label info to sort the 'sim_mat'."
-    #         OT_sorted = self.source.func_for_sort_sim_mat(ot_to_plot, category_idx_list=self.source.category_idx_list)
-
-    #     if OT_format == "default":
-    #         return ot_to_plot
-
-    #     elif OT_format == "sorted":
-    #         return OT_sorted
-
-    #     elif OT_format == "both":
-    #         return ot_to_plot, OT_sorted
-
-    #     else:
-    #         raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
-
-    # delete tag
-    # def show_OT(
-    #     self,
-    #     ot_to_plot: Optional[np.ndarray] = None,
-    #     title: Optional[str] = None,
-    #     OT_format: str = "default",
-    #     return_data: bool = False,
-    #     return_figure: bool = True,
-    #     visualization_config: 'VisualizationConfig' = VisualizationConfig(),
-    #     fig_dir: Optional[str] = None,
-    #     ticks: Optional[str] = None
-    # ) -> Any:
-    #     """Visualize the OT.
-
-    #     Args:
-    #         ot_to_plot (Optional[np.ndarray], optional):
-    #             the OT to visualize. Defaults to None.
-    #             If None, the OT computed as GWOT will be used.
-
-    #         title (str, optional):
-    #             the title of OT figure.
-    #             Defaults to None. If None, this will be automatically defined.
-
-    #         OT_format (str, optional):
-    #             format of sim_mat to visualize.
-    #             Options are "default", "sorted", and "both". Defaults to "default".
-
-    #          return_data (bool, optional):
-    #             return the computed OT. Defaults to False.
-
-    #         return_figure (bool, optional):
-    #             make the result figures or not. Defaults to True.
-
-    #         visualization_config (VisualizationConfig, optional):
-    #             container of parameters used for figure. Defaults to VisualizationConfig().
-
-    #         fig_dir (Optional[str], optional):
-    #             you can define the path to which you save the figures (.png).
-    #             If None, the figures will be saved in the same subfolder in "results_dir". Defaults to None.
-
-    #         ticks (Optional[str], optional):
-    #             you can use "objects" or "category (if existed)" or "None". Defaults to None.
-
-    #     Returns:
-    #         OT : the result of GWOT or sorted OT. This depends on OT_format.
-
-    #     Raises:
-    #         ValueError: If an invalid OT_format is provided.
-    #     """
-    #     if ot_to_plot is None:
-    #         ot_to_plot = self.OT
-
-    #     if OT_format == "sorted" or OT_format == "both":
-    #         assert self.source.sorted_sim_mat is not None, "No label info to sort the 'sim_mat'."
-    #         OT_sorted = self.source.func_for_sort_sim_mat(ot_to_plot, category_idx_list=self.source.category_idx_list)
-
-    #     if return_figure:
-    #         save_file = self.data_name + "_" + self.pair_name
-    #         if fig_dir is not None:
-    #             fig_ext=visualization_config.visualization_params["fig_ext"]
-    #             fig_path = os.path.join(fig_dir, f"{save_file}.{fig_ext}")
-    #         else:
-    #             fig_path = None
-
-    #         if OT_format == "default" or OT_format == "both":
-    #             if OT_format == "default":
-    #                 assert self.source.category_name_list is None, "please set the 'sim_mat_format = sorted'. "
-
-    #             visualize_functions.show_heatmap(
-    #                 ot_to_plot,
-    #                 title=title,
-    #                 save_file_name=fig_path,
-    #                 ticks=ticks,
-    #                 category_name_list=None,
-    #                 num_category_list=None,
-    #                 object_labels=self.source.object_labels,
-    #                 **visualization_config(),
-    #             )
-
-    #         elif OT_format == "sorted" or OT_format == "both":
-    #             visualize_functions.show_heatmap(
-    #                 OT_sorted,
-    #                 title=title,
-    #                 save_file_name=fig_path,
-    #                 ticks=ticks,
-    #                 category_name_list=self.source.category_name_list,
-    #                 num_category_list=self.source.num_category_list,
-    #                 object_labels=self.source.object_labels,
-    #                 **visualization_config(),
-    #             )
-
-    #         else:
-    #             raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
-
-    #     if return_data:
-    #         if OT_format == "default":
-    #             return ot_to_plot
-
-    #         elif OT_format == "sorted":
-    #             return OT_sorted
-
-    #         elif OT_format == "both":
-    #             return ot_to_plot, OT_sorted
-
-    #         else:
-    #             raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
-
 
 class AlignRepresentations:
     """This object has methods for conducting N groups level analysis and corresponding results.
@@ -1912,7 +1704,7 @@ class AlignRepresentations:
             OT_list.append(OT)
             OT_sorted_list.append(OT_sorted)
 
-        return OT_list
+        return OT_list, OT_sorted_list
 
     def gw_alignment(
         self,
@@ -2059,7 +1851,14 @@ class AlignRepresentations:
         self.OT_sorted_list = OT_sorted_list
 
         if return_data:
-            return OT_list
+            if OT_format == "default":
+                return self.OT_list
+            elif OT_format == "sorted":
+                return self.OT_sorted_list
+            elif OT_format == "both":
+                return self.OT_list, self.OT_sorted_list
+            else:
+                raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
 
     def gwot_after_entropic(
         self,
