@@ -3,19 +3,18 @@ from typing import Any, List, Optional, Tuple
 
 import matplotlib
 import matplotlib.pyplot as plt
-import numpy as np
 import scipy as sp
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 import seaborn as sns
+
 #%%
-from ..align_representations import AlignRepresentations, Representation
+from ..align_representations import AlignRepresentations
 
 
 def show_distribution(
     align_representation: AlignRepresentations,
     fig_dir: Optional[str] = None,
     **kwargs
-) -> Tuple[matplotlib.axes.Axes]:
+) -> List[matplotlib.axes.Axes]:
 
     if fig_dir is None:
         fig_dir = align_representation.main_results_dir + "/individual_distribution/"
@@ -51,7 +50,7 @@ def show_distribution_rep(
     font_size: int = 20,
     fig_ext: str = "png",
     show_figure: bool = True,
-):
+) -> matplotlib.axes.Axes:
 
     sim_vector = sp.spatial.distance.squareform(sim_mat, checks=False)
 

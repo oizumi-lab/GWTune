@@ -269,85 +269,87 @@ class Representation:
         embedding = MDS_embedding.fit_transform(self.sim_mat)
         return embedding
 
-    def show_sim_mat(
-        self,
-        sim_mat_format: str = "default",
-        visualization_config: VisualizationConfig = VisualizationConfig(),
-        fig_dir: Optional[str] = None,
-        ticks: Optional[str] = None,
-    ) -> None:
-        """Show the dissimilarity matrix of the representation.
+    # delete tag
+    # def show_sim_mat(
+    #     self,
+    #     sim_mat_format: str = "default",
+    #     visualization_config: VisualizationConfig = VisualizationConfig(),
+    #     fig_dir: Optional[str] = None,
+    #     ticks: Optional[str] = None,
+    # ) -> None:
+    #     """Show the dissimilarity matrix of the representation.
 
-        Args:
-            sim_mat_format (str, optional):
-                "default", "sorted", or "both". If "sorted" is selected, the rearranged matrix is shown. Defaults to "default".
-            visualization_config (VisualizationConfig, optional):
-                container of parameters used for figure. Defaults to VisualizationConfig().
-            fig_dir (Optional[str], optional):
-                The directory for saving the figure. Defaults to None.
-            ticks (Optional[str], optional):
-                "numbers", "objects", or "category". Defaults to None.
+    #     Args:
+    #         sim_mat_format (str, optional):
+    #             "default", "sorted", or "both". If "sorted" is selected, the rearranged matrix is shown. Defaults to "default".
+    #         visualization_config (VisualizationConfig, optional):
+    #             container of parameters used for figure. Defaults to VisualizationConfig().
+    #         fig_dir (Optional[str], optional):
+    #             The directory for saving the figure. Defaults to None.
+    #         ticks (Optional[str], optional):
+    #             "numbers", "objects", or "category". Defaults to None.
 
-        Raises:
-            ValueError: If an invalid `sim_mat_format` value is provided.
-        """
+    #     Raises:
+    #         ValueError: If an invalid `sim_mat_format` value is provided.
+    #     """
 
-        if fig_dir is not None:
-            fig_ext=visualization_config.visualization_params["fig_ext"]
-            default_fig_path = os.path.join(fig_dir, f"RDM_{self.name}_default.{fig_ext}")
-            sorted_fig_path = os.path.join(fig_dir, f"RDM_{self.name}_sorted.{fig_ext}")
-        else:
-            default_fig_path = None
-            sorted_fig_path = None
+    #     if fig_dir is not None:
+    #         fig_ext=visualization_config.visualization_params["fig_ext"]
+    #         default_fig_path = os.path.join(fig_dir, f"RDM_{self.name}_default.{fig_ext}")
+    #         sorted_fig_path = os.path.join(fig_dir, f"RDM_{self.name}_sorted.{fig_ext}")
+    #     else:
+    #         default_fig_path = None
+    #         sorted_fig_path = None
 
-        if sim_mat_format == "default" or sim_mat_format == "both":
-            visualize_functions.show_heatmap(
-                self.sim_mat,
-                title=self.name,
-                save_file_name=default_fig_path,
-                ticks=ticks,
-                category_name_list=None,
-                num_category_list=None,
-                object_labels=self.object_labels,
-                **visualization_config(),
-            )
+    #     if sim_mat_format == "default" or sim_mat_format == "both":
+    #         visualize_functions.show_heatmap(
+    #             self.sim_mat,
+    #             title=self.name,
+    #             save_file_name=default_fig_path,
+    #             ticks=ticks,
+    #             category_name_list=None,
+    #             num_category_list=None,
+    #             object_labels=self.object_labels,
+    #             **visualization_config(),
+    #         )
 
-        elif sim_mat_format == "sorted" or sim_mat_format == "both":
-            assert self.category_idx_list is not None, "No label info to sort the 'sim_mat'."
-            visualize_functions.show_heatmap(
-                self.sorted_sim_mat,
-                title=self.name,
-                save_file_name=sorted_fig_path,
-                ticks=ticks,
-                category_name_list=self.category_name_list,
-                num_category_list=self.num_category_list,
-                object_labels=self.object_labels,
-                **visualization_config(),
-            )
+    #     elif sim_mat_format == "sorted" or sim_mat_format == "both":
+    #         assert self.category_idx_list is not None, "No label info to sort the 'sim_mat'."
+    #         visualize_functions.show_heatmap(
+    #             self.sorted_sim_mat,
+    #             title=self.name,
+    #             save_file_name=sorted_fig_path,
+    #             ticks=ticks,
+    #             category_name_list=self.category_name_list,
+    #             num_category_list=self.num_category_list,
+    #             object_labels=self.object_labels,
+    #             **visualization_config(),
+    #         )
 
-        else:
-            raise ValueError("sim_mat_format must be either 'default', 'sorted', or 'both'.")
+    #     else:
+    #         raise ValueError("sim_mat_format must be either 'default', 'sorted', or 'both'.")
 
-    def show_sim_mat_distribution(self, **kwargs) -> None:
-        """Show the distribution of the values of elements of the dissimilarity matrix.
-        """
+    # delete tag
+    # def show_sim_mat_distribution(self, **kwargs) -> None:
+    #     """Show the distribution of the values of elements of the dissimilarity matrix.
+    #     """
 
-        # figsize = kwargs.get('figsize', (4, 3))
-        title_size = kwargs.get("title_size", 60)
-        color = kwargs.get("color", "C0")
+    #     # figsize = kwargs.get('figsize', (4, 3))
+    #     title_size = kwargs.get("title_size", 60)
+    #     color = kwargs.get("color", "C0")
 
-        lower_triangular = np.tril(self.sim_mat)
-        lower_triangular = lower_triangular.flatten()
+    #     lower_triangular = np.tril(self.sim_mat)
+    #     lower_triangular = lower_triangular.flatten()
 
-        plt.figure()
-        plt.hist(lower_triangular, bins=100, color=color)
-        plt.title(f"Distribution of RDM ({self.name})", fontsize=title_size)
-        plt.xlabel("RDM value")
-        plt.ylabel("Count")
-        plt.grid(True)
-        plt.show()
-        plt.clf()
-        plt.close()
+    #     plt.figure()
+    #     plt.hist(lower_triangular, bins=100, color=color)
+    #     plt.title(f"Distribution of RDM ({self.name})", fontsize=title_size)
+    #     plt.xlabel("RDM value")
+    #     plt.ylabel("Count")
+    #     plt.grid(True)
+    #     plt.show()
+    #     plt.clf()
+    #     plt.close()
 
     def show_embedding(
         self,
@@ -506,6 +508,10 @@ class PairwiseAnalysis:
                     database=self.instance_name + "_" + self.config.init_mat_plan,
                     **self.config.db_params).render_as_string(hide_password=False)
 
+        # results
+        self.OT = None
+        self.OT_sorted = None
+
     def _change_types_to_numpy(self, *var):
         ret = []
         for a in var:
@@ -620,10 +626,6 @@ class PairwiseAnalysis:
         delete_results: bool = False,
         OT_format: str = "default",
         return_data: bool = False,
-        return_figure: bool = True,
-        show_log: bool = False,
-        fig_dir: str = None,
-        ticks: str = None,
         save_dataframe: bool = False,
         target_device: Optional[str] = None,
         sampler_seed: int = 42,
@@ -676,69 +678,32 @@ class PairwiseAnalysis:
         if delete_results:
             self.delete_prev_results()
 
+        # run gwot
         self.OT, df_trial = self._entropic_gw_alignment(
             compute_OT,
             target_device=target_device,
             sampler_seed=sampler_seed,
         )
 
-        if fig_dir is None:
-            fig_dir = self.figure_path
-
-            if not os.path.exists(fig_dir):
-                os.makedirs(fig_dir, exist_ok=True)
-
-        OT = self.sort_OT(
-            ot_to_plot = None,
-            OT_format = OT_format,
-        )
-
-        # OT = self.show_OT(
-        #     ot_to_plot = None,
-        #     title=f"$\Gamma$ ({self.pair_name.replace('_', ' ')})",
-        #     return_data=return_data,
-        #     return_figure=return_figure,
-        #     OT_format=OT_format,
-        #     visualization_config=visualization_config,
-        #     fig_dir=fig_dir,
-        #     ticks=ticks,
-        # )
-
-        # if show_log:
-        #     self.get_optimization_log(
-        #         fig_dir=fig_dir,
-        #         **visualization_config(),
-        #     )
-
         if save_dataframe:
             df_trial.to_csv(self.save_path + '/' + self.filename + '.csv')
 
-        return OT
-
-    def sort_OT(
-        self,
-        ot_to_plot: Optional[np.ndarray] = None,
-        OT_format: str = "default",
-    ) -> Any:
-        if ot_to_plot is None:
-            ot_to_plot = self.OT
-
-        if OT_format == "sorted" or OT_format == "both":
-            assert self.source.sorted_sim_mat is not None, "No label info to sort the 'sim_mat'."
-            OT_sorted = self.source.func_for_sort_sim_mat(ot_to_plot, category_idx_list=self.source.category_idx_list)
-
+        # sort OT
         if OT_format == "default":
-            return ot_to_plot
-
-        elif OT_format == "sorted":
-            return OT_sorted
-
-        elif OT_format == "both":
-            return ot_to_plot, OT_sorted
+            return self.OT
 
         else:
-            raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
+            assert self.source.sorted_sim_mat is not None, "No label info to sort the 'sim_mat'."
+            self.OT_sorted = self.source.func_for_sort_sim_mat(self.OT, category_idx_list=self.source.category_idx_list)
 
+            if OT_format == "sorted":
+                return self.OT_sorted
+
+            elif OT_format == "both":
+                return self.OT, self.OT_sorted
+
+            else:
+                ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
 
     def delete_prev_results(self) -> None:
         """
@@ -1010,112 +975,6 @@ class PairwiseAnalysis:
 
         plt.clf()
         plt.close()
-
-    def show_OT(
-        self,
-        ot_to_plot: Optional[np.ndarray] = None,
-        title: Optional[str] = None,
-        OT_format: str = "default",
-        return_data: bool = False,
-        return_figure: bool = True,
-        visualization_config: 'VisualizationConfig' = VisualizationConfig(),
-        fig_dir: Optional[str] = None,
-        ticks: Optional[str] = None
-    ) -> Any:
-        """Visualize the OT.
-
-        Args:
-            ot_to_plot (Optional[np.ndarray], optional):
-                the OT to visualize. Defaults to None.
-                If None, the OT computed as GWOT will be used.
-
-            title (str, optional):
-                the title of OT figure.
-                Defaults to None. If None, this will be automatically defined.
-
-            OT_format (str, optional):
-                format of sim_mat to visualize.
-                Options are "default", "sorted", and "both". Defaults to "default".
-
-             return_data (bool, optional):
-                return the computed OT. Defaults to False.
-
-            return_figure (bool, optional):
-                make the result figures or not. Defaults to True.
-
-            visualization_config (VisualizationConfig, optional):
-                container of parameters used for figure. Defaults to VisualizationConfig().
-
-            fig_dir (Optional[str], optional):
-                you can define the path to which you save the figures (.png).
-                If None, the figures will be saved in the same subfolder in "results_dir". Defaults to None.
-
-            ticks (Optional[str], optional):
-                you can use "objects" or "category (if existed)" or "None". Defaults to None.
-
-        Returns:
-            OT : the result of GWOT or sorted OT. This depends on OT_format.
-
-        Raises:
-            ValueError: If an invalid OT_format is provided.
-        """
-        if ot_to_plot is None:
-            ot_to_plot = self.OT
-
-        if OT_format == "sorted" or OT_format == "both":
-            assert self.source.sorted_sim_mat is not None, "No label info to sort the 'sim_mat'."
-            OT_sorted = self.source.func_for_sort_sim_mat(ot_to_plot, category_idx_list=self.source.category_idx_list)
-
-        if return_figure:
-            save_file = self.data_name + "_" + self.pair_name
-            if fig_dir is not None:
-                fig_ext=visualization_config.visualization_params["fig_ext"]
-                fig_path = os.path.join(fig_dir, f"{save_file}.{fig_ext}")
-            else:
-                fig_path = None
-
-            if OT_format == "default" or OT_format == "both":
-                if OT_format == "default":
-                    assert self.source.category_name_list is None, "please set the 'sim_mat_format = sorted'. "
-
-                visualize_functions.show_heatmap(
-                    ot_to_plot,
-                    title=title,
-                    save_file_name=fig_path,
-                    ticks=ticks,
-                    category_name_list=None,
-                    num_category_list=None,
-                    object_labels=self.source.object_labels,
-                    **visualization_config(),
-                )
-
-            elif OT_format == "sorted" or OT_format == "both":
-                visualize_functions.show_heatmap(
-                    OT_sorted,
-                    title=title,
-                    save_file_name=fig_path,
-                    ticks=ticks,
-                    category_name_list=self.source.category_name_list,
-                    num_category_list=self.source.num_category_list,
-                    object_labels=self.source.object_labels,
-                    **visualization_config(),
-                )
-
-            else:
-                raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
-
-        if return_data:
-            if OT_format == "default":
-                return ot_to_plot
-
-            elif OT_format == "sorted":
-                return OT_sorted
-
-            elif OT_format == "both":
-                return ot_to_plot, OT_sorted
-
-            else:
-                raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
 
     def eval_accuracy(
         self,
@@ -1584,6 +1443,138 @@ class PairwiseAnalysis:
         plt.clf()
         plt.close()
 
+    # delete tag
+    # def sort_OT(
+    #     self,
+    #     ot_to_plot: Optional[np.ndarray] = None,
+    #     OT_format: str = "default",
+    # ) -> Any:
+    #     if ot_to_plot is None:
+    #         ot_to_plot = self.OT
+
+    #     if OT_format == "sorted" or OT_format == "both":
+    #         assert self.source.sorted_sim_mat is not None, "No label info to sort the 'sim_mat'."
+    #         OT_sorted = self.source.func_for_sort_sim_mat(ot_to_plot, category_idx_list=self.source.category_idx_list)
+
+    #     if OT_format == "default":
+    #         return ot_to_plot
+
+    #     elif OT_format == "sorted":
+    #         return OT_sorted
+
+    #     elif OT_format == "both":
+    #         return ot_to_plot, OT_sorted
+
+    #     else:
+    #         raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
+
+    # delete tag
+    # def show_OT(
+    #     self,
+    #     ot_to_plot: Optional[np.ndarray] = None,
+    #     title: Optional[str] = None,
+    #     OT_format: str = "default",
+    #     return_data: bool = False,
+    #     return_figure: bool = True,
+    #     visualization_config: 'VisualizationConfig' = VisualizationConfig(),
+    #     fig_dir: Optional[str] = None,
+    #     ticks: Optional[str] = None
+    # ) -> Any:
+    #     """Visualize the OT.
+
+    #     Args:
+    #         ot_to_plot (Optional[np.ndarray], optional):
+    #             the OT to visualize. Defaults to None.
+    #             If None, the OT computed as GWOT will be used.
+
+    #         title (str, optional):
+    #             the title of OT figure.
+    #             Defaults to None. If None, this will be automatically defined.
+
+    #         OT_format (str, optional):
+    #             format of sim_mat to visualize.
+    #             Options are "default", "sorted", and "both". Defaults to "default".
+
+    #          return_data (bool, optional):
+    #             return the computed OT. Defaults to False.
+
+    #         return_figure (bool, optional):
+    #             make the result figures or not. Defaults to True.
+
+    #         visualization_config (VisualizationConfig, optional):
+    #             container of parameters used for figure. Defaults to VisualizationConfig().
+
+    #         fig_dir (Optional[str], optional):
+    #             you can define the path to which you save the figures (.png).
+    #             If None, the figures will be saved in the same subfolder in "results_dir". Defaults to None.
+
+    #         ticks (Optional[str], optional):
+    #             you can use "objects" or "category (if existed)" or "None". Defaults to None.
+
+    #     Returns:
+    #         OT : the result of GWOT or sorted OT. This depends on OT_format.
+
+    #     Raises:
+    #         ValueError: If an invalid OT_format is provided.
+    #     """
+    #     if ot_to_plot is None:
+    #         ot_to_plot = self.OT
+
+    #     if OT_format == "sorted" or OT_format == "both":
+    #         assert self.source.sorted_sim_mat is not None, "No label info to sort the 'sim_mat'."
+    #         OT_sorted = self.source.func_for_sort_sim_mat(ot_to_plot, category_idx_list=self.source.category_idx_list)
+
+    #     if return_figure:
+    #         save_file = self.data_name + "_" + self.pair_name
+    #         if fig_dir is not None:
+    #             fig_ext=visualization_config.visualization_params["fig_ext"]
+    #             fig_path = os.path.join(fig_dir, f"{save_file}.{fig_ext}")
+    #         else:
+    #             fig_path = None
+
+    #         if OT_format == "default" or OT_format == "both":
+    #             if OT_format == "default":
+    #                 assert self.source.category_name_list is None, "please set the 'sim_mat_format = sorted'. "
+
+    #             visualize_functions.show_heatmap(
+    #                 ot_to_plot,
+    #                 title=title,
+    #                 save_file_name=fig_path,
+    #                 ticks=ticks,
+    #                 category_name_list=None,
+    #                 num_category_list=None,
+    #                 object_labels=self.source.object_labels,
+    #                 **visualization_config(),
+    #             )
+
+    #         elif OT_format == "sorted" or OT_format == "both":
+    #             visualize_functions.show_heatmap(
+    #                 OT_sorted,
+    #                 title=title,
+    #                 save_file_name=fig_path,
+    #                 ticks=ticks,
+    #                 category_name_list=self.source.category_name_list,
+    #                 num_category_list=self.source.num_category_list,
+    #                 object_labels=self.source.object_labels,
+    #                 **visualization_config(),
+    #             )
+
+    #         else:
+    #             raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
+
+    #     if return_data:
+    #         if OT_format == "default":
+    #             return ot_to_plot
+
+    #         elif OT_format == "sorted":
+    #             return OT_sorted
+
+    #         elif OT_format == "both":
+    #             return ot_to_plot, OT_sorted
+
+    #         else:
+    #             raise ValueError("OT_format must be either 'default', 'sorted', or 'both'.")
+
 
 class AlignRepresentations:
     """This object has methods for conducting N groups level analysis and corresponding results.
@@ -1674,6 +1665,10 @@ class AlignRepresentations:
         self.set_specific_eps_list(specific_eps_list)
 
         self.set_pair_computed(pairs_computed)
+
+        # results
+        self.OT_list = [None] * len(self.all_pair_list)
+        self.OT_sorted_list = [None] * len(self.all_pair_list)
 
     def set_pair_computed(self, pairs_computed: Optional[List[str]]) -> None:
         """User can only re-run the optimization for specific pairs by using `set_pair_computed`.
@@ -1846,54 +1841,54 @@ class AlignRepresentations:
             self.RSA_corr[pairwise.pair_name] = corr
             print(f"Correlation {pairwise.pair_name.replace('_', ' ')} : {corr}")
 
-    def show_sim_mat(
-        self,
-        sim_mat_format: str = "default",
-        visualization_config: VisualizationConfig = VisualizationConfig(),
-        visualization_config_hist: VisualizationConfig = VisualizationConfig(),
-        fig_dir: Optional[str] = None,
-        show_distribution: bool = True,
-        ticks: Optional[str] = None,
-    ) -> None:
-        """Show the dissimilarity matrix of the representation.
+    # delete dag
+    # def show_sim_mat(
+    #     self,
+    #     sim_mat_format: str = "default",
+    #     visualization_config: VisualizationConfig = VisualizationConfig(),
+    #     visualization_config_hist: VisualizationConfig = VisualizationConfig(),
+    #     fig_dir: Optional[str] = None,
+    #     show_distribution: bool = True,
+    #     ticks: Optional[str] = None,
+    # ) -> None:
+    #     """Show the dissimilarity matrix of the representation.
 
-        Args:
-            sim_mat_format (str, optional):
-                "default", "sorted", or "both". If "sorted" is selected, the rearranged matrix is shown. Defaults to "default".
-            visualization_config (VisualizationConfig, optional):
-                container of parameters used for figure. Defaults to VisualizationConfig().
-            visualization_config_hist (VisualizationConfig, optional):
-                container of parameters used for histogram figure. Defaults to VisualizationConfig().
-            fig_dir (Optional[str], optional):
-                The directory for saving the figure. Defaults to None.
-            show_distribution (bool, optional):
-                show the histogram figures. Defaults to True.
-            ticks (Optional[str], optional):
-                "numbers", "objects", or "category". Defaults to None.
-        """
+    #     Args:
+    #         sim_mat_format (str, optional):
+    #             "default", "sorted", or "both". If "sorted" is selected, the rearranged matrix is shown. Defaults to "default".
+    #         visualization_config (VisualizationConfig, optional):
+    #             container of parameters used for figure. Defaults to VisualizationConfig().
+    #         visualization_config_hist (VisualizationConfig, optional):
+    #             container of parameters used for histogram figure. Defaults to VisualizationConfig().
+    #         fig_dir (Optional[str], optional):
+    #             The directory for saving the figure. Defaults to None.
+    #         show_distribution (bool, optional):
+    #             show the histogram figures. Defaults to True.
+    #         ticks (Optional[str], optional):
+    #             "numbers", "objects", or "category". Defaults to None.
+    #     """
 
-        if fig_dir is None:
-            fig_dir = self.main_results_dir + "/" + self.data_name + "/individual_sim_mat/"
-            os.makedirs(fig_dir, exist_ok=True)
+    #     if fig_dir is None:
+    #         fig_dir = self.main_results_dir + "/" + self.data_name + "/individual_sim_mat/"
+    #         os.makedirs(fig_dir, exist_ok=True)
 
-        for representation in self.representations_list:
-            representation.show_sim_mat(
-                sim_mat_format=sim_mat_format,
-                visualization_config=visualization_config,
-                fig_dir=fig_dir,
-                ticks=ticks,
-            )
+    #     for representation in self.representations_list:
+    #         representation.show_sim_mat(
+    #             sim_mat_format=sim_mat_format,
+    #             visualization_config=visualization_config,
+    #             fig_dir=fig_dir,
+    #             ticks=ticks,
+    #         )
 
-            if show_distribution:
-                representation.show_sim_mat_distribution(
-                    **visualization_config_hist())
+    #         if show_distribution:
+    #             representation.show_sim_mat_distribution(
+    #                 **visualization_config_hist())
 
     def _single_computation(
         self,
         compute_OT=False,
         delete_results=False,
         return_data=False,
-        return_figure=True,
         OT_format="default",
         show_log=False,
         fig_dir=None,
@@ -1905,15 +1900,15 @@ class AlignRepresentations:
     ):
 
         OT_list = []
+        OT_sorted_list = []
         for pairwise in self.pairwise_list:
             if change_sampler_seed:
                 sampler_seed += 1
 
-            OT = pairwise.run_entropic_gwot(
+            OT, OT_sorted = pairwise.run_entropic_gwot(
                 compute_OT=compute_OT,
                 delete_results=delete_results,
                 return_data=return_data,
-                return_figure=return_figure,
                 OT_format=OT_format,
                 show_log=show_log,
                 fig_dir=fig_dir,
@@ -1924,6 +1919,7 @@ class AlignRepresentations:
             )
 
             OT_list.append(OT)
+            OT_sorted_list.append(OT_sorted)
 
         return OT_list
 
@@ -2056,7 +2052,7 @@ class AlignRepresentations:
                     future.result()
 
             if return_figure or return_data:
-                OT_list = self._single_computation(
+                OT_list, OT_sorted_list = self._single_computation(
                     compute_OT=False,
                     delete_results=False,
                     return_data=return_data,
@@ -2069,7 +2065,7 @@ class AlignRepresentations:
                 )
 
         if self.config.n_jobs == 1:
-            OT_list = self._single_computation(
+            OT_list, OT_sorted_list = self._single_computation(
                 compute_OT=compute_OT,
                 delete_results=delete_results,
                 return_data=return_data,
@@ -2086,6 +2082,8 @@ class AlignRepresentations:
         if self.config.n_jobs < 1:
             raise ValueError("n_jobs > 0 is required in this toolbox.")
 
+        self.OT_list = OT_list
+        self.OT_sorted_list = OT_sorted_list
 
         if return_data:
             return OT_list
