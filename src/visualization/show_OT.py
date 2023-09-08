@@ -1,13 +1,10 @@
 import os
-from typing import Any, List, Optional, Tuple
+from typing import List, Optional
 
 import matplotlib
-import matplotlib.pyplot as plt
-import numpy as np
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from ..align_representations import AlignRepresentations, PairwiseAnalysis
-from ..visualization import show_heatmap
+from .show_sim_mat import show_heatmap
 
 
 def show_OT(
@@ -15,8 +12,8 @@ def show_OT(
     OT_format: str = "default",
     ticks: Optional[str] = None,
     fig_dirs: Optional[List[str]] = None,
-    **kwargs
-) -> matplotlib.axes.Axes :
+    **kwargs,
+) -> matplotlib.axes.Axes:
     """Visualize the OT.
 
     Args:
@@ -53,7 +50,7 @@ def show_OT(
 
     Raises:
         ValueError: If an invalid OT_format is provided.
-     """
+    """
 
     # plot OTs
     if fig_dirs is None:
@@ -67,8 +64,8 @@ def show_OT(
             title=f"$\Gamma$ ({pairwise.pair_name.replace('_', ' ')})",
             ticks=ticks,
             fig_dir=fig_dir,
-            **kwargs
-            )
+            **kwargs,
+        )
         axes.append(ax)
 
     return axes
@@ -80,7 +77,7 @@ def show_OT_single(
     title: Optional[str] = None,
     ticks: Optional[str] = None,
     fig_dir: Optional[str] = None,
-    **kwargs
+    **kwargs,
 ) -> matplotlib.axes.Axes:
     # figure path setting
     if fig_dir is None:

@@ -23,19 +23,17 @@ from matplotlib.colors import LogNorm
 from scipy.spatial import distance
 from scipy.stats import pearsonr, spearmanr
 from sklearn import manifold
-from sqlalchemy import URL, create_engine
-from sqlalchemy_utils import create_database, database_exists, drop_database
+from sklearn.base import BaseEstimator, TransformerMixin
+from sqlalchemy import URL
+from sqlalchemy_utils import database_exists
 from tqdm.auto import tqdm
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
+from .embeddings import obtain_embedding
 from .gw_alignment import GW_Alignment
 from .histogram_matching import SimpleHistogramMatching
 from .utils import backend, gw_optimizer, visualize_functions
 
-
-class VisualizationConfig:
-    def __init__(self) -> None:
-        pass
 
 
 # %%
@@ -273,7 +271,6 @@ class Representation:
     def show_embedding(
         self,
         dim: int = 3,
-        visualization_config: VisualizationConfig = VisualizationConfig(),
         category_name_list: Optional[List[str]] = None,
         num_category_list: Optional[List[int]] = None,
         category_idx_list: Optional[List[int]] = None,
@@ -651,9 +648,10 @@ class PairwiseAnalysis:
             elif metric == "pearson":
                 corr, _ = pearsonr(upper_tri_a, upper_tri_b)
 
+        # delete this method
         elif method == "all":
             if metric == "spearman":
-                corr, _ = spearmanr(a.flatten(), b.flatten())
+                corr, _ = (a.flspearmanratten(), b.flatten())
             elif metric == "pearson":
                 corr, _ = pearsonr(a.flatten(), b.flatten())
 
@@ -790,114 +788,6 @@ class PairwiseAnalysis:
                     dir_path = os.path.join(root, name)
                     os.rmdir(dir_path)
             shutil.rmtree(self.save_path)
-
-    def get_optimization_log(self, fig_dir: Optional[str] = None, **kwargs) -> pd.DataFrame:
-        """Show both the relationships between epsilons and GWD, and between accuracy and GWD
-
-        Args:
-            fig_dir (_type_, optional):
-                you can define the path to which you save the figures (.png).
-                If None, the figures will be saved in the same subfolder in "results_dir". Defaults to None.
-
-        Returns:
-            df_trial (pd.DataFrame):
-                dataframe of the optimization log
-        """
-        figsize = kwargs.get('figsize', (8,6))
-        fig_ext = kwargs.get('fig_ext', 'png')
-        title_size = kwargs.get('title_size', 20)
-        marker_size = kwargs.get('marker_size', 20)
-        show_figure = kwargs.get('show_figure', False)
-        plot_eps_log = kwargs.get('plot_eps_log', False)
-
-        cmap = kwargs.get("cmap", 'viridis')
-        cbar_label_size = kwargs.get("cbar_label_size", 20)
-        cbar_ticks_size = kwargs.get("cbar_ticks_size", 20)
-        cbar_format = kwargs.get('cbar_format', None)
-
-        xticks_rotation = kwargs.get("xticks_rotation", 0)
-
-        xticks_size = kwargs.get("xticks_size", 10)
-        yticks_size = kwargs.get("yticks_size", 10)
-
-        xlabel_size = kwargs.get("xlabel_size", 20)
-        ylabel_size = kwargs.get("ylabel_size", 20)
-
-        lim_eps = kwargs.get("lim_eps", None)
-        lim_gwd = kwargs.get("lim_gwd", None)
-        lim_acc = kwargs.get("lim_acc", None)
-
-        study = self._run_optimization(compute_OT = False)
-        df_trial = study.trials_dataframe()
-
-        # figure plotting epsilon as x-axis and GWD as y-axis
-        plt.figure(figsize=figsize)
-        plt.title(f"epsilon - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
-        plt.scatter(df_trial["params_eps"], df_trial["value"], c = 100 * df_trial["user_attrs_best_acc"], s = marker_size, cmap=cmap)
-
-        plt.xlabel("epsilon", fontsize=xlabel_size)
-        plt.ylabel("GWD", fontsize=ylabel_size)
-
-        if lim_eps is not None:
-            plt.xlim(lim_eps)
-
-        if lim_gwd is not None:
-            plt.ylim(lim_gwd)
-
-        if plot_eps_log:
-            plt.xscale('log')
-
-        plt.tick_params(axis='x', which='both', labelsize=xticks_size, rotation=xticks_rotation)
-        plt.tick_params(axis='y', which='major', labelsize=yticks_size)
-
-        plt.grid(True, which = 'both')
-        cbar = plt.colorbar()
-        cbar.set_label(label='Matching Rate (%)', size=cbar_label_size)
-        cbar.ax.tick_params(labelsize=cbar_ticks_size)
-
-        plt.tight_layout()
-
-        if fig_dir is None:
-            fig_dir = self.figure_path
-
-        plt.savefig(os.path.join(fig_dir, f"Optim_log_eps_GWD_{self.pair_name}.{fig_ext}"))
-
-        if show_figure:
-            plt.show()
-
-        plt.clf()
-        plt.close()
-
-        # figure plotting accuracy as x-axis and GWD as y-axis
-        plt.figure(figsize=figsize)
-        plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap)
-        plt.title(f"Matching Rate - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
-        plt.xlabel("Matching Rate (%)", fontsize=xlabel_size)
-        plt.xticks(fontsize=xticks_size)
-        plt.ylabel("GWD", fontsize=ylabel_size)
-        plt.yticks(fontsize=yticks_size)
-
-        cbar =  plt.colorbar(format = cbar_format)
-        cbar.set_label(label='epsilon', size=cbar_label_size)
-        cbar.ax.tick_params(labelsize=cbar_ticks_size)
-
-        plt.grid(True)
-
-        if lim_acc is not None:
-            plt.xlim(lim_acc)
-
-        if lim_gwd is not None:
-            plt.ylim(lim_gwd)
-
-        plt.tight_layout()
-
-        plt.savefig(os.path.join(fig_dir, f"acc_gwd_eps({self.pair_name}).{fig_ext}"))
-
-        if show_figure:
-            plt.show()
-
-        plt.clf()
-        plt.close()
 
     def eval_accuracy(
         self,
@@ -1226,7 +1116,6 @@ class PairwiseAnalysis:
         data_type: Optional[str] = None,
         ticks: Optional[str] = None,
         category_mat: Optional[np.ndarray] = None,
-        visualization_config: VisualizationConfig = VisualizationConfig()
     ) -> None:
         """Run GWOT without entropy by setting the optimized entropic GWOT as the initial plan.
 
@@ -1461,6 +1350,14 @@ class AlignRepresentations:
         self.OT_list = [None] * len(self.all_pair_list)
         self.OT_sorted_list = [None] * len(self.all_pair_list)
 
+        # evaluation
+        self.top_k_accuracy = pd.DataFrame()
+        self.k_nearest_matching_rate = pd.DataFrame()
+
+        # embedding
+        self.low_embedding_list = [None] * len(self.representations_list)
+        self.embedding_transformer = None
+
     def set_pair_computed(self, pairs_computed: Optional[List[str]]) -> None:
         """User can only re-run the optimization for specific pairs by using `set_pair_computed`.
 
@@ -1631,49 +1528,6 @@ class AlignRepresentations:
             corr = pairwise.RSA(metric=metric, method=method)
             self.RSA_corr[pairwise.pair_name] = corr
             print(f"Correlation {pairwise.pair_name.replace('_', ' ')} : {corr}")
-
-    # delete dag
-    # def show_sim_mat(
-    #     self,
-    #     sim_mat_format: str = "default",
-    #     visualization_config: VisualizationConfig = VisualizationConfig(),
-    #     visualization_config_hist: VisualizationConfig = VisualizationConfig(),
-    #     fig_dir: Optional[str] = None,
-    #     show_distribution: bool = True,
-    #     ticks: Optional[str] = None,
-    # ) -> None:
-    #     """Show the dissimilarity matrix of the representation.
-
-    #     Args:
-    #         sim_mat_format (str, optional):
-    #             "default", "sorted", or "both". If "sorted" is selected, the rearranged matrix is shown. Defaults to "default".
-    #         visualization_config (VisualizationConfig, optional):
-    #             container of parameters used for figure. Defaults to VisualizationConfig().
-    #         visualization_config_hist (VisualizationConfig, optional):
-    #             container of parameters used for histogram figure. Defaults to VisualizationConfig().
-    #         fig_dir (Optional[str], optional):
-    #             The directory for saving the figure. Defaults to None.
-    #         show_distribution (bool, optional):
-    #             show the histogram figures. Defaults to True.
-    #         ticks (Optional[str], optional):
-    #             "numbers", "objects", or "category". Defaults to None.
-    #     """
-
-    #     if fig_dir is None:
-    #         fig_dir = self.main_results_dir + "/" + self.data_name + "/individual_sim_mat/"
-    #         os.makedirs(fig_dir, exist_ok=True)
-
-    #     for representation in self.representations_list:
-    #         representation.show_sim_mat(
-    #             sim_mat_format=sim_mat_format,
-    #             visualization_config=visualization_config,
-    #             fig_dir=fig_dir,
-    #             ticks=ticks,
-    #         )
-
-    #         if show_distribution:
-    #             representation.show_sim_mat_distribution(
-    #                 **visualization_config_hist())
 
     def _single_computation(
         self,
@@ -1867,7 +1721,6 @@ class AlignRepresentations:
         OT_format: str = "default",
         ticks: Optional[str] = None,
         category_mat: Optional[Any] = None,
-        visualization_config: VisualizationConfig = VisualizationConfig(),
     ) -> None:
         """Run GWOT without entropy by setting the optimized entropic GWOT as the initial plan.
 
@@ -1979,31 +1832,6 @@ class AlignRepresentations:
                 continue
             pairwise.delete_prev_results()
 
-    def show_optimization_log(
-        self,
-        fig_dir: Optional[str] = None,
-        visualization_config: VisualizationConfig = VisualizationConfig()
-    ) -> None:
-        """Show both the relationships between epsilons and GWD, and between accuracy and GWD
-
-        Args:
-            fig_dir (Optional[str], optional):
-                you can define the path to which you save the figures (.png).
-                If None, the figures will be saved in the same subfolder in "results_dir". Defaults to None.
-            visualization_config (VisualizationConfig, optional):
-                Container of parameters used for figure. Defaults to VisualizationConfig().
-        """
-
-        # default setting
-        plt.rcParams.update(plt.rcParamsDefault)
-        plt.style.use("seaborn-darkgrid")
-
-        for pairwise in self.pairwise_list:
-            pairwise.get_optimization_log(
-                fig_dir=fig_dir,
-                **visualization_config(),
-            )
-
     def calc_barycenter(self, X_init=None):
         embedding_list = [representation.embedding for representation in self.representations_list]
 
@@ -2031,7 +1859,6 @@ class AlignRepresentations:
         return_data: bool = False,
         return_figure: bool = True,
         OT_format: str = "default",
-        visualization_config: VisualizationConfig = VisualizationConfig(),
         show_log: bool = False,
         fig_dir: Optional[str] = None,
         ticks: Optional[str] = None
@@ -2234,7 +2061,7 @@ class AlignRepresentations:
         if return_dataframe:
             return accuracy
 
-    def _get_dataframe(self, eval_type="ot_plan", concat=True):
+    def _get_dataframe(self, eval_type="ot_plan", melt=True):
         if eval_type == "ot_plan":
             df = self.top_k_accuracy
         elif eval_type == "k_nearest":
@@ -2245,65 +2072,10 @@ class AlignRepresentations:
         cols = [col for col in df.columns if "top_n" not in col]
         df = df[cols]
 
-        if concat:
-            df = pd.concat([df[i] for i in df.columns], axis=0)
-            df = df.rename("matching rate")
+        if melt:
+            df = pd.melt(df.reset_index(), id_vars=['top_n'], value_name='matching rate').drop(columns=['variable'])
+
         return df
-
-    def plot_accuracy(
-        self,
-        eval_type: str = "ot_plan",
-        fig_dir: Optional[str] = None,
-        fig_name: str = "Accuracy_ot_plan.png",
-        scatter: bool = True
-    ) -> None:
-        """Plot the accuracy of the unsupervised alignment for each top_k
-
-        Args:
-            eval_type (str, optional):
-                Specifies the method used to evaluate accuracy. Can be "ot_plan", "k_nearest", or "category".
-                Defaults to "ot_plan".
-
-            fig_dir (Optional[str], optional):
-                Directory path where the generated figure will be saved. If None, the figure will not be saved
-                but displayed. Defaults to None.
-
-            fig_name (str, optional):
-                Name of the saved figure if `fig_dir` is specified. Defaults to "Accuracy_ot_plan.png".
-
-            scatter (bool, optional):
-                If True, the accuracy will be visualized as a swarm plot. Otherwise, a line plot will be used.
-                Defaults to True.
-        """
-        # default setting
-        plt.rcParams.update(plt.rcParamsDefault)
-        plt.style.use("seaborn-darkgrid")
-        plt.figure(figsize=(5, 3))
-
-        if scatter:
-            df = self._get_dataframe(eval_type, concat=True)
-            sns.set_style("darkgrid")
-            sns.set_palette("pastel")
-            sns.swarmplot(data=pd.DataFrame(df), x="top_n", y="matching rate", size=5, dodge=True)
-
-        else:
-            df = self._get_dataframe(eval_type, concat=False)
-            for group in df.columns:
-                plt.plot(df.index, df[group], c="blue")
-
-        plt.ylim(0, 100)
-        plt.title(eval_type)
-        plt.xlabel("top k")
-        plt.ylabel("Matching rate (%)")
-        # plt.legend(loc = "best")
-        plt.tick_params(axis="both", which="major")
-        plt.subplots_adjust(left=0.2, right=0.9, bottom=0.2)
-        if fig_dir is not None:
-            plt.savefig(os.path.join(fig_dir, fig_name))
-        plt.show()
-
-        plt.clf()
-        plt.close()
 
     def _procrustes_to_pivot(self, pivot):
         the_others, pivot_idx_list = self._check_pairs(pivot)
@@ -2339,12 +2111,62 @@ class AlignRepresentations:
 
         return the_others, pivot_idx_list
 
+    def calc_embedding(
+        self,
+        dim: int,
+        pivot: Union[int, str] = 0,
+        emb_name: Optional[str] = "PCA",
+        emb_transformer: Optional[TransformerMixin] = None,
+        category_idx_list: Optional[List[int]] = None,
+        return_data: bool = False,
+        **kwargs
+    ) -> None:
+
+        # procrustes alignment
+        if pivot != "barycenter":
+            self._procrustes_to_pivot(pivot)
+            #for i in range(len(self.pairwise_list) // 2):
+            #    pair = self.pairwise_list[i]
+            #    pair.source.embedding = pair.get_new_source_embedding()
+        else:
+            assert self.barycenter is not None
+
+        # get sort idx)
+        sort_idx = np.concatenate(category_idx_list) if category_idx_list is not None else None
+
+        if (sort_idx is None) and (self.representations_list[0].category_idx_list is not None):
+            sort_idx = np.concatenate(self.representations_list[0].category_idx_list)
+
+        if sort_idx is None:
+            sort_idx = np.arange(self.representations_list[0].embedding.shape[0])
+
+        # get embedding
+        embedding_list = []
+        for i in range(len(self.representations_list)):
+            embedding = self.representations_list[i].embedding[sort_idx, :]
+            embedding_list.append(embedding)
+
+        # get low dimensional embedding
+        low_embedding_list, embedding_transformer = obtain_embedding(
+            embedding_list,
+            dim=dim,
+            emb_name=emb_name,
+            emb_transformer=emb_transformer,
+            **kwargs
+        )
+
+        # save
+        self.low_embedding_list = low_embedding_list
+        self.embedding_transformer = embedding_transformer
+
+        if return_data:
+            return low_embedding_list
+
     def visualize_embedding(
         self,
         dim: int,
         pivot: Union[int, str] = 0,
         returned: str = "figure",
-        visualization_config: VisualizationConfig = VisualizationConfig(),
         category_name_list: Optional[List[str]] = None,
         num_category_list: Optional[List[int]] = None,
         category_idx_list: Optional[List[int]] = None,
@@ -2352,6 +2174,9 @@ class AlignRepresentations:
         legend: bool = True,
         fig_dir: Optional[str] = None,
         fig_name: str = "Aligned_embedding",
+        fig_ext: str = "svg",
+        emb_name: Optional[str] = "PCA",
+        emb_transformer: Optional[TransformerMixin] = None,
     ) -> Optional[Union[plt.Figure, List[np.ndarray]]]:
         """Visualizes the aligned embedding in the specified number of dimensions.
 
@@ -2385,11 +2210,12 @@ class AlignRepresentations:
             on the `fig_dir` parameter. If `returned` is "row_data", a list of embeddings is returned.
         """
 
+        # path setting
         if fig_dir is None:
-            fig_dir = self.main_results_dir + "/" + self.data_name + "/visualize_embedding/"
+            fig_dir = self.main_results_dir + "/visualize_embedding/"
             os.makedirs(fig_dir, exist_ok=True)
 
-        fig_path = os.path.join(fig_dir, f"{fig_name}.{visualization_config.visualization_params['fig_ext']}")
+        fig_path = os.path.join(fig_dir, f"{fig_name}.{fig_ext}")
 
         if pivot != "barycenter":
             self._procrustes_to_pivot(pivot)
@@ -2422,7 +2248,7 @@ class AlignRepresentations:
             )
 
             visualize_embedding.plot_embedding(
-                name_list=name_list, title=title, legend=legend, save_dir=fig_path, **visualization_config()
+                name_list=name_list, title=title, legend=legend, save_dir=fig_path,
             )
 
         elif returned == "row_data":
