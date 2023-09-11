@@ -2125,8 +2125,7 @@ class AlignRepresentations:
             if self.config.multi_gpu != False:
                 warnings.warn("numpy doesn't use GPU. Please 'multi_GPU = False'.", UserWarning)
             
-            if self.config.device != "cpu":
-                assert "numpy doesn't use GPU. Please 'device = cpu'."
+            assert self.config.device == "cpu", "numpy doesn't use GPU. Please 'device = cpu'."
             
             target_device = self.config.device
 
