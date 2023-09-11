@@ -2119,6 +2119,16 @@ class AlignRepresentations:
             first_sampler_seed = fix_sampler_seed
         else:
             raise ValueError("please 'sampler_seed' = True or False or int > 0.")
+        
+        
+        if self.config.to_types == "numpy":
+            if self.config.multi_gpu != False:
+                warnings.warn("numpy doesn't use GPU. Please 'multi_GPU = False'.", UserWarning)
+            
+            if self.config.device != "cpu":
+                assert "numpy doesn't use GPU. Please 'device = cpu'."
+            
+            target_device = self.config.device
 
         if self.config.n_jobs > 1:
             OT_list = []
@@ -2133,22 +2143,18 @@ class AlignRepresentations:
 
             with pool:
                 for pair_number in range(len(self.pairwise_list)):
+                    
+                    if self.config.to_types == "torch":
+                        if self.config.multi_gpu:
+                            target_device = "cuda:" + str(pair_number % torch.cuda.device_count())
+                        else:
+                            target_device = self.config.device
 
-                    if self.config.multi_gpu:
-                        target_device = "cuda:" + str(pair_number % torch.cuda.device_count())
-                    else:
-                        target_device = self.config.device
-
-                    if isinstance(self.config.multi_gpu, list):
-                        gpu_idx = pair_number % len(self.config.multi_gpu)
-                        target_device = "cuda:" + str(self.config.multi_gpu[gpu_idx])
+                        if isinstance(self.config.multi_gpu, list):
+                            gpu_idx = pair_number % len(self.config.multi_gpu)
+                            target_device = "cuda:" + str(self.config.multi_gpu[gpu_idx])
 
                     pairwise = self.pairwise_list[pair_number]
-
-                    if self.config.to_types == "numpy":
-                        if self.config.multi_gpu != False:
-                            warnings.warn("numpy doesn't use GPU. Please 'multi_GPU = False'.", UserWarning)
-                        target_device = self.config.device
 
                     if change_sampler_seed:
                         sampler_seed = first_sampler_seed + pair_number
