@@ -1,33 +1,33 @@
+# Standard Library
+import colorsys
 import os
 from typing import List, Optional, Tuple
 
-import colorsys
+# Third Party Library
 import matplotlib
-import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
+import numpy as np
 
+# Local Library
 from ..align_representations import AlignRepresentations, PairwiseAnalysis
 
 
 def plot_embedding(
     align_representation: AlignRepresentations,
     dim: int,
-    fig_dir: Optional[str] = None,
     category_name_list: Optional[List[str]] = None,
     num_category_list: Optional[List[int]] = None,
-    category_idx_list: Optional[List[int]] = None,
     title: Optional[str] = None,
     legend: bool = True,
     fig_name: str = "Aligned_embedding",
+    fig_dir: Optional[str] = None,
     **kwargs
 ) -> matplotlib.axes.Axes:
 
-    if category_idx_list is None:
-        if align_representation.representations_list[0].category_idx_list is not None:
+    if category_name_list is None:
+        if align_representation.representations_list[0].category_name_list is not None:
             category_name_list = align_representation.representations_list[0].category_name_list
             num_category_list = align_representation.representations_list[0].num_category_list
-            category_idx_list = align_representation.representations_list[0].category_idx_list
 
     name_list = []
     for representation in align_representation.representations_list:
@@ -41,8 +41,8 @@ def plot_embedding(
         num_category_list=num_category_list,
         title=title,
         has_legend=legend,
-        fig_dir=fig_dir,
         fig_name=fig_name,
+        fig_dir=fig_dir,
         **kwargs
     )
     return ax

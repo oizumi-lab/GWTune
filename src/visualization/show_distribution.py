@@ -1,11 +1,14 @@
+# Standard Library
 import os
 from typing import Any, List, Optional, Tuple
 
+# Third Party Library
 import matplotlib
 import matplotlib.pyplot as plt
 import scipy as sp
 import seaborn as sns
 
+# Local Library
 #%%
 from ..align_representations import AlignRepresentations
 
@@ -15,6 +18,32 @@ def show_distribution(
     fig_dir: Optional[str] = None,
     **kwargs
 ) -> List[matplotlib.axes.Axes]:
+    """Visualize the distribution of RDMs.
+
+    Args:
+        align_representation (AlignRepresentations):
+            AlignRepresentations object.
+        fig_dir (Optional[str], optional):
+            Directory to save the heatmap. If None, the heatmap won't be saved.
+            Defaults to None.
+
+    Keyword Args:
+        These keyword arguments are passed internally to `show_distribution_rep`.
+
+        figsize (Tuple[int, int], optional): The size of the figure. Defaults to (4, 3).
+        title_size (int, optional): The size of the title. Defaults to 20.
+        xlabel_size (int, optional): The size of the x-axis label. Defaults to 15.
+        ylabel_size (int, optional): The size of the y-axis label.  Defaults to 15.
+        alpha (float, optional): The transparency of the histogram. Defaults to 1..
+        bins (int, optional): The number of bins. Defaults to 100.
+        color (str, optional): The color of the histogram. Defaults to "C0".
+        font_size (int, optional): The size of the font. Defaults to 20.
+        fig_ext (str, optional): The extension of the figure. Defaults to "png".
+        show_figure (bool, optional): Show the figure or not. Defaults to True.
+
+    Returns:
+        List[matplotlib.axes.Axes]: histgram of the similarity matrices.
+    """
 
     if fig_dir is None:
         fig_dir = align_representation.main_results_dir + "/individual_distribution/"
@@ -51,6 +80,29 @@ def show_distribution_rep(
     fig_ext: str = "png",
     show_figure: bool = True,
 ) -> matplotlib.axes.Axes:
+    """Visualize the distribution of RDM of a single representation.
+
+    Args:
+        sim_mat (Any): The similarity matrix.
+        title (str): The title of the figure.
+        fig_name (Optional[str], optional): File name to save the figure. Defaults to None.
+        fig_dir (Optional[str], optional): Directory to save the figure. Defaults to None.
+
+    Keyword Args:
+        figsize (Tuple[int, int], optional): The size of the figure. Defaults to (4, 3).
+        title_size (int, optional): The size of the title. Defaults to 20.
+        xlabel_size (int, optional): The size of the x-axis label. Defaults to 15.
+        ylabel_size (int, optional): The size of the y-axis label.  Defaults to 15.
+        alpha (float, optional): The transparency of the histogram. Defaults to 1..
+        bins (int, optional): The number of bins. Defaults to 100.
+        color (str, optional): The color of the histogram. Defaults to "C0".
+        font_size (int, optional): The size of the font. Defaults to 20.
+        fig_ext (str, optional): The extension of the figure. Defaults to "png".
+        show_figure (bool, optional): Show the figure or not. Defaults to True.
+
+    Returns:
+        matplotlib.axes.Axes: Histogram of the similarity matrix.
+    """
 
     sim_vector = sp.spatial.distance.squareform(sim_mat, checks=False)
 

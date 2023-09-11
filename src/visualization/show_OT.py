@@ -1,8 +1,11 @@
+# Standard Library
 import os
 from typing import List, Optional
 
+# Third Party Library
 import matplotlib
 
+# Local Library
 from ..align_representations import AlignRepresentations, PairwiseAnalysis
 from .show_sim_mat import show_heatmap
 
@@ -17,9 +20,10 @@ def show_OT(
     """Visualize the OT.
 
     Args:
-        ot_to_plot (Optional[np.ndarray], optional):
-            the OT to visualize. Defaults to None.
-            If None, the OT computed as GWOT will be used.
+        align_representation (AlignRepresentations): AlignRepresentations object.
+        sim_mat_format (str, optional): _description_. Defaults to "default".
+        ticks (str, optional): _description_. Defaults to "number".
+        fig_dir (Optional[str], optional): _description_. Defaults to None.
 
         title (str, optional):
             the title of OT figure.

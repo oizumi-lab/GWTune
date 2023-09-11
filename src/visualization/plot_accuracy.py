@@ -1,10 +1,13 @@
+# Standard Library
 import os
 from typing import Optional, Tuple
 
+# Third Party Library
 import matplotlib
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+# Local Library
 from ..align_representations import AlignRepresentations
 
 

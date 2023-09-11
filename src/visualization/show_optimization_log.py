@@ -1,10 +1,13 @@
+# Standard Library
 import os
 from typing import List, Optional, Tuple
 
+# Third Party Library
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 
+# Local Library
 from ..align_representations import AlignRepresentations, PairwiseAnalysis
 
 
