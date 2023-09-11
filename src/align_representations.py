@@ -1491,6 +1491,8 @@ class AlignRepresentations:
         self,
         compute_OT: bool = False,
         delete_results: bool = False,
+        delete_database: bool = False,
+        delete_directory: bool = False,
         return_data: bool = False,
         OT_format: str = "default",
         save_dataframe: bool = False,
@@ -1589,6 +1591,8 @@ class AlignRepresentations:
                         pairwise.run_entropic_gwot,
                         compute_OT=compute_OT,
                         delete_results=delete_results,
+                        delete_database=delete_database,
+                        delete_directory=delete_directory,
                         OT_format="default",
                         save_dataframe=save_dataframe,
                         target_device=target_device,
@@ -1603,6 +1607,8 @@ class AlignRepresentations:
             OT_list, OT_sorted_list = self._single_computation(
                 compute_OT=False,
                 delete_results=False,
+                delete_database=delete_database,
+                delete_directory=delete_directory,
                 OT_format=OT_format,
                 save_dataframe=save_dataframe,
             )
@@ -1611,6 +1617,8 @@ class AlignRepresentations:
             OT_list, OT_sorted_list = self._single_computation(
                 compute_OT=compute_OT,
                 delete_results=delete_results,
+                delete_database=delete_database,
+                delete_directory=delete_directory,
                 OT_format=OT_format,
                 save_dataframe=save_dataframe,
                 change_sampler_seed=change_sampler_seed,
@@ -1639,6 +1647,8 @@ class AlignRepresentations:
         self,
         compute_OT: bool = False,
         delete_results: bool = False,
+        delete_database: bool = False,
+        delete_directory: bool = False,
         OT_format: str = "default",
         save_dataframe: bool = False,
         target_device: str = "cpu",
@@ -1670,6 +1680,8 @@ class AlignRepresentations:
             OT, OT_sorted = pairwise.run_entropic_gwot(
                 compute_OT=compute_OT,
                 delete_results=delete_results,
+                delete_database=delete_database,
+                delete_directory=delete_directory,
                 OT_format=OT_format,
                 save_dataframe=save_dataframe,
                 target_device=target_device,
@@ -2067,6 +2079,8 @@ class AlignRepresentations:
             pairwise.run_entropic_gwot(
                 compute_OT=compute_OT,
                 delete_results=delete_results,
+                delete_database=delete_database,
+                delete_directory=delete_directory,
                 return_data=return_data,
                 return_figure=return_figure,
                 OT_format=OT_format,

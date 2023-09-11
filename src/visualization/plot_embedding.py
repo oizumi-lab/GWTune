@@ -60,6 +60,11 @@ def plot_embedding(
     for representation in align_representation.representations_list:
         name_list.append(representation.name)
 
+    if fig_dir is None:
+        fig_dir = os.path.join(align_representation.main_results_dir, "visualize_embedding")
+        if not os.path.exists(fig_dir):
+            os.makedirs(fig_dir)
+
     ax = _plot_embedding(
         align_representation.low_embedding_list,
         dim=dim,
@@ -267,6 +272,7 @@ def _plot_embedding(
         cbar.set_label(colorbar_label, size=xlabel_size)
         cbar.ax.tick_params(labelsize=xlabel_size)
         cbar.mappable.set_clim(colorbar_range[0], colorbar_range[1])
+
 
     if fig_dir is not None:
         fig_path = os.path.join(fig_dir, f"{fig_name}.{fig_ext}")
