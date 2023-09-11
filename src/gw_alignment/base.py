@@ -3,16 +3,10 @@ import gc
 import os
 from typing import Any, List, Tuple
 
-import numpy as np
 import optuna
-import ot
-import seaborn as sns
 import torch
-from tqdm.auto import tqdm
 
 # warnings.simplefilter("ignore")
-from ..utils.backend import Backend
-from ..utils.init_matrix import InitMatrix
 from .main_compute import EntropicGWComputation, EntropicSemirelaxedGWComputation, GWComputation, EntropicPartialGWComputation
 
 # nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv

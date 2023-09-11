@@ -1,5 +1,4 @@
 # Local Library
-from .base import VisualizationConfig
 from .plot_accuracy import *
 from .plot_embedding import *
 from .show_distribution import *
