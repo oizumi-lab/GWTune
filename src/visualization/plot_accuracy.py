@@ -79,7 +79,7 @@ def plot_accuracy(
         if not os.path.exists(fig_dir):
             os.makedirs(fig_dir)
 
-    plt.savefig(os.path.join(fig_dir, f"{fig_name}_{eval_type}.{fig_ext}"))
+    plt.savefig(os.path.join(fig_dir, f"{fig_name}_{eval_type}.{fig_ext}"), bbox_inches='tight', dpi=300)
 
     if show_figure:
         plt.show()

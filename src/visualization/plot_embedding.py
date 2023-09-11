@@ -273,10 +273,9 @@ def _plot_embedding(
         cbar.ax.tick_params(labelsize=xlabel_size)
         cbar.mappable.set_clim(colorbar_range[0], colorbar_range[1])
 
-
     if fig_dir is not None:
         fig_path = os.path.join(fig_dir, f"{fig_name}.{fig_ext}")
-        plt.savefig(fig_path)
+        plt.savefig(fig_path, bbox_inches='tight', dpi=300)
 
     if show_figure:
         plt.show()

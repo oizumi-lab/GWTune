@@ -120,7 +120,7 @@ def show_distribution_rep(
     ax.set_ylabel("Count", fontsize=ylabel_size)
 
     if fig_dir is not None:
-        plt.savefig(os.path.join(fig_dir, fig_name + "." + fig_ext))
+        plt.savefig(os.path.join(fig_dir, fig_name + "." + fig_ext), bbox_inches='tight', dpi=300)
 
     if show_figure:
         plt.show()

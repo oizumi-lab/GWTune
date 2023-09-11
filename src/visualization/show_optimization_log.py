@@ -167,7 +167,9 @@ def show_optimization_log_rep(
 
     # save figure
     plt.savefig(
-        os.path.join(fig_dir, f"Optim_log_eps_GWD_{pairwise.pair_name}.{fig_ext}")
+        os.path.join(fig_dir, f"Optim_log_eps_GWD_{pairwise.pair_name}.{fig_ext}"),
+        bbox_inches='tight',
+        dpi=300
     )
 
     # show figure
@@ -211,7 +213,11 @@ def show_optimization_log_rep(
 
     plt.tight_layout()
 
-    plt.savefig(os.path.join(fig_dir, f"acc_gwd_eps({pairwise.pair_name}).{fig_ext}"))
+    plt.savefig(
+        os.path.join(fig_dir, f"acc_gwd_eps({pairwise.pair_name}).{fig_ext}"),
+        bbox_inches='tight',
+        dpi=300
+    )
 
     if show_figure:
         plt.show()
