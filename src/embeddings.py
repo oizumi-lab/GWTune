@@ -3,7 +3,6 @@ from typing import Any, List, Optional, Tuple
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE, Isomap, MDS
-from umap import UMAP
 
 
 def obtain_embedding(
@@ -51,9 +50,6 @@ def load_transformer(
 
     elif emb_name == "MDS":
         emb_transformer = MDS(n_components=dim, **kwargs)
-
-    elif emb_name == "UMAP":
-        emb_transformer = UMAP(n_components=dim, **kwargs)
 
     else:
         raise ValueError(f"Unknown embedding algorithm: {emb_name}")

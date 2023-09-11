@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Local Library
-from ..align_representations import AlignRepresentations, PairwiseAnalysis
+from ..align_representations import AlignRepresentations
 
 
 def plot_embedding(
@@ -23,6 +23,33 @@ def plot_embedding(
     fig_dir: Optional[str] = None,
     **kwargs
 ) -> matplotlib.axes.Axes:
+    """Plot the aligned embedding.
+
+    Args:
+        align_representation (AlignRepresentations):
+            AlignRepresentations object.
+        dim (int):
+            Dimension of the embedding. Can be 2 or 3.
+        category_name_list (Optional[List[str]], optional):
+            List of category names. Defaults to None.
+        num_category_list (Optional[List[int]], optional):
+            List of number of categories. Defaults to None.
+        title (Optional[str], optional):
+            Title of the plot. Defaults to None.
+        legend (bool, optional):
+            Whether to show the legend. Defaults to True.
+        fig_name (str, optional):
+            Name of the saved figure if `fig_dir` is specified. Defaults to "Aligned_embedding".
+        fig_dir (Optional[str], optional):
+            Directory to save the plot. If None, the figure won't be saved. Defaults to None.
+
+    Keyword Args:
+        These keyword arguments are passed internally to `_plot_embedding`.
+
+
+    Returns:
+        ax (matplotlib.axes.Axes): embedding plot.
+    """
 
     if category_name_list is None:
         if align_representation.representations_list[0].category_name_list is not None:
@@ -62,10 +89,10 @@ def _plot_embedding(
     xlabel: str = "PC1",
     ylabel: str = "PC2",
     zlabel: str = "PC3",
+    title_size: int = 60,
     xlabel_size: int = 25,
     ylabel_size: int = 25,
     zlabel_size: int = 25,
-    title_size: int = 60,
     legend_size: Optional[int] = None,
     color_labels: Optional[List[str]] = None,
     color_hue: Optional[str] = None,
@@ -77,9 +104,60 @@ def _plot_embedding(
     cmap: str = "viridis",
     alpha: float = 1,
     font: str = "Arial",
-    fig_ext: str = "svg",
+    fig_ext: str = "png",
     show_figure: bool = True
 ) -> matplotlib.axes.Axes:
+    """Plot the aligned embedding.
+
+    Args:
+        embedding_list (List[np.ndarray]):
+            low-dimensional embedding list
+        dim (int):
+            Dimension of the embedding. Can be 2 or 3.
+        name_list (List[str]):
+            List of names of the embedding/representation.
+        category_name_list (Optional[List[str]], optional):
+            List of category names. Defaults to None.
+        num_category_list (Optional[List[int]], optional):
+            List of number of categories. Defaults to None.
+        title (Optional[str], optional):
+            Title of the plot. Defaults to None.
+        has_legend (bool, optional):
+            Whether to show the legend. Defaults to True.
+        fig_name (str, optional):
+            Name of the saved figure if `fig_dir` is specified. Defaults to "Aligned_embedding".
+        fig_dir (Optional[str], optional):
+            Directory to save the plot. If None, the figure won't be saved. Defaults to None.
+
+    Keyword Args:
+        figsize (Tuple[int, int], optional): The size of the figure. Defaults to (15, 15).
+        xlabel (str, optional): The label of the x-axis. Defaults to "PC1".
+        ylabel (str, optional): The label of the y-axis. Defaults to "PC2".
+        zlabel (str, optional): The label of the z-axis. Defaults to "PC3".
+        title_size (int, optional): The size of the title. Defaults to 60.
+        xlabel_size (int, optional): The size of the x-axis label. Defaults to 25.
+        ylabel_size (int, optional): The size of the y-axis label. Defaults to 25.
+        zlabel_size (int, optional): The size of the z-axis label. Defaults to 25.
+        legend_size (Optional[int], optional): The size of the legend. Defaults to None.
+        color_labels (Optional[List[str]], optional): The color labels. Defaults to None.
+        color_hue (Optional[str], optional): The hue of the color labels. Defaults to None.
+        colorbar_label (Optional[str], optional): The label of the colorbar. Defaults to None.
+        colorbar_range (List[int], optional): The range of the colorbar. Defaults to [0, 1].
+        colorbar_shrink (float, optional): The shrink of the colorbar. Defaults to 0.8.
+        markers_list (Optional[List[str]], optional): The list of markers. Defaults to None.
+        marker_size (int, optional): The size of the markers. Defaults to 30.
+        cmap (str, optional): The colormap to use. Defaults to "viridis".
+        alpha (float, optional): The transparency of the markers. Defaults to 1.
+        font (str, optional): The font to use. Defaults to "Arial".
+        fig_ext (str, optional): The extension of the saved figure. Defaults to "png".
+        show_figure (bool, optional): Whether to show the figure. Defaults to True.
+
+    Raises:
+        ValueError: `dim` must be 2 or 3.
+
+    Returns:
+        matplotlib.axes.Axes: embedding plot.
+    """
 
     if color_labels is None:
 
@@ -149,7 +227,7 @@ def _plot_embedding(
                 marker = markers_list[i],
                 color = color_labels,
                 s = marker_size,
-                alpha = 1,
+                alpha = alpha,
                 cmap=cmap,
             )
 
@@ -162,7 +240,7 @@ def _plot_embedding(
                 marker = markers_list[i],
                 color = color_labels,
                 s = marker_size,
-                alpha = 1,
+                alpha = alpha,
                 cmap=cmap,
             )
 
@@ -197,6 +275,8 @@ def _plot_embedding(
     if show_figure:
         plt.show()
 
+    plt.clf()
+    plt.close()
     return ax
 
 

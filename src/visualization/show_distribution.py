@@ -125,4 +125,6 @@ def show_distribution_rep(
     if show_figure:
         plt.show()
 
+    plt.clf()
+    plt.close()
     return ax

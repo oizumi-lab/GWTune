@@ -16,17 +16,35 @@ def show_optimization_log(
     fig_dir: Optional[str] = None,
     **kwargs
 ) -> Tuple[List[matplotlib.axes.Axes], List[matplotlib.axes.Axes]]:
-    """Display dissimilarity matrices for a given AlignRepresentations object.
+    """Show both the relationships between epsilons and GWD, and between accuracy and GWD.
 
     Args:
-        align_representation (AlignRepresentations): AlignRepresentations object.
-        sim_mat_format (str, optional): _description_. Defaults to "default".
-        ticks (str, optional): _description_. Defaults to "number".
-        fig_dir (Optional[str], optional): _description_. Defaults to None.
+        align_representation (AlignRepresentations):
+            AlignRepresentations object.
+        fig_dir (Optional[str], optional):
+            Directory to save the heatmap. If None, the heatmap won't be saved.
 
     Keyword Args:
-        These keyword arguments are passed internally to `show_heatmap`.
-        For more details, please refer to the documentation.
+        These keyword arguments are passed internally to `show_optimization_log_rep`.
+
+        figsize (Tuple[int, int], optional): The size of the figure. Defaults to (8, 6).
+        title_size (int, optional): The size of the title. Defaults to 20.
+        xlabel_size (int, optional): The size of the x-axis label. Defaults to 20.
+        ylabel_size (int, optional): The size of the y-axis label. Defaults to 20.
+        xticks_rotation (int, optional): The rotation of the x-axis ticks. Defaults to 0.
+        cbar_ticks_size (int, optional): The size of the colorbar ticks. Defaults to 20.
+        xticks_size (int, optional): The size of the x-axis ticks. Defaults to 10.
+        yticks_size (int, optional): The size of the y-axis ticks. Defaults to 10.
+        cbar_format (Optional[str], optional): The format of the colorbar ticks. Defaults to None.
+        cbar_label_size (int, optional): The size of the colorbar label. Defaults to 20.
+        cmap (str, optional): The colormap to use. Defaults to "viridis".
+        marker_size (int, optional): The size of the markers. Defaults to 20.
+        plot_eps_log (bool, optional): Whether to plot epsilon in log scale. Defaults to False.
+        lim_eps (Optional[Tuple[float, float]], optional): The limits of the range of epsilon. Defaults to None.
+        lim_gwd (Optional[Tuple[float, float]], optional): The limits of the range of GWD. Defaults to None.
+        lim_acc (Optional[Tuple[float, float]], optional): The limits of the range of accuracy. Defaults to None.
+        fig_ext (str, optional): The extension of the saved figure. Defaults to "png".
+        show_figure (bool, optional): Whether to show the figure. Defaults to True.
 
     Returns:
         axis (List[matplotlib.axes.Axes]): heatmap of the similarity matrices.
@@ -74,20 +92,34 @@ def show_optimization_log_rep(
     """Display a heatmap of the given matrix with various customization options.
 
     Args:
-        matrix (Any): The matrix to be visualized as a heatmap.
-        title (str, optional): The title of the heatmap.
-        save_file_name (str, optional): File name to save the heatmap. If None, the heatmap won't be saved.
-        ticks (str, optional): Determines how ticks should be displayed. Options are "objects", "category", or "numbers".
-        category_name_list (List[str], optional): List of category names if `ot_category_tick` is True.
-        num_category_list (List[int], optional): List of the number of items in each category.
-        object_labels (List[str], optional): Labels for individual objects, used if `ot_object_tick` is True.
+        pairwise (PairwiseAnalysis):
+            PairwiseAnalysis object.
+        fig_dir (Optional[str], optional):
+            Directory to save the heatmap. If None, the heatmap won't be saved.
 
-    Raises:
-        ValueError: If both `ot_object_tick` and `ot_category_tick` are True.
-        ValueError: If `ticks` is "category" but `ot_category_tick` is False.
+    Keyword Args:
+        figsize (Tuple[int, int], optional): The size of the figure. Defaults to (8, 6).
+        title_size (int, optional): The size of the title. Defaults to 20.
+        xlabel_size (int, optional): The size of the x-axis label. Defaults to 20.
+        ylabel_size (int, optional): The size of the y-axis label. Defaults to 20.
+        xticks_rotation (int, optional): The rotation of the x-axis ticks. Defaults to 0.
+        cbar_ticks_size (int, optional): The size of the colorbar ticks. Defaults to 20.
+        xticks_size (int, optional): The size of the x-axis ticks. Defaults to 10.
+        yticks_size (int, optional): The size of the y-axis ticks. Defaults to 10.
+        cbar_format (Optional[str], optional): The format of the colorbar ticks. Defaults to None.
+        cbar_label_size (int, optional): The size of the colorbar label. Defaults to 20.
+        cmap (str, optional): The colormap to use. Defaults to "viridis".
+        marker_size (int, optional): The size of the markers. Defaults to 20.
+        plot_eps_log (bool, optional): Whether to plot epsilon in log scale. Defaults to False.
+        lim_eps (Optional[Tuple[float, float]], optional): The limits of the range of epsilon. Defaults to None.
+        lim_gwd (Optional[Tuple[float, float]], optional): The limits of the range of GWD. Defaults to None.
+        lim_acc (Optional[Tuple[float, float]], optional): The limits of the range of accuracy. Defaults to None.
+        fig_ext (str, optional): The extension of the saved figure. Defaults to "png".
+        show_figure (bool, optional): Whether to show the figure. Defaults to True.
 
     Returns:
-        None: Displays or saves the heatmap.
+        ax1 (matplotlib.axes.Axes): The axes of the epsilon-GWD figure.
+        ax2 (matplotlib.axes.Axes): The axes of the matching_rate-GWD figure.
     """
 
     # get trial history

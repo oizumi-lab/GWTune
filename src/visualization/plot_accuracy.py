@@ -15,8 +15,8 @@ def plot_accuracy(
     align_representation: AlignRepresentations,
     eval_type: str = "ot_plan",
     scatter: bool = True,
-    fig_dir: Optional[str] = None,
     fig_name: str = "matching_rate_ot_plan",
+    fig_dir: Optional[str] = None,
     *,
     figsize: Tuple[int, int] = (5, 3),
     fig_ext: str = "png",
@@ -25,21 +25,26 @@ def plot_accuracy(
     """Plot the accuracy of the unsupervised alignment for each top_k
 
     Args:
+        align_representation (AlignRepresentations):
+            AlignRepresentations object.
         eval_type (str, optional):
             Specifies the method used to evaluate accuracy. Can be "ot_plan", "k_nearest", or "category".
             Defaults to "ot_plan".
-
-        fig_dir (Optional[str], optional):
-            Directory path where the generated figure will be saved. If None, the figure will not be saved
-            but displayed. Defaults to None.
-
-        fig_name (str, optional):
-            Name of the saved figure if `fig_dir` is specified. Defaults to "Accuracy_ot_plan.png".
-
         scatter (bool, optional):
             If True, the accuracy will be visualized as a swarm plot. Otherwise, a line plot will be used.
             Defaults to True.
+        fig_name (str, optional):
+            Name of the saved figure if `fig_dir` is specified. Defaults to "Accuracy_ot_plan".
+        fig_dir (Optional[str], optional):
+            Directory to save the swarmplot. If None, the figure won't be saved.
+            Defaults to None.
+
+    Keyword Args:
+        figsize (Tuple[int, int], optional): The size of the figure. Defaults to (5, 3).
+        fig_ext (str, optional): The extension of the saved figure. Defaults to "png".
+        show_figure (bool, optional): Whether to show the figure. Defaults to False.
     """
+
     # close all figures
     plt.clf()
     plt.close()
@@ -79,4 +84,6 @@ def plot_accuracy(
     if show_figure:
         plt.show()
 
+    plt.clf()
+    plt.close()
     return ax

@@ -60,14 +60,14 @@ def show_sim_mat(
         show_figure (bool, optional): Whether to show the figure. Defaults to True.
 
     Returns:
-        axis (List[matplotlib.axes.Axes]): heatmap of the similarity matrices.
+        axes (List[matplotlib.axes.Axes]): heatmap of the similarity matrices.
     """
 
     if fig_dir is None:
         fig_dir = align_representation.main_results_dir + "/individual_sim_mat/"
         os.makedirs(fig_dir, exist_ok=True)
 
-    axis = []
+    axes = []
     for representation in align_representation.representations_list:
         ax = show_sim_mat_rep(
             representation=representation,
@@ -76,9 +76,9 @@ def show_sim_mat(
             fig_dir=fig_dir,
             **kwargs
         )
-        axis.append(ax)
+        axes.append(ax)
 
-    return axis
+    return axes
 
 
 def show_sim_mat_rep(
@@ -285,4 +285,6 @@ def show_heatmap(
     if show_figure:
         plt.show()
 
+    plt.clf()
+    plt.close()
     return ax

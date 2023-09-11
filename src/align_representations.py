@@ -1745,6 +1745,22 @@ class AlignRepresentations:
         if return_dataframe:
             return accuracy
 
+    def _get_dataframe(self, eval_type="ot_plan", melt=True):
+        if eval_type == "ot_plan":
+            df = self.top_k_accuracy
+        elif eval_type == "k_nearest":
+            df = self.k_nearest_matching_rate
+        elif eval_type == "category":
+            df = self.category_level_accuracy
+
+        cols = [col for col in df.columns if "top_n" not in col]
+        df = df[cols]
+
+        if melt:
+            df = pd.melt(df.reset_index(), id_vars=['top_n'], value_name='matching rate').drop(columns=['variable'])
+
+        return df
+
     # embedding methods
     def calc_embedding(
         self,
