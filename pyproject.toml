@@ -8,49 +8,17 @@ packages = [{include = "src"}]
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.11"
+jupyter = "^1.0.0"
+pot = "0.9.0"
 matplotlib = "^3.6.1"
 pandas = "^1.5.0"
 scipy = "*"
 seaborn = "^0.12.0"
-pot = "0.9.0"
-jupyter = "^1.0.0"
-# sklearn = "^0.0"
-pytest = "^7.2.0"
-pytest-cov = "^4.0.0"
-sphinx = "^5.3.0"
-pulp = "^2.6.0"
-tqdm = "^4.64.1"
 optuna = "^3.2.0"
-pymysql = "^1.0.2"
 scikit-learn = "*"
-pysqlite3 = "^0.5.0"
-plotly = "^5.13.1"
-jax = "^0.4.6"
-jaxlib = "^0.4.6"
-rsatoolbox = "^0.1.2"
-cryptography = "^40.0.1"
 sqlalchemy = "^2.0.9"
-django = "^4.2"
-sqlalchemy-utils = "^0.41.1"
 torch = "2.0.1"
-torchvision = "^0.15.2"
-torchaudio = "^2.0.2"
-
-[poetry.group.dev.dependencies]
-autopep8 = "^2.0.1"
-
-[tool.poetry.group.dev.dependencies]
-pyproject-flake8 = "5.0.4"
-flake8-isort = "^6.0.0"
-flake8-bugbear = "^23.1.20"
-flake8-builtins = "^2.1.0"
-flake8-unused-arguments = "^0.0.12"
-flake8-pytest-style = "^1.6.0"
-pep8-naming = "^0.13.3"
-mypy = "^0.991"
-black = "^22.12.0"
-isort = "^5.12.0"
-flake8-eradicate = "^1.4.0"
+pytest = "^7.4.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
