@@ -452,7 +452,6 @@ class EntropicGWComputation(GWComputation):
         return logv
 
 
-
 class EntropicSemirelaxedGWComputation(GWComputation):
     def __init__(
         self,
