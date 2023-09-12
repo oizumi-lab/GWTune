@@ -169,8 +169,7 @@ def _plot_embedding(
         if num_category_list is None:
             color_labels = get_color_labels(
                 embedding_list[0].shape[0],
-                hue=color_hue,
-                show_labels=False
+                cmap=cmap
             )
 
         else:
@@ -233,7 +232,6 @@ def _plot_embedding(
                 color = color_labels,
                 s = marker_size,
                 alpha = alpha,
-                cmap=cmap,
             )
 
             ax.scatter([], [], [], marker = markers_list[i], color = "black", s = marker_size, alpha = 1, label = name_list[i].replace("_", " "))
@@ -246,7 +244,6 @@ def _plot_embedding(
                 color = color_labels,
                 s = marker_size,
                 alpha = alpha,
-                cmap=cmap,
             )
 
             ax.scatter(x = [], y = [], marker = markers_list[i], color = "black", s = marker_size, alpha = 1, label = name_list[i].replace("_", " "))
@@ -287,47 +284,21 @@ def _plot_embedding(
 
 def get_color_labels(
     n: int,
-    hue: Optional[str] = None,
-    show_labels: bool = True
+    cmap: Optional[str] = None
 ) -> List[Tuple[float, float, float]]:
     """Create color labels for n objects
 
     Args:
         n (int): number of objects
-        hue (str): "warm", "cool", or None
-        show_labels (bool): whether to show color labels
+        cmap (Optional[str], optional): colormap. Defaults to None.
 
     Returns:
         color_labels (List): color labels for each objects
     """
 
-    # Set the saturation and lightness values to maximum
-    saturation = 1.0
-    lightness = 0.5
-
-    if hue == "warm":
-        hue_list = np.linspace(-0.2, 0.1, n)
-    elif hue == "cool":
-        hue_list = np.linspace(0.5, 0.8, n)
-    else:
-        hue_list = np.linspace(0, 1, n, endpoint = False)
-
     # Create a list to store the color labels
-    color_labels = []
-
-    # Generate the color labels
-    for i in range(n):
-        hue = hue_list[i]
-        r, g, b = colorsys.hls_to_rgb(hue, lightness, saturation)
-        color_labels.append((r, g, b))
-
-    if show_labels:
-        # Show color labels
-        plt.figure(figsize=(10, 5))
-        plt.scatter(np.linspace(0, n-1, n), np.zeros((n,)), c = color_labels)
-        plt.xticks(ticks = np.linspace(0, n-1, n))
-        plt.title("Show color labels")
-        plt.show()
+    cm = plt.get_cmap(cmap)
+    color_labels = [cm(v) for v in np.linspace(0, 1, n)]
 
     return color_labels
 

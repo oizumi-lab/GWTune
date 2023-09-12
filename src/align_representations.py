@@ -44,6 +44,7 @@ class OptimizationConfig:
 
     def __init__(
         self,
+        gw_type: str = "entropic_gromov_wasserstein",
         eps_list: List[float] = [1.0, 10.0],
         eps_log: bool = True,
         num_trial: int = 4,
@@ -77,6 +78,10 @@ class OptimizationConfig:
         """Initialization of the instance.
 
         Args:
+            gw_type (str, optional):
+                Type of Gromov-Wasserstein alignment. Options are "entropic_gromov_wasserstein",
+                "entropic_semirelaxed_gromov_wasserstein" and "entropic_partial_gromov_wasserstein".
+                Defaults to "entropic_gromov_wasserstein".
             eps_list (List[float], optional):
                 List of epsilon values (regularization term). Defaults to [1., 10.].
             eps_log (bool, optional):
@@ -96,6 +101,8 @@ class OptimizationConfig:
                 Number of jobs to run in parallel. Defaults to 1.
             multi_gpu (Union[bool, List[int]], optional):
                 Indicates if multiple GPUs are used for computation. Defaults to False.
+            storage (str, optional):
+                URL for the database storage. Defaults to None.
             db_params (dict, optional):
                 Parameters for creating the database URL.
                 Defaults to {"drivername": "mysql", "username": "root", "password": "", "host": "localhost", "port": 3306}.
@@ -114,6 +121,7 @@ class OptimizationConfig:
                 Defaults to {"n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3}.
         """
 
+        self.gw_type = gw_type
         self.eps_list = eps_list
         self.eps_log = eps_log
         self.num_trial = num_trial
@@ -716,6 +724,7 @@ class PairwiseAnalysis:
                 self.data_path,
                 max_iter=self.config.max_iter,
                 n_iter=self.config.n_iter,
+                gw_type=self.config.gw_type,
                 to_types=self.config.to_types,
                 data_type=self.config.data_type,
                 sinkhorn_method=self.config.sinkhorn_method,
@@ -1224,7 +1233,7 @@ class AlignRepresentations:
             Name identifier for the main representation pair. (Set internally)
         main_file_name (str):
             Filename identifier for the main results. (Set internally)
-        RSA_corr (dict):
+        RSA_corr (Dict[str, float]):
             Dictionary to store RSA correlation values. (Set internally)
         OT_list (List[Optional[np.ndarray]]):
             List of OT matrices. (Set internally)
@@ -1301,7 +1310,7 @@ class AlignRepresentations:
         self.set_pair_computed(pairs_computed)
 
         # results
-        self.RSA_corr = dict()
+        self.RSA_corr: Dict[str, float] = dict()
         self.OT_list = [None] * len(self.all_pair_list)
         self.OT_sorted_list = [None] * len(self.all_pair_list)
 
@@ -1964,6 +1973,8 @@ class AlignRepresentations:
         self,
         drop_filenames: Optional[List[str]] = None,
         drop_all: bool = False,
+        delete_database: bool = False,
+        delete_directory: bool = False,
     ) -> None:
         """Delete the specified database and directory with the given filename
 
@@ -1974,12 +1985,16 @@ class AlignRepresentations:
             drop_all (bool, optional):
                 If set to True, all results will be deleted regardless of the `drop_filenames` parameter.
                 Defaults to False.
+            delete_database (bool, optional):
+                If set to True, the database will be deleted. Defaults to False.
+            delete_directory (bool, optional):
+                If set to True, the directory will be deleted. Defaults to False.
 
         Raises:
             ValueError: If neither `drop_filenames` is specified nor `drop_all` is set to True.
         """
         if drop_all:
-            drop_filenames = [pairwise.filename for pairwise in self.pairwise_list]
+            drop_filenames = [pairwise.study_name for pairwise in self.pairwise_list]
 
         if drop_filenames is None:
             raise ValueError(
@@ -1987,11 +2002,11 @@ class AlignRepresentations:
             )
 
         for pairwise in self.pairwise_list:
-            if (pairwise.filename not in drop_filenames) or (
+            if (pairwise.study_name not in drop_filenames) or (
                 not database_exists(pairwise.storage)
             ):
                 continue
-            pairwise.delete_prev_results()
+            pairwise.delete_prev_results(delete_database=delete_database, delete_directory=delete_directory)
 
     # barycenter GWOT methods
     def calc_barycenter(self, X_init=None):
