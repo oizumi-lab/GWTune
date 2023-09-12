@@ -11,9 +11,20 @@ To further facilitate use cases of our toolbox, we also provide tutorials for ot
 You can find these tutorials in the `tutorial_other_datasets` folder.   
 
 ## Requirements
-Please see `pyproject.toml` for required libraries.  
-If you are using poetry, please run `poetry install` first and then, install `torch`, `torchvision`, `torchaudio` that are compatible with your environment.  
-For compatibility information, see the [official pytorch page](https://pytorch.org/get-started/locally/). 
+Please see `pyproject.toml` or `environment.yaml`, `requirements.txt` for required libraries.  
+
+- For using `poetry`, please run `poetry install` first and then, install `torch`, `torchvision`, `torchaudio` that are compatible with your environment. For compatibility information, see the [official pytorch page](https://pytorch.org/get-started/locally/). 
+
+- For using `conda`, we provide `environment.yaml` for building the virtual environment.
+    ```
+    conda env create -n [env_name] -f environment.yaml
+    source activate [env_name]
+    ```
+- For using pip, requirements.txt can be used for building the enviroment.
+    ```
+    pip install -r requirements.txt
+    ```
+
 
 ## Folders in this repository  
 

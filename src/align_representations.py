@@ -406,9 +406,6 @@ class PairwiseAnalysis:
             self.source.num_category_list, self.target.num_category_list
         ), "the label information doesn't seem to be the same."
 
-        assert np.array_equal(
-            self.source.object_labels, self.target.object_labels
-        ), "the label information doesn't seem to be the same."
 
         # Generate the URL for the database. Syntax differs for SQLite and others.
         self.storage = self.config.storage
@@ -1556,6 +1553,16 @@ class AlignRepresentations:
         else:
             raise ValueError("please 'sampler_seed' = True or False or int > 0.")
 
+
+        if self.config.to_types == "numpy":
+            if self.config.multi_gpu != False:
+                warnings.warn("numpy doesn't use GPU. Please 'multi_GPU = False'.", UserWarning)
+                self.config.multi_gpu = False
+
+            assert self.config.device == "cpu", "numpy doesn't use GPU. Please 'device = cpu'."
+
+            target_device = self.config.device
+
         if self.config.n_jobs > 1:
             OT_list = []
             processes = []
@@ -1570,26 +1577,17 @@ class AlignRepresentations:
             with pool:
                 for pair_number in range(len(self.pairwise_list)):
 
-                    if self.config.multi_gpu:
-                        target_device = "cuda:" + str(
-                            pair_number % torch.cuda.device_count()
-                        )
-                    else:
-                        target_device = self.config.device
+                    if self.config.to_types == "torch":
+                        if self.config.multi_gpu:
+                            target_device = "cuda:" + str(pair_number % torch.cuda.device_count())
+                        else:
+                            target_device = self.config.device
 
-                    if isinstance(self.config.multi_gpu, list):
-                        gpu_idx = pair_number % len(self.config.multi_gpu)
-                        target_device = "cuda:" + str(self.config.multi_gpu[gpu_idx])
+                        if isinstance(self.config.multi_gpu, list):
+                            gpu_idx = pair_number % len(self.config.multi_gpu)
+                            target_device = "cuda:" + str(self.config.multi_gpu[gpu_idx])
 
                     pairwise = self.pairwise_list[pair_number]
-
-                    if self.config.to_types == "numpy":
-                        if self.config.multi_gpu != False:
-                            warnings.warn(
-                                "numpy doesn't use GPU. Please 'multi_GPU = False'.",
-                                UserWarning,
-                            )
-                        target_device = self.config.device
 
                     if change_sampler_seed:
                         sampler_seed = first_sampler_seed + pair_number

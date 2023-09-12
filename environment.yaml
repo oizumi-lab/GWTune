@@ -1,0 +1,22 @@
+name: gwtune
+channels:
+  - conda-forge
+dependencies:
+  - python >= 3.9
+  - matplotlib
+  - numpy
+  - optuna>=3.2.0
+  - pandas
+  - pot=0.9.0
+  - pymysql
+  - scikit-learn
+  - scipy
+  - seaborn
+  - sqlalchemy
+  - tqdm
+  - umap-learn
+  - pip:
+      - sqlalchemy-utils==0.41.1
+      - torch==2.0.1
+      - torchaudio==2.0.2
+      - torchvision==0.15.2
