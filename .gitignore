@@ -17,3 +17,5 @@ pyproject.toml
 *.svg
 */*.ipynb_checkpoints
 pyproject_copy.toml
+
+.DS_Store

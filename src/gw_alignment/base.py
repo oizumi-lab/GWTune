@@ -3,16 +3,10 @@ import gc
 import os
 from typing import Any, List, Tuple
 
-import numpy as np
 import optuna
-import ot
-import seaborn as sns
 import torch
-from tqdm.auto import tqdm
 
 # warnings.simplefilter("ignore")
-from ..utils.backend import Backend
-from ..utils.init_matrix import InitMatrix
 from .main_compute import EntropicGWComputation, EntropicSemirelaxedGWComputation, GWComputation, EntropicPartialGWComputation
 
 # nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
@@ -47,7 +41,7 @@ class GW_Alignment:
         max_iter: int = 1000,
         numItermax: int = 1000,
         n_iter: int = 20,
-        problem_type: str = "entropic_gromov_wasserstein",
+        gw_type: str = "entropic_gromov_wasserstein",
         to_types: str = "torch",
         data_type: str = "double",
         sinkhorn_method: str = "sinkhorn",
@@ -56,30 +50,36 @@ class GW_Alignment:
         """Initialize the Gromov-Wasserstein alignment object.
 
         Args:
-            source_dist (Any):  Array-like, shape (n_source, n_source).
-                                Dissimilarity matrix of the source data.
-            target_dist (Any):  Array-like, shape (n_target, n_target).
-                                Dissimilarity matrix of the target data.
-            data_path (str):    Directory to save the computation results.
-            max_iter (int, optional):   Maximum number of iterations for entropic
-                                        Gromov-Wasserstein alignment by POT.
-                                        Defaults to 1000.
-            numItermax (int, optional): Maximum number of iterations for the
-                                        Sinkhorn algorithm. Defaults to 1000.
-            n_iter (int, optional): Number of initial plans evaluated in optimization. Defaults to 20.
-            to_types (str, optional):   Specifies the type of data structure to be used,
-                                        either "torch" or "numpy". Defaults to "torch".
-            data_type (str, optional):  Specifies the type of data to be used
-                                        in computation. Defaults to "double".
-            sinkhorn_method (str, optional):    Method used for the solver. Options are
-                                                "sinkhorn", "sinkhorn_log", "greenkhorn",
-                                                "sinkhorn_stabilized", or "sinkhorn_epsilon_scaling".
-                                                Defaults to "sinkhorn".
+            source_dist (Any):
+                Array-like, shape (n_source, n_source). Dissimilarity matrix of the source data.
+            target_dist (Any):
+                Array-like, shape (n_target, n_target).Dissimilarity matrix of the target data.
+            data_path (str):
+                Directory to save the computation results.
+            max_iter (int, optional):
+                Maximum number of iterations for entropic Gromov-Wasserstein alignment by POT.
+                Defaults to 1000.
+            numItermax (int, optional):
+                Maximum number of iterations for the Sinkhorn algorithm. Defaults to 1000.
+            n_iter (int, optional):
+                Number of initial plans evaluated in optimization. Defaults to 20.
+            gw_type (str, optional):
+                Type of Gromov-Wasserstein alignment to be used. Options are "entropic_gromov_wasserstein",
+                "entropic_semirelaxed_gromov_wasserstein", or "entropic_partial_gromov_wasserstein".
+                Defaults to "entropic_gromov_wasserstein".
+            to_types (str, optional):
+                Specifies the type of data structure to be used, either "torch" or "numpy".
+                Defaults to "torch".
+            data_type (str, optional):
+                Specifies the type of data to be used in computation. Defaults to "double".
+            sinkhorn_method (str, optional):
+                Method used for the solver. Options are "sinkhorn", "sinkhorn_log", "greenkhorn",
+                "sinkhorn_stabilized", or "sinkhorn_epsilon_scaling". Defaults to "sinkhorn".
         """
         self.to_types = to_types
         self.data_type = data_type
         self.sinkhorn_method = sinkhorn_method
-        self.problem_type = problem_type
+        self.gw_type = gw_type
 
         # distribution in the source space, and target space
         self.source_size = len(source_dist)
@@ -92,7 +92,7 @@ class GW_Alignment:
         self.n_iter = n_iter
 
         self.main_compute = self.load_gw_computation(
-            problem_type=problem_type,
+            gw_type=gw_type,
             source_dist=source_dist,
             target_dist=target_dist,
             to_types=to_types,
@@ -197,19 +197,19 @@ class GW_Alignment:
 
     def load_gw_computation(
         self,
-        problem_type: str,
+        gw_type: str,
         **kwargs
     ) -> GWComputation:
-        if problem_type == "entropic_gromov_wasserstein":
+        if gw_type == "entropic_gromov_wasserstein":
             gwc = EntropicGWComputation(**kwargs)
 
-        elif problem_type == "entropic_semirelaxed_gromov_wasserstein":
+        elif gw_type == "entropic_semirelaxed_gromov_wasserstein":
             gwc = EntropicSemirelaxedGWComputation(**kwargs)
 
-        elif problem_type == "entropic_partial_gromov_wasserstein":
+        elif gw_type == "entropic_partial_gromov_wasserstein":
             gwc = EntropicPartialGWComputation(**kwargs)
 
         else:
-            raise ValueError(f"problem type {problem_type} is not defined.")
+            raise ValueError(f"gw type {gw_type} is not defined.")
 
         return gwc

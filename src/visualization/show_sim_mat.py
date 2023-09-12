@@ -1,209 +1,218 @@
-# visualizationをやるための関数を定義する
-import copy
+# Standard Library
 import os
-import sys
-import warnings
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple
 
+# Third Party Library
 import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
-import optuna
-from dataclasses import dataclass
-import ot
-import seaborn as sns
-import torch
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from ..align_representations import AlignRepresentations
+# Local Library
+from ..align_representations import AlignRepresentations, Representation
+
 
 def show_sim_mat(
     align_representation: AlignRepresentations,
-    fig_dir: Optional[str] = None,
-    ticks: str = "number",
     sim_mat_format: str = "default",
-    *,
-    show_figure: bool = True,
-    figsize: Tuple[int, int] = (8, 6),
-    title_size: int = 60,
-    xlabel: str = "target",
-    ylabel: str = "source",
-    xlabel_size: int = 40,
-    ylabel_size: int = 40,
-    xticks_rotation: int = 90,
-    yticks_rotation: int = 0,
-    xticks_size: int = 20,
-    yticks_size: int = 20,
-    cbar_format: Optional[str] = None,
-    cbar_ticks_size: int = 20,
-    ot_object_tick: bool = False,
-    ot_category_tick: bool = False,
-    draw_category_line: bool = False,
-    category_line_alpha: float = 0.2,
-    category_line_style: str = "dashed",
-    category_line_color: str = "C2",
-    cmap: str = "cividis",
-    aspect: str = "equal",
-    fig_ext: str = "png"
+    ticks: str = "number",
+    fig_dir: Optional[str] = None,
+    **kwargs
 ) -> List[matplotlib.axes.Axes]:
+    """Display dissimilarity matrices for a given AlignRepresentations object.
 
+    Args:
+        align_representation (AlignRepresentations):
+            AlignRepresentations object.
+        sim_mat_format (str, optional):
+            "default", "sorted", or "both". Defaults to "default".
+        ticks (str, optional):
+            Determines how ticks should be displayed. Options are "objects", "category", or "numbers".
+            Defaults to "number".
+        fig_dir (Optional[str], optional):
+            Directory to save the heatmap. If None, the heatmap won't be saved.
 
+    Keyword Args:
+        These keyword arguments are passed internally to `visualization.show_heatmap`.
 
+        figsize (Tuple[int, int], optional): The size of the figure. Defaults to (8, 6).
+        title_size (int, optional): The size of the title. Defaults to 60.
+        xlabel (Optional[str], optional): The label for the x-axis. Defaults to None.
+        ylabel (Optional[str], optional): The label for the y-axis. Defaults to None.
+        xlabel_size (int, optional): The size of the x-axis label. Defaults to 40.
+        ylabel_size (int, optional): The size of the y-axis label. Defaults to 40.
+        xticks_rotation (int, optional): The rotation of the x-axis ticks. Defaults to 90.
+        yticks_rotation (int, optional): The rotation of the y-axis ticks. Defaults to 0.
+        cbar_ticks_size (int, optional): The size of the colorbar ticks. Defaults to 20.
+        xticks_size (int, optional): The size of the x-axis ticks. Defaults to 20.
+        yticks_size (int, optional): The size of the y-axis ticks. Defaults to 20.
+        cbar_format (Optional[str], optional): The format of the colorbar ticks. Defaults to None.
+        cbar_label (Optional[str], optional): The label for the colorbar. Defaults to None.
+        cbar_label_size (int, optional): The size of the colorbar label. Defaults to 20.
+        cmap (str, optional): The colormap to use. Defaults to "cividis".
+        ot_object_tick (bool, optional): Whether to use object labels for the ticks. Defaults to False.
+        ot_category_tick (bool, optional): Whether to use category labels for the ticks. Defaults to False.
+        draw_category_line (bool, optional): Whether to draw lines between categories. Defaults to False.
+        category_line_alpha (float, optional): The alpha value of the category lines. Defaults to 0.2.
+        category_line_style (str, optional): The style of the category lines. Defaults to "dashed".
+        category_line_color (str, optional): The color of the category lines. Defaults to "C2".
+        fig_ext (str, optional): The extension of the saved figure. Defaults to "png".
+        show_figure (bool, optional): Whether to show the figure. Defaults to True.
 
-def show_sim_mat(
-    align_representation: AlignRepresentations,
-    fig_dir: Optional[str] = None,
-    ticks: str = "number",
-    sim_mat_format: str = "default",
-    *,
-    show_figure: bool = True,
-    figsize: Tuple[int, int] = (8, 6),
-    title_size: int = 60,
-    xlabel: str = "target",
-    ylabel: str = "source",
-    xlabel_size: int = 40,
-    ylabel_size: int = 40,
-    xticks_rotation: int = 90,
-    yticks_rotation: int = 0,
-    xticks_size: int = 20,
-    yticks_size: int = 20,
-    cbar_format: Optional[str] = None,
-    cbar_ticks_size: int = 20,
-    ot_object_tick: bool = False,
-    ot_category_tick: bool = False,
-    draw_category_line: bool = False,
-    category_line_alpha: float = 0.2,
-    category_line_style: str = "dashed",
-    category_line_color: str = "C2",
-    cmap: str = "cividis",
-    aspect: str = "equal",
-    fig_ext: str = "png"
-) -> matplotlib.axes.Axes:
+    Returns:
+        axes (List[matplotlib.axes.Axes]): heatmap of the similarity matrices.
+    """
 
     if fig_dir is None:
-        fig_dir = align_representation.main_results_dir + "/" + align_representation.data_name + "/individual_sim_mat/"
+        fig_dir = align_representation.main_results_dir + "/individual_sim_mat/"
         os.makedirs(fig_dir, exist_ok=True)
 
-        for representation in self.representations_list:
-            representation.show_sim_mat(
-                sim_mat_format=sim_mat_format,
-                visualization_config=visualization_config,
-                fig_dir=fig_dir,
-                ticks=ticks,
-            )
+    axes = []
+    for representation in align_representation.representations_list:
+        ax = show_sim_mat_rep(
+            representation=representation,
+            sim_mat_format=sim_mat_format,
+            ticks=ticks,
+            fig_dir=fig_dir,
+            **kwargs
+        )
+        axes.append(ax)
 
-            if show_distribution:
-                representation.show_sim_mat_distribution(
-                    **visualization_config_hist())
+    return axes
 
 
-    if fig_dir is not None:
-        fig_path = os.path.join(fig_dir, f"RDM_{align_representation.name}.{fig_ext}")
-    else:
-        fig_path = None
+def show_sim_mat_rep(
+    representation: Representation,
+    sim_mat_format: str = "default",
+    ticks: str = "number",
+    fig_dir: Optional[str] = None,
+    **kwargs
+) -> matplotlib.axes.Axes:
+    """Display a heatmap of the given matrix with various customization options.
+
+    Args:
+        representation (Representation):
+            The representation to be visualized.
+        sim_mat_format (str, optional):
+            "default", "sorted", or "both". Defaults to "default".
+            Default to "default".
+        ticks (str, optional):
+            Determines how ticks should be displayed. Options are "objects", "category", or "numbers".
+            Defaults to "number".
+        fig_dir (Optional[str], optional):
+            Directory to save the heatmap. If None, the heatmap won't be saved.
+
+    Keyword Args:
+        These keyword arguments are passed internally to `visualization.show_heatmap`.
+
+    Returns:
+        ax (matplotlib.axes.Axes): heatmap of the similarity matrices.
+    """
 
     if sim_mat_format == "default" or sim_mat_format == "both":
-        sim_mat = align_representation.sim_mat
-        title = align_representation.name
-        category_name_list = None
-        num_category_list = None
+        ax = show_heatmap(
+            representation.sim_mat,
+            title=representation.name,
+            ticks=ticks,
+            category_name_list=None,
+            num_category_list=None,
+            object_labels=representation.object_labels,
+            fig_name=f"RDM_{representation.name}_default",
+            fig_dir=fig_dir,
+            **kwargs
+        )
+        return ax
 
     elif sim_mat_format == "sorted" or sim_mat_format == "both":
-        assert align_representation.category_idx_list is not None, "No label info to sort the 'sim_mat'."
-        sim_mat = align_representation.sorted_sim_mat
-        title = align_representation.name + "_sorted",
-        category_name_list = align_representation.category_name_list
-        num_category_list = align_representation.num_category_list
+
+        assert representation.category_idx_list is not None, "No label info to sort the 'sim_mat'."
+        ax = show_heatmap(
+            representation.sorted_sim_mat,
+            title=representation.name,
+            ticks=ticks,
+            category_name_list=representation.category_name_list,
+            num_category_list=representation.num_category_list,
+            object_labels=representation.object_labels,
+            fig_name=f"RDM_{representation.name}_sorted",
+            fig_dir=fig_dir,
+            **kwargs
+        )
+        return ax
 
     else:
         raise ValueError("sim_mat_format must be either 'default', 'sorted', or 'both'.")
 
-    ax = _show_sim_mat(
-        sim_mat,
-        save_file_name=fig_path,
-        title=title,
-        ticks=ticks,
-        category_name_list=category_name_list,
-        num_category_list=num_category_list,
-        object_labels=align_representation.object_labels,
-        # plot parameter setting
-        show_figure=show_figure,
-        figsize=figsize,
-        title_size=title_size,
-        xlabel=xlabel,
-        ylabel=ylabel,
-        xlabel_size=xlabel_size,
-        ylabel_size=ylabel_size,
-        xticks_rotation=xticks_rotation,
-        yticks_rotation=yticks_rotation,
-        xticks_size=xticks_size,
-        yticks_size=yticks_size,
-        cbar_format=cbar_format,
-        cbar_ticks_size=cbar_ticks_size,
-        ot_object_tick=ot_object_tick,
-        ot_category_tick=ot_category_tick,
-        draw_category_line=draw_category_line,
-        category_line_alpha=category_line_alpha,
-        category_line_style=category_line_style,
-        category_line_color=category_line_color,
-        cmap=cmap,
-        aspect=aspect
-    )
-    return ax
 
-
-def _show_sim_mat(
-    matrix: Any,
-    save_file_name: Optional[str],
-    title: str,
-    ticks: str,
-    category_name_list: Optional[List[str]],
-    num_category_list: Optional[List[int]],
-    object_labels: Optional[List[str]],
+def show_heatmap(
+    sim_mat: Any,
+    title: Optional[str],
+    ticks: Optional[str] = None,
+    category_name_list: Optional[List[str]] = None,
+    num_category_list: Optional[List[int]] = None,
+    object_labels: Optional[List[str]] = None,
+    fig_name: Optional[str] = None,
+    fig_dir: Optional[str] = None,
     *,
-    # plot parameter setting
-    show_figure: bool = True,
     figsize: Tuple[int, int] = (8, 6),
     title_size: int = 60,
-    xlabel: str = "target",
-    ylabel: str = "source",
+    xlabel: Optional[str] = None,
+    ylabel: Optional[str] = None,
     xlabel_size: int = 40,
     ylabel_size: int = 40,
     xticks_rotation: int = 90,
     yticks_rotation: int = 0,
+    cbar_ticks_size: int = 20,
     xticks_size: int = 20,
     yticks_size: int = 20,
     cbar_format: Optional[str] = None,
-    cbar_ticks_size: int = 20,
+    cbar_label: Optional[str] = None,
+    cbar_label_size: int = 20,
+    cmap: str = "cividis",
     ot_object_tick: bool = False,
     ot_category_tick: bool = False,
     draw_category_line: bool = False,
     category_line_alpha: float = 0.2,
     category_line_style: str = "dashed",
     category_line_color: str = "C2",
-    cmap: str = "cividis",
-    aspect: str = "equal"
-) -> None:
+    fig_ext: str = "png",
+    show_figure: bool = True,
+) -> matplotlib.axes.Axes:
     """Display a heatmap of the given matrix with various customization options.
 
     Args:
-        matrix (Any): The matrix to be visualized as a heatmap.
+        sim_mat (Any): The matrix to be visualized as a heatmap.
         title (str, optional): The title of the heatmap.
-        save_file_name (str, optional): File name to save the heatmap. If None, the heatmap won't be saved.
         ticks (str, optional): Determines how ticks should be displayed. Options are "objects", "category", or "numbers".
         category_name_list (List[str], optional): List of category names if `ot_category_tick` is True.
         num_category_list (List[int], optional): List of the number of items in each category.
         object_labels (List[str], optional): Labels for individual objects, used if `ot_object_tick` is True.
-        **kwargs: Other keyword arguments for customizing the heatmap.
+        fig_name (Optional[str], optional): File name to save the heatmap. If None, the heatmap won't be saved.
+        fig_dir (Optional[str], optional): Directory to save the heatmap. If None, the heatmap won't be saved.
 
-    Raises:
-        ValueError: If both `ot_object_tick` and `ot_category_tick` are True.
-        ValueError: If `ticks` is "category" but `ot_category_tick` is False.
-
-    Returns:
-        None: Displays or saves the heatmap.
+    Keyword Args:
+        figsize (Tuple[int, int], optional): The size of the figure. Defaults to (8, 6).
+        title_size (int, optional): The size of the title. Defaults to 60.
+        xlabel (Optional[str], optional): The label for the x-axis. Defaults to None.
+        ylabel (Optional[str], optional): The label for the y-axis. Defaults to None.
+        xlabel_size (int, optional): The size of the x-axis label. Defaults to 40.
+        ylabel_size (int, optional): The size of the y-axis label. Defaults to 40.
+        xticks_rotation (int, optional): The rotation of the x-axis ticks. Defaults to 90.
+        yticks_rotation (int, optional): The rotation of the y-axis ticks. Defaults to 0.
+        cbar_ticks_size (int, optional): The size of the colorbar ticks. Defaults to 20.
+        xticks_size (int, optional): The size of the x-axis ticks. Defaults to 20.
+        yticks_size (int, optional): The size of the y-axis ticks. Defaults to 20.
+        cbar_format (Optional[str], optional): The format of the colorbar ticks. Defaults to None.
+        cbar_label (Optional[str], optional): The label for the colorbar. Defaults to None.
+        cbar_label_size (int, optional): The size of the colorbar label. Defaults to 20.
+        cmap (str, optional): The colormap to use. Defaults to "cividis".
+        ot_object_tick (bool, optional): Whether to use object labels for the ticks. Defaults to False.
+        ot_category_tick (bool, optional): Whether to use category labels for the ticks. Defaults to False.
+        draw_category_line (bool, optional): Whether to draw lines between categories. Defaults to False.
+        category_line_alpha (float, optional): The alpha value of the category lines. Defaults to 0.2.
+        category_line_style (str, optional): The style of the category lines. Defaults to "dashed".
+        category_line_color (str, optional): The color of the category lines. Defaults to "C2".
+        fig_ext (str, optional): The extension of the saved figure. Defaults to "png".
+        show_figure (bool, optional): Whether to show the figure. Defaults to True.
     """
 
     # Set up the graph style
@@ -215,12 +224,13 @@ def _show_sim_mat(
     if title is not None:
         ax.set_title(title, size = title_size)
 
-    aximg = ax.imshow(matrix, cmap = cmap, aspect = aspect)
+    aximg = ax.imshow(sim_mat, cmap=cmap, aspect='equal')
 
     if ot_object_tick and ot_category_tick:
         raise(ValueError, "please turn off either 'ot_category_tick' or 'ot_object_tick'.")
 
     if not ot_object_tick and ot_category_tick:
+
         assert category_name_list is not None
         assert num_category_list is not None
 
@@ -238,16 +248,17 @@ def _show_sim_mat(
                     plt.axhline(pos, alpha = category_line_alpha, linestyle = category_line_style, color = category_line_color)
                     plt.axvline(pos, alpha = category_line_alpha, linestyle = category_line_style, color = category_line_color)
 
+
     if ot_object_tick and not ot_category_tick:
 
         if ticks == "numbers":
-            plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = xticks_size, rotation = xticks_rotation)
-            plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = yticks_size, rotation = yticks_rotation)
+            plt.xticks(ticks = np.arange(len(sim_mat)) + 0.5, labels = np.arange(len(sim_mat)) + 1, size = xticks_size, rotation = xticks_rotation)
+            plt.yticks(ticks = np.arange(len(sim_mat)) + 0.5, labels = np.arange(len(sim_mat)) + 1, size = yticks_size, rotation = yticks_rotation)
 
         elif ticks == "objects":
             assert object_labels is not None
-            plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = object_labels, size = xticks_size, rotation = xticks_rotation)
-            plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = object_labels, size = yticks_size, rotation = yticks_rotation)
+            plt.xticks(ticks = np.arange(len(sim_mat)) + 0.5, labels = object_labels, size = xticks_size, rotation = xticks_rotation)
+            plt.yticks(ticks = np.arange(len(sim_mat)) + 0.5, labels = object_labels, size = yticks_size, rotation = yticks_rotation)
 
         elif ticks == "category":
             raise(ValueError, "please use 'ot_category_tick = True'.")
@@ -263,17 +274,17 @@ def _show_sim_mat(
     cax = divider.append_axes("right", size="5%", pad=0.1)
 
     cbar = fig.colorbar(aximg, cax=cax, format = cbar_format)
-
+    cbar.set_label(cbar_label, size = cbar_label_size)
     cbar.ax.tick_params(axis='y', labelsize = cbar_ticks_size)
 
     plt.tight_layout()
 
-    if save_file_name is not None:
-        plt.savefig(save_file_name)
+    if fig_dir is not None:
+        plt.savefig(os.path.join(fig_dir, fig_name + "." + fig_ext), bbox_inches='tight', dpi=300)
 
-    if return_figure:
-        return ax
+    if show_figure:
+        plt.show()
 
-    else:
-        plt.clf()
-        plt.close()
+    plt.clf()
+    plt.close()
+    return ax

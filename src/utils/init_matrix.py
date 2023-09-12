@@ -6,7 +6,7 @@ import ot
 
 
 # %%
-class InitMatrix():
+class InitMatrix:
     """A class for creating initial matrices for Gromov-Wasserstein alignment.
 
     This class provides methods to generate initial matrices based on various conditions
@@ -50,7 +50,9 @@ class InitMatrix():
         self.p = p
         self.q = q
 
-    def set_user_define_init_mat_list(self, mat: Union[np.ndarray, List[np.ndarray]]) -> None:
+    def set_user_define_init_mat_list(
+        self, mat: Union[np.ndarray, List[np.ndarray]]
+    ) -> None:
         """Sets the user-defined initial matrix or matrices.
 
         This method allows users to specify their own initial matrices for the Gromov-Wasserstein alignment.
@@ -70,9 +72,13 @@ class InitMatrix():
             self.user_define_init_mat_list = [mat]
 
         else:
-            raise ValueError('The provided input should either be a numpy array or a list of numpy arrays.')
+            raise ValueError(
+                "The provided input should either be a numpy array or a list of numpy arrays."
+            )
 
-    def make_initial_T(self, init_mat_plan: str, seed: int = 42, **kwargs) -> np.ndarray:
+    def make_initial_T(
+        self, init_mat_plan: str, seed: int = 42, **kwargs
+    ) -> np.ndarray:
         """Generates the initial matrix for Gromov-Wasserstein alignment.
 
         Users can specify the initialization method for the matrix, choosing from options such as
@@ -89,19 +95,30 @@ class InitMatrix():
             ValueError: If the provided initialization method is not implemented.
         """
 
-        np.random.seed(seed)  # fix the seed of numpy.random, seed can be changed by user.
+        np.random.seed(
+            seed
+        )  # fix the seed of numpy.random, seed can be changed by user.
 
-        if init_mat_plan == 'random':
+        if init_mat_plan == "random":
             T = self.make_random_init_plan(self.p, self.q, **kwargs)
 
-        elif init_mat_plan == 'uniform':
-            T = np.outer(ot.unif(self.source_size), ot.unif(self.target_size))
+        elif init_mat_plan == "uniform":
+            T = np.outer(self.p, self.q)
 
-        elif init_mat_plan == 'diag':
+        elif init_mat_plan == "diag":
+            assert (
+                self.source_size == self.target_size
+            ), "The source size and target size should be same."
             T = np.diag(ot.unif(self.source_size))
 
+        elif init_mat_plan == "permutation":
+            assert (
+                self.source_size == self.target_size
+            ), "The source size and target size should be same."
+            T = self.make_permutated_init_plan()
+
         else:
-            raise ValueError('Not defined init_mat_plan.')
+            raise ValueError("Not defined init_mat_plan.")
 
         return T
 
@@ -145,10 +162,27 @@ class InitMatrix():
 
         return T
 
+    def make_permutated_init_plan(self) -> np.ndarray:
+        """Generates a permutated initial matrix for Gromov-Wasserstein alignment.
+
+        Note that when using this method, p and q must always be uniform distributions
+
+        Returns:
+            T (np.ndarray): Initial matrix where each row and each column contains only one element of 1/n
+        """
+
+        n = self.source_size
+        permutated_idx = np.random.permutation(n)
+
+        T = np.zeros((n, n))
+        for i, permutated_idx in enumerate(permutated_idx):
+            T[i, permutated_idx] = 1 / n
+        return T
+
 
 # %%
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_builder = InitMatrix(2000, 1000)
-    t = test_builder.make_initial_T('diag')
+    t = test_builder.make_initial_T("diag")
 
 # %%
