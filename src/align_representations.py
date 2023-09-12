@@ -286,7 +286,7 @@ class Representation:
             np.ndarray: The computed embeddings.
         """
         MDS_embedding = manifold.MDS(
-            n_components=dim, dissimilarity="precomputed", random_state=0
+            n_components=dim, dissimilarity="precomputed", random_state=0, normalized_stress="auto"
         )
         embedding = MDS_embedding.fit_transform(self.sim_mat)
         return embedding
@@ -2005,6 +2005,7 @@ class AlignRepresentations:
             ):
                 continue
             pairwise.delete_prev_results(delete_database=delete_database, delete_directory=delete_directory)
+
 
     # barycenter GWOT methods
     def calc_barycenter(self, X_init=None):

@@ -6,6 +6,7 @@ from typing import List, Optional, Tuple
 # Third Party Library
 import matplotlib
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
 # Local Library
@@ -61,7 +62,11 @@ def plot_embedding(
         name_list.append(representation.name)
 
     if fig_dir is None:
-        fig_dir = os.path.join(align_representation.main_results_dir, "visualize_embedding")
+        fig_dir = os.path.join(
+            align_representation.main_results_dir,
+            "visualize_embedding",
+            align_representation.config.init_mat_plan
+        )
         if not os.path.exists(fig_dir):
             os.makedirs(fig_dir)
 
@@ -100,7 +105,6 @@ def _plot_embedding(
     zlabel_size: int = 25,
     legend_size: Optional[int] = None,
     color_labels: Optional[List[str]] = None,
-    color_hue: Optional[str] = None,
     colorbar_label: Optional[str] = None,
     colorbar_range: List[int] = [0, 1],
     colorbar_shrink: float = 0.8,
@@ -145,7 +149,6 @@ def _plot_embedding(
         zlabel_size (int, optional): The size of the z-axis label. Defaults to 25.
         legend_size (Optional[int], optional): The size of the legend. Defaults to None.
         color_labels (Optional[List[str]], optional): The color labels. Defaults to None.
-        color_hue (Optional[str], optional): The hue of the color labels. Defaults to None.
         colorbar_label (Optional[str], optional): The label of the colorbar. Defaults to None.
         colorbar_range (List[int], optional): The range of the colorbar. Defaults to [0, 1].
         colorbar_shrink (float, optional): The shrink of the colorbar. Defaults to 0.8.
@@ -185,11 +188,13 @@ def _plot_embedding(
     plt.style.use("default")
     plt.rcParams["grid.color"] = "black"
     plt.rcParams['font.family'] = font
-    fig = plt.figure(figsize = figsize)
+    _, ax = plt.subplots(figsize = figsize, subplot_kw={'projection': '3d'})
+
+    # Adjust the scale of the axis.
+    ax.get_proj = lambda: np.dot(Axes3D.get_proj(ax), np.diag([0.9, 0.9, 0.9, 1]))
 
     # Set the axis
     if dim == 3:
-        ax = fig.add_subplot(1, 1, 1, projection='3d')
         ax.set_xlabel(xlabel, fontsize = xlabel_size)
         ax.set_ylabel(ylabel, fontsize = ylabel_size)
         ax.set_zlabel(zlabel, fontsize = zlabel_size)
@@ -207,7 +212,6 @@ def _plot_embedding(
         ax.zaxis.pane.set_edgecolor('w')
 
     elif dim == 2:
-        ax = fig.add_subplot(1, 1, 1)
         ax.set_xlabel(xlabel, fontsize = xlabel_size)
         ax.set_ylabel(ylabel, fontsize = ylabel_size)
 
@@ -272,7 +276,7 @@ def _plot_embedding(
 
     if fig_dir is not None:
         fig_path = os.path.join(fig_dir, f"{fig_name}.{fig_ext}")
-        plt.savefig(fig_path, bbox_inches='tight', dpi=300)
+        plt.savefig(fig_path, dpi=300, bbox_inches='tight')
 
     if show_figure:
         plt.show()

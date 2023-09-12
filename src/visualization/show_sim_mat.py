@@ -64,7 +64,11 @@ def show_sim_mat(
     """
 
     if fig_dir is None:
-        fig_dir = align_representation.main_results_dir + "/individual_sim_mat/"
+        fig_dir = os.path.join(
+            align_representation.main_results_dir,
+            "individual_sim_mat",
+            align_representation.config.init_mat_plan
+        )
         os.makedirs(fig_dir, exist_ok=True)
 
     axes = []

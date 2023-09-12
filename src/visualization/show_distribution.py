@@ -46,8 +46,13 @@ def show_distribution(
     """
 
     if fig_dir is None:
-        fig_dir = align_representation.main_results_dir + "/individual_distribution/"
-        os.makedirs(fig_dir, exist_ok=True)
+        fig_dir = os.path.join(
+            align_representation.main_results_dir,
+            "individual_distribution",
+            align_representation.config.init_mat_plan
+        )
+        if not os.path.exists(fig_dir):
+            os.makedirs(fig_dir)
 
     axis = []
     for representation in align_representation.representations_list:

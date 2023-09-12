@@ -75,7 +75,11 @@ def plot_accuracy(
     fig.subplots_adjust(left=0.2, right=0.9, bottom=0.2)
 
     if fig_dir is None:
-        fig_dir = os.path.join(align_representation.main_results_dir, "matching_rate")
+        fig_dir = os.path.join(
+            align_representation.main_results_dir,
+            "matching_rate",
+            align_representation.config.init_mat_plan
+        )
         if not os.path.exists(fig_dir):
             os.makedirs(fig_dir)
 

@@ -49,7 +49,7 @@ def load_transformer(
         emb_transformer = Isomap(n_components=dim, **kwargs)
 
     elif emb_name == "MDS":
-        emb_transformer = MDS(n_components=dim, **kwargs)
+        emb_transformer = MDS(n_components=dim, normalized_stress='auto', **kwargs)
 
     else:
         raise ValueError(f"Unknown embedding algorithm: {emb_name}")

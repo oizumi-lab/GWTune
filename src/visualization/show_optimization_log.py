@@ -63,6 +63,11 @@ def show_optimization_log(
         eps_gwd_axs.append(eps_gwd_ax)
         acc_gwd_axs.append(acc_gwd_ax)
 
+    # close figures
+    open_figures = plt.get_fignums()
+    for fig_num in open_figures:
+        plt.close(fig_num)
+
     return eps_gwd_axs, acc_gwd_axs
 
 
