@@ -562,6 +562,8 @@ class PairwiseAnalysis:
                 return the computed OT. Defaults to False.
             return_figure (bool, optional):
                 make the result figures or not. Defaults to True.
+            visualization_config (VisualizationConfig, optional):
+                container of parameters used for figure. Defaults to VisualizationConfig().
             show_log (bool, optional):
                 If True, the evaluation figure of GWOT will be made. Defaults to False.
             fig_dir (str, optional):
@@ -1157,6 +1159,9 @@ class PairwiseAnalysis:
 
             category_mat (Optional[np.ndarray], optional):
                 This will be used for the category info. Defaults to None.
+
+            visualization_config (VisualizationConfig, optional):
+                container of parameters used for figure. Defaults to VisualizationConfig().
         """
 
         self.OT, df_trial = self._entropic_gw_alignment(compute_OT=False)
@@ -1579,10 +1584,10 @@ class AlignRepresentations:
                         elif isinstance(self.config.multi_gpu, list):
                             gpu_idx = pair_number % len(self.config.multi_gpu)
                             target_device = "cuda:" + str(self.config.multi_gpu[gpu_idx])
-
+                        
                         elif self.config.multi_gpu == False:
                             target_device = self.config.device
-
+                        
                         else:
                             raise ValueError("please 'multi_GPU = True or False or list of GPU index'.")
 
@@ -1904,6 +1909,9 @@ class AlignRepresentations:
 
             category_mat (Optional[Any], optional):
                 This will be used for the category info. Defaults to None.
+
+            visualization_config (VisualizationConfig, optional):
+                container of parameters used for figure. Defaults to VisualizationConfig().
         """
 
         if parallel_method == "multiprocess":
@@ -2055,6 +2063,8 @@ class AlignRepresentations:
             OT_format (str, optional):
                 Format of similarity matrix to visualize. Options include "default", "sorted", and "both".
                 Defaults to "default".
+            visualization_config (VisualizationConfig, optional):
+                Container of parameters used for figure. Defaults to VisualizationConfig().
             show_log (bool, optional):
                 If True, displays the evaluation figure of GWOT. Defaults to False.
             fig_dir (Optional[str], optional):
