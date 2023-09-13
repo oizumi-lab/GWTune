@@ -677,7 +677,7 @@ class PairwiseAnalysis:
             self.filename = filename
 
         self.results_dir = results_dir
-        self.save_path = os.path.join(results_dir, self.data_name, self.filename, self.config.init_mat_plan)
+        self.save_path = os.path.join(results_dir, self.filename, self.config.init_mat_plan)
         self.figure_path = os.path.join(self.save_path, 'figure')
         self.data_path = os.path.join(self.save_path, 'data')
 
@@ -1990,7 +1990,7 @@ class AlignRepresentations:
         """
 
         if fig_dir is None:
-            fig_dir = os.path.join(self.main_results_dir, self.data_name, "individual_sim_mat", self.config.init_mat_plan)
+            fig_dir = os.path.join(self.main_results_dir, "individual_sim_mat", self.config.init_mat_plan)
             os.makedirs(fig_dir, exist_ok=True)
 
         for representation in self.representations_list:
@@ -2752,7 +2752,7 @@ class AlignRepresentations:
         """
 
         if fig_dir is None:
-            fig_dir = os.path.join(self.main_results_dir, self.data_name, "visualize_embedding", self.config.init_mat_plan)
+            fig_dir = os.path.join(self.main_results_dir, "visualize_embedding", self.config.init_mat_plan)
             os.makedirs(fig_dir, exist_ok=True)
 
         fig_path = os.path.join(fig_dir, f"{fig_name}.{visualization_config.visualization_params['fig_ext']}")
