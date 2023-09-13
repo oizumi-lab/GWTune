@@ -2145,14 +2145,15 @@ class AlignRepresentations:
                 for pair_number in range(len(self.pairwise_list)):
                     
                     if self.config.to_types == "torch":
-                        if self.config.multi_gpu:
+                        if self.config.multi_gpu == True:
                             target_device = "cuda:" + str(pair_number % torch.cuda.device_count())
-                        else:
-                            target_device = self.config.device
-
-                        if isinstance(self.config.multi_gpu, list):
+                        
+                        elif isinstance(self.config.multi_gpu, list):
                             gpu_idx = pair_number % len(self.config.multi_gpu)
                             target_device = "cuda:" + str(self.config.multi_gpu[gpu_idx])
+                        
+                        else:
+                            target_device = self.config.device
 
                     pairwise = self.pairwise_list[pair_number]
 
