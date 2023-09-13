@@ -598,7 +598,7 @@ class PairwiseAnalysis:
         )
 
         if save_dataframe:
-            df_trial.to_csv(self.save_path + "/" + self.instance_name + ".csv")
+            df_trial.to_csv(self.save_path + "/" + self.filename + ".csv")
 
         # sort OT
         if OT_format == "default":
