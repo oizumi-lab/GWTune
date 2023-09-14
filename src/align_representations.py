@@ -456,7 +456,11 @@ class Representation:
         Returns:
             np.ndarray: The computed embeddings.
         """
-        MDS_embedding = manifold.MDS(n_components=dim, dissimilarity="precomputed", random_state=0)
+        MDS_embedding = manifold.MDS(
+            n_components=dim,
+            dissimilarity="precomputed",
+            normalized_stress="auto",
+            random_state=0)
         embedding = MDS_embedding.fit_transform(self.sim_mat)
         return embedding
 
@@ -743,13 +747,11 @@ class PairwiseAnalysis:
         plt.clf()
         plt.close()
 
-    def RSA(self, metric: str = "spearman", method: str = "normal") -> float:
+    def RSA(self, metric: str = "spearman") -> float:
         """Conventional representation similarity analysis (RSA).
 
         Args:
             metric (str, optional): spearman or pearson. Defaults to "spearman".
-            method (str, optional): compute RSA from all ("all") or upper tri ("normal")
-                                    of the element in the matrices. Defaults to "normal".
 
         Returns:
             corr : RSA value
@@ -759,20 +761,13 @@ class PairwiseAnalysis:
 
         a, b = self._change_types_to_numpy(a, b)
 
-        if method == "normal":
-            upper_tri_a = a[np.triu_indices(a.shape[0], k=1)]
-            upper_tri_b = b[np.triu_indices(b.shape[0], k=1)]
+        upper_tri_a = a[np.triu_indices(a.shape[0], k=1)]
+        upper_tri_b = b[np.triu_indices(b.shape[0], k=1)]
 
-            if metric == "spearman":
-                corr, _ = spearmanr(upper_tri_a, upper_tri_b)
-            elif metric == "pearson":
-                corr, _ = pearsonr(upper_tri_a, upper_tri_b)
-
-        elif method == "all":
-            if metric == "spearman":
-                corr, _ = spearmanr(a.flatten(), b.flatten())
-            elif metric == "pearson":
-                corr, _ = pearsonr(a.flatten(), b.flatten())
+        if metric == "spearman":
+            corr, _ = spearmanr(upper_tri_a, upper_tri_b)
+        elif metric == "pearson":
+            corr, _ = pearsonr(upper_tri_a, upper_tri_b)
 
         return corr
 
@@ -1948,18 +1943,15 @@ class AlignRepresentations:
 
         return pairwise_list
 
-    def RSA_get_corr(self, metric: str = "spearman", method: str = "normal") -> None:
+    def RSA_get_corr(self, metric: str = "spearman") -> None:
         """Conventional representation similarity analysis (RSA).
 
         Args:
             metric (str, optional):
                 spearman or pearson. Defaults to "spearman".
-            method (str, optional):
-                compute RSA from all ("all") or upper tri ("normal") of the element in the matrices.
-                Defaults to "normal".
         """
         for pairwise in self.pairwise_list:
-            corr = pairwise.RSA(metric=metric, method=method)
+            corr = pairwise.RSA(metric=metric)
             self.RSA_corr[pairwise.pair_name] = corr
             print(f"Correlation {pairwise.pair_name.replace('_', ' ')} : {corr}")
 
@@ -2119,15 +2111,15 @@ class AlignRepresentations:
             first_sampler_seed = fix_sampler_seed
         else:
             raise ValueError("please 'sampler_seed' = True or False or int > 0.")
-        
-        
+
+
         if self.config.to_types == "numpy":
             if self.config.multi_gpu != False:
                 warnings.warn("numpy doesn't use GPU. Please 'multi_GPU = False'.", UserWarning)
                 self.config.multi_gpu = False
-            
+
             assert self.config.device == "cpu", "numpy doesn't use GPU. Please 'device = cpu'."
-            
+
             target_device = self.config.device
 
         if self.config.n_jobs > 1:
@@ -2143,15 +2135,15 @@ class AlignRepresentations:
 
             with pool:
                 for pair_number in range(len(self.pairwise_list)):
-                    
+
                     if self.config.to_types == "torch":
                         if self.config.multi_gpu == True:
                             target_device = "cuda:" + str(pair_number % torch.cuda.device_count())
-                        
+
                         elif isinstance(self.config.multi_gpu, list):
                             gpu_idx = pair_number % len(self.config.multi_gpu)
                             target_device = "cuda:" + str(self.config.multi_gpu[gpu_idx])
-                        
+
                         else:
                             target_device = self.config.device
 
