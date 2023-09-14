@@ -14,20 +14,20 @@ You can find these tutorials in the `tutorial_other_datasets` folder.
 We outline instructions for installing the required packages using `poetry`, `conda`, `pip`.
 
 ### Step1
-- poetry 
+- `poetry`
     
     Install the required packages using `pyproject.toml`
     ```
     poetry install
     ```
-- conda
+- `conda`
 
     Install the required packages using `environemnt.yaml`
     ```
     conda env create -n GWTune -f environment.yaml
     source activate GWTune
     ```
-- pip
+- `pip`
     
     Install the required packages using `requirements.txt`.
     ```
@@ -52,12 +52,12 @@ For compatibility information, see the [official pytorch page](https://pytorch.o
 If you use this toolbox in your research and find it useful, please cite the following papers and give a star ⭐.
 
 [1] Toolbox for Gromov-Wasserstein optimal transport: Application to unsupervised alignment in neuroscience   
-Masaru Sasaki*, Ken Takeda*, Kota Abe, Masafumi Oizumi    
+Masaru Sasaki\*, Ken Takeda\*, Kota Abe, Masafumi Oizumi    
 bioRxiv: To be uploaded   
-*equal contribution   
+\*equal contribution   
 
 [2] Is my "red" your "red"?: Unsupervised alignment of qualia structures via optimal transport.  
-Genji Kawakita*, Ariel Zeleznikow-Johnston*, Ken Takeda*, Naotsugu Tsuchiya, Masafumi Oizumi  
+Genji Kawakita\*, Ariel Zeleznikow-Johnston\*, Ken Takeda\*, Naotsugu Tsuchiya, Masafumi Oizumi  
 PsyArxiv: https://psyarxiv.com/h3pqm/  
 *equal contribution
 
