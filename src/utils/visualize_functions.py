@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from mpl_toolkits.mplot3d import Axes3D
 from sklearn.decomposition import PCA
 
 
@@ -160,7 +161,7 @@ def show_heatmap(
     category_line_alpha = kwargs.get('category_line_alpha', 0.2)
     category_line_style = kwargs.get('category_line_style', 'dashed')
     category_line_color = kwargs.get('category_line_color', 'C2')
-    
+
     font = kwargs.get('font', 'Noto Sans CJK JP')
     show_figure = kwargs.get('show_figure', True)
 
@@ -412,6 +413,9 @@ class VisualizeEmbedding():
 
         else:
             raise ValueError("'dim' is either 2 or 3")
+
+        # Adjust the scale of the axis.
+        ax.get_proj = lambda: np.dot(Axes3D.get_proj(ax), np.diag([0.9, 0.9, 0.9, 1]))
 
         ax.grid(True)
         ax.xaxis.set_ticklabels([])
