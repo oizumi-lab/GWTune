@@ -14,44 +14,32 @@ You can find these tutorials in the `tutorial_other_datasets` folder.
 We outline instructions for installing the required packages using `poetry`, `conda`, `pip`.
 
 ### Step1
-- poetry 
+- `poetry`
     
     Install the required packages using `pyproject.toml`
     ```
     poetry install
     ```
-- conda
+- `conda`
 
     Install the required packages using `environemnt.yaml`
     ```
     conda env create -n GWTune -f environment.yaml
     source activate GWTune
     ```
-- pip
+- `pip`
     
-    Consider using a virtual environment when installing the required packages via pip.
+    Install the required packages using `requirements.txt`.
     ```
-    virtualenv .env
-    source .env/bin/activate
-    ```
-    Then, install the packages using `requirements.txt`.
-    ```
+    virtualenv .env && source .env/bin/activate
     pip install -r requirements.txt
     ```
 
 ### Step2
 After installing the packages above, install `torch` that is compatible with your environment.    
-For compatibility information, see the [official pytorch page](https://pytorch.org/get-started/locally/). 
-
-## Folders in this repository  
-
-`data`: Datasets for tutorials.  
-`scripts`: Scripts for GWOT optimization tutorials.  
-`src`: Core modules for GWOT hyperparameter optimization.  
-`src/utils`: Utility modules that are not specific to GWOT optimization but are useful for general purposes.  
+For compatibility information, see the [official pytorch page](https://pytorch.org/get-started/locally/).  
 
 ## Datasets for the main tutorial
-
 1. `color`: Human similarity judgements of 93 colors for 5 participant groups made from the data used in [Kawakita et al., 2023, PsyArxiv](https://psyarxiv.com/h3pqm/)
 2. `THINGS` : Human similarity judgments of 1854 objects for 4 participant groups made from [the THINGS dataset](https://things-initiative.org/)  
 
@@ -61,15 +49,15 @@ For compatibility information, see the [official pytorch page](https://pytorch.o
 5. `simulation`: Synthetic data illustrating differences between supervised alignment and unsupervised alignment
 
 ### Using and Citing the toolbox
-If you use this toolbox in your research and find it useful, please cite the following papers.
+If you use this toolbox in your research and find it useful, please cite the following papers and give a star ⭐.
 
 [1] Toolbox for Gromov-Wasserstein optimal transport: Application to unsupervised alignment in neuroscience   
-Masaru Sasaki*, Ken Takeda*, Kota Abe, Masafumi Oizumi    
+Masaru Sasaki\*, Ken Takeda\*, Kota Abe, Masafumi Oizumi    
 bioRxiv: To be uploaded   
-*equal contribution   
+\*equal contribution   
 
 [2] Is my "red" your "red"?: Unsupervised alignment of qualia structures via optimal transport.  
-Genji Kawakita*, Ariel Zeleznikow-Johnston*, Ken Takeda*, Naotsugu Tsuchiya, Masafumi Oizumi  
+Genji Kawakita\*, Ariel Zeleznikow-Johnston\*, Ken Takeda\*, Naotsugu Tsuchiya, Masafumi Oizumi  
 PsyArxiv: https://psyarxiv.com/h3pqm/  
 *equal contribution
 
