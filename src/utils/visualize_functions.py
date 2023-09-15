@@ -275,16 +275,18 @@ class VisualizeEmbedding():
         self,
         embedding_list : List[np.ndarray],
         dim: int,
-        method: str = "PCA",
+        method: Optional[str] = "PCA",
+        method_params: Optional[dict] = None,
         category_name_list: Optional[List[str]] = None,
         num_category_list: Optional[List[int]] = None,
-        category_idx_list: Optional[List[int]] = None
+        category_idx_list: Optional[List[int]] = None,
     ) -> None:
         """Initialize the VisualizeEmbedding class.
 
         Args:
             embedding_list (List[np.ndarray]): A list of embeddings.
-            dim (int): Dimension (either 2 or 3) for the visualization after applying PCA.
+            dim (int): Dimension (either 2 or 3) for the visualization after applying dimensionality reduction.
+            method (Optional[str]): Dimensionality reduction method. Defaults to "PCA". If None, the embedding will not be reduced.
             category_name_list (Optional[List[str]]): List of category names. Defaults to None.
             num_category_list (Optional[List[int]]): List of the number of items in each category. Defaults to None.
             category_idx_list (Optional[List[int]]): Index list for categories. Defaults to None.
@@ -298,12 +300,15 @@ class VisualizeEmbedding():
                 category_concat_embedding_list.append(concatenated_embedding)
             self.embedding_list = category_concat_embedding_list
 
-        if self.embedding_list[0].shape[1] > 3:
-            self.embedding_list = self.apply_dim_reduction_to_embedding_list(
-                n_dim = dim,
-                method = method,
-                show_result = False,
-            )
+        if method_params is None:
+            method_params = {}
+
+        self.embedding_list = self.apply_dim_reduction_to_embedding_list(
+            n_dim = dim,
+            method = method,
+            show_result = False,
+            **method_params
+        )
 
         self.dim = dim
         self.method = method
@@ -314,8 +319,9 @@ class VisualizeEmbedding():
     def apply_dim_reduction_to_embedding_list(
         self,
         n_dim: int,
-        method: str = "PCA",
+        method: Optional[str] = "PCA",
         show_result: bool = True,
+        **kwargs
     ) -> List[np.ndarray]:
         """Apply dimensionality reduction to the embedding list.
 
@@ -328,13 +334,17 @@ class VisualizeEmbedding():
         Returns:
             low_embedding_list (list): A list of embeddings after dimensionality reduction.
         """
+        if method is None:
+            assert self.embedding_list[0].shape[1] <= 3, "The dimension of the embedding is less than 4. Please set 'method'."
+            low_embedding_list = self.embedding_list
 
-        emb_transformer = self.load_emb_transformer(method=method, n_dim=n_dim)
-        n_object = self.embedding_list[0].shape[0]
-        embedding_list_cat = np.concatenate([self.embedding_list[i] for i in range(len(self.embedding_list))], axis = 0)
+        else:
+            emb_transformer = self.load_emb_transformer(method=method, n_dim=n_dim, **kwargs)
+            n_object = self.embedding_list[0].shape[0]
+            embedding_list_cat = np.concatenate([self.embedding_list[i] for i in range(len(self.embedding_list))], axis = 0)
 
-        low_embedding_list = emb_transformer.fit_transform(embedding_list_cat)
-        low_embedding_list = [low_embedding_list[i*n_object:(i+1)*n_object] for i in range(len(self.embedding_list))]
+            low_embedding_list = emb_transformer.fit_transform(embedding_list_cat)
+            low_embedding_list = [low_embedding_list[i*n_object:(i+1)*n_object] for i in range(len(self.embedding_list))]
 
         if show_result:
             assert method == "PCA", "show_result is only available for PCA."
