@@ -2700,6 +2700,7 @@ class AlignRepresentations:
     def visualize_embedding(
         self,
         dim: int,
+        method: str = "PCA",
         pivot: Union[int, str] = 0,
         returned: str = "figure",
         visualization_config: VisualizationConfig = VisualizationConfig(),
@@ -2716,6 +2717,8 @@ class AlignRepresentations:
         Args:
             dim (int):
                 The number of dimensions in which the points are embedded.
+            method (str, optional):
+                The method used to reduce the dimensionality of the embedding. Options include "PCA", "TSNE", "Isomap" and "MDS".
             pivot (Union[int, str], optional):
                 The index of the pivot Representation or the name of the pivot Representation. Defaults to 0.
             returned (str, optional):
@@ -2774,6 +2777,7 @@ class AlignRepresentations:
             visualize_embedding = visualize_functions.VisualizeEmbedding(
                 embedding_list=embedding_list,
                 dim=dim,
+                method=method,
                 category_name_list=category_name_list,
                 num_category_list=num_category_list,
                 category_idx_list=category_idx_list,

@@ -7,6 +7,7 @@ import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE, Isomap, MDS
 
 
 def get_color_labels(
@@ -274,6 +275,7 @@ class VisualizeEmbedding():
         self,
         embedding_list : List[np.ndarray],
         dim: int,
+        method: str = "PCA",
         category_name_list: Optional[List[str]] = None,
         num_category_list: Optional[List[int]] = None,
         category_idx_list: Optional[List[int]] = None
@@ -297,42 +299,79 @@ class VisualizeEmbedding():
             self.embedding_list = category_concat_embedding_list
 
         if self.embedding_list[0].shape[1] > 3:
-            self.embedding_list = self.apply_pca_to_embedding_list(n_dim_pca = dim, show_result = False)
+            self.embedding_list = self.apply_dim_reduction_to_embedding_list(
+                n_dim = dim,
+                method = method,
+                show_result = False,
+            )
 
         self.dim = dim
+        self.method = method
         self.category_name_list = category_name_list
         self.num_category_list = num_category_list
         self.category_idx_list = category_idx_list
 
-    def apply_pca_to_embedding_list(self, n_dim_pca: int, show_result: bool = True) -> List[np.ndarray]:
-        """Apply pca to the embedding list.
+    def apply_dim_reduction_to_embedding_list(
+        self,
+        n_dim: int,
+        method: str = "PCA",
+        show_result: bool = True,
+    ) -> List[np.ndarray]:
+        """Apply dimensionality reduction to the embedding list.
 
         Args:
             embedding_list (list): A list of embeddings.
-            n_dim_pca (int): Dimmension after PCA.
+            n_dim (int): Dimmension after dimensionality reduction.
+            method (str, optional): Dimensionality reduction method. Defaults to "PCA".
             show_result (bool, optional): If true, show the cumulative contibution rate. Defaults to True.
 
         Returns:
-            embedding_list_pca (list): A list of embeddings after PCA.
+            low_embedding_list (list): A list of embeddings after dimensionality reduction.
         """
 
-        pca = PCA(n_components = n_dim_pca)
+        emb_transformer = self.load_emb_transformer(method=method, n_dim=n_dim)
         n_object = self.embedding_list[0].shape[0]
         embedding_list_cat = np.concatenate([self.embedding_list[i] for i in range(len(self.embedding_list))], axis = 0)
-        embedding_list_pca = pca.fit_transform(embedding_list_cat)
-        embedding_list_pca = [embedding_list_pca[i*n_object:(i+1)*n_object] for i in range(len(self.embedding_list))]
+
+        low_embedding_list = emb_transformer.fit_transform(embedding_list_cat)
+        low_embedding_list = [low_embedding_list[i*n_object:(i+1)*n_object] for i in range(len(self.embedding_list))]
 
         if show_result:
+            assert method == "PCA", "show_result is only available for PCA."
             fig = plt.figure()
             ax = fig.add_subplot(1, 1, 1)
             plt.gca().get_xaxis().set_major_locator(ticker.MaxNLocator(integer=True))
-            ax.plot([0] + list( np.cumsum(pca.explained_variance_ratio_)), "-o")
+            ax.plot([0] + list(np.cumsum(emb_transformer.explained_variance_ratio_)), "-o")
             plt.xlabel("Number of principal components")
             plt.ylabel("Cumulative contribution rate")
             plt.grid()
             plt.show()
 
-        return embedding_list_pca
+        return low_embedding_list
+
+    def load_emb_transformer(
+        self,
+        method: str = "PCA",
+        n_dim: int = 3,
+        **kwargs
+    ) -> Any:
+
+        if method == "PCA":
+            emb_transformer = PCA(n_components=n_dim, **kwargs)
+
+        elif method == "TSNE":
+            emb_transformer = TSNE(n_components=n_dim, **kwargs)
+
+        elif method == "Isomap":
+            emb_transformer = Isomap(n_components=n_dim, **kwargs)
+
+        elif method == "MDS":
+            emb_transformer = MDS(n_components=n_dim, normalized_stress="auto", **kwargs)
+
+        else:
+            raise ValueError(f"Unknown embedding algorithm: {method}")
+
+        return emb_transformer
 
     def plot_embedding(
         self,
