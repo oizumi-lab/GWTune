@@ -36,7 +36,8 @@ We outline instructions for installing the required packages using `poetry`, `co
     ```
 
 ### Step2
-After installing the above packages, install `torch` that is compatible with your environment.    
+Although this toolbox works on CPU only, using a GPU will be more effective, especially when the number of points to align is large.    
+If you are using a GPU, install `torch` that is compatible with your environment.    
 See the [official pytorch page](https://pytorch.org/get-started/locally/) for compatibility information.
 
 ## Datasets for the main tutorial
@@ -45,8 +46,8 @@ See the [official pytorch page](https://pytorch.org/get-started/locally/) for co
 
 ### Other tutorial datasets 
 3. `AllenBrain`: Neuropixels recordings in the primary visual cortex of mice from [the Visual Coding - Neuropixels dataset](https://portal.brain-map.org/explore/circuits/visual-coding-neuropixels)    
-4. `DNN`: Internal representations of vision DNNs (ResNet50 and VGG19) for a subset of visual images from the ImageNet dataset   
-5. `simulation`: Synthetic data illustrating the differences between supervised alignment and unsupervised alignment
+4. `DNN`: Internal representations of vision DNNs (ResNet50 and VGG19) for visual images from the ImageNet dataset   
+5. `simulation`: Synthetic data illustrating the differences between supervised and unsupervised alignment
 
 ### Using and Citing the Toolbox
 If you use this toolbox in your research and find it useful, please cite the following papers and give a star ⭐.
