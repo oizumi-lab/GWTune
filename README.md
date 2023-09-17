@@ -53,14 +53,14 @@ See the [official pytorch page](https://pytorch.org/get-started/locally/) for co
 If you use this toolbox in your research and find it useful, please cite the following papers and give a star ⭐.
 
 [1] Toolbox for Gromov-Wasserstein optimal transport: Application to unsupervised alignment in neuroscience   
-Masaru Sasaki\*, Ken Takeda\*, Kota Abe, Masafumi Oizumi    
-bioRxiv: [Sasaki and Takeda et al., 2023, bioRxiv](https://www.biorxiv.org/content/10.1101/2023.09.15.558038v1)  
-\*equal contribution   
+Masaru Sasaki&dagger;, Ken Takeda&dagger;, Kota Abe, Masafumi Oizumi    
+[bioRxiv](https://www.biorxiv.org/content/10.1101/2023.09.15.558038v1)     
+&dagger;: equal contribution   
 
-[2] Is my "red" your "red"?: Unsupervised alignment of qualia structures via optimal transport.  
-Genji Kawakita\*, Ariel Zeleznikow-Johnston\*, Ken Takeda\*, Naotsugu Tsuchiya, Masafumi Oizumi  
-PsyArxiv: [Kawakita et al., 2023, PsyArxiv](https://psyarxiv.com/h3pqm/)  
-\*equal contribution
+[2] Is my "red" your "red"?: Unsupervised alignment of qualia structures via optimal transport  
+Genji Kawakita&dagger;, Ariel Zeleznikow-Johnston&dagger;, Ken Takeda&dagger;, Naotsugu Tsuchiya&Dagger;, Masafumi Oizumi&Dagger;  
+[PsyArxiv](https://psyarxiv.com/h3pqm/)   
+&dagger;, &Dagger;: equal contribution
 
 ## References
 If you are interested in the details of the datasets used in the tutorials or in the mathematical details of unsupervised alignment based on GWOT, please refer to the above papers [1,2].  
