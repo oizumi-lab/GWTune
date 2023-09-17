@@ -54,7 +54,7 @@ If you use this toolbox in your research and find it useful, please cite the fol
 
 [1] Toolbox for Gromov-Wasserstein optimal transport: Application to unsupervised alignment in neuroscience   
 Masaru Sasaki\*, Ken Takeda\*, Kota Abe, Masafumi Oizumi    
-bioRxiv: https://www.biorxiv.org/content/10.1101/2023.09.15.558038v1
+bioRxiv: https://www.biorxiv.org/content/10.1101/2023.09.15.558038v1  
 \*equal contribution   
 
 [2] Is my "red" your "red"?: Unsupervised alignment of qualia structures via optimal transport.  
