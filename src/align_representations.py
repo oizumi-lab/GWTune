@@ -1165,7 +1165,7 @@ class PairwiseAnalysis:
         OT_format: str = "default",
         return_data: bool = False,
         return_figure: bool = True,
-        visualization_config: 'VisualizationConfig' = VisualizationConfig(),
+        visualization_config: VisualizationConfig = VisualizationConfig(),
         fig_dir: Optional[str] = None,
         ticks: Optional[str] = None
     ) -> Any:
