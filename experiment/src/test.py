@@ -115,3 +115,11 @@ print(original(ii, k=1, order='minimum'))
 print(revised(ii, k=1, order='minimum'))
 
 # %%
+import numpy as np
+from scipy.stats import pearsonr
+a = np.arange(36).reshape(6, 6)
+b = np.arange(36).reshape(6, 6)
+triu = np.triu_indices(6, 1)
+
+pearsonr(a[triu], b[triu])
+# %%
