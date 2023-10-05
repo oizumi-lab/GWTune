@@ -5,7 +5,9 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from mpl_toolkits.mplot3d import Axes3D
 from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE, Isomap, MDS
 
 
 def get_color_labels(
@@ -160,7 +162,7 @@ def show_heatmap(
     category_line_alpha = kwargs.get('category_line_alpha', 0.2)
     category_line_style = kwargs.get('category_line_style', 'dashed')
     category_line_color = kwargs.get('category_line_color', 'C2')
-    
+
     font = kwargs.get('font', 'Noto Sans CJK JP')
     show_figure = kwargs.get('show_figure', True)
 
@@ -199,8 +201,9 @@ def show_heatmap(
 
     if ot_object_tick and not ot_category_tick:
         if ticks == "numbers":
-            plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = xticks_size, rotation = xticks_rotation)
-            plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = yticks_size, rotation = yticks_rotation)
+            # plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = xticks_size, rotation = xticks_rotation)
+            # plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = yticks_size, rotation = yticks_rotation)
+            pass
         elif ticks == "objects":
             # assert object_labels is not None
             plt.xticks(ticks = np.arange(len(x_object_labels)), labels = x_object_labels, size = xticks_size, rotation = xticks_rotation)
@@ -272,15 +275,18 @@ class VisualizeEmbedding():
         self,
         embedding_list : List[np.ndarray],
         dim: int,
+        method: Optional[str] = "PCA",
+        method_params: Optional[dict] = None,
         category_name_list: Optional[List[str]] = None,
         num_category_list: Optional[List[int]] = None,
-        category_idx_list: Optional[List[int]] = None
+        category_idx_list: Optional[List[int]] = None,
     ) -> None:
         """Initialize the VisualizeEmbedding class.
 
         Args:
             embedding_list (List[np.ndarray]): A list of embeddings.
-            dim (int): Dimension (either 2 or 3) for the visualization after applying PCA.
+            dim (int): Dimension (either 2 or 3) for the visualization after applying dimensionality reduction.
+            method (Optional[str]): Dimensionality reduction method. Defaults to "PCA". If None, the embedding will not be reduced.
             category_name_list (Optional[List[str]]): List of category names. Defaults to None.
             num_category_list (Optional[List[int]]): List of the number of items in each category. Defaults to None.
             category_idx_list (Optional[List[int]]): Index list for categories. Defaults to None.
@@ -294,43 +300,88 @@ class VisualizeEmbedding():
                 category_concat_embedding_list.append(concatenated_embedding)
             self.embedding_list = category_concat_embedding_list
 
-        if self.embedding_list[0].shape[1] > 3:
-            self.embedding_list = self.apply_pca_to_embedding_list(n_dim_pca = dim, show_result = False)
+        if method_params is None:
+            method_params = {}
+
+        self.embedding_list = self.apply_dim_reduction_to_embedding_list(
+            n_dim = dim,
+            method = method,
+            show_result = False,
+            **method_params
+        )
 
         self.dim = dim
+        self.method = method
         self.category_name_list = category_name_list
         self.num_category_list = num_category_list
         self.category_idx_list = category_idx_list
 
-    def apply_pca_to_embedding_list(self, n_dim_pca: int, show_result: bool = True) -> List[np.ndarray]:
-        """Apply pca to the embedding list.
+    def apply_dim_reduction_to_embedding_list(
+        self,
+        n_dim: int,
+        method: Optional[str] = "PCA",
+        show_result: bool = True,
+        **kwargs
+    ) -> List[np.ndarray]:
+        """Apply dimensionality reduction to the embedding list.
 
         Args:
             embedding_list (list): A list of embeddings.
-            n_dim_pca (int): Dimmension after PCA.
+            n_dim (int): Dimmension after dimensionality reduction.
+            method (str, optional): Dimensionality reduction method. Defaults to "PCA".
             show_result (bool, optional): If true, show the cumulative contibution rate. Defaults to True.
 
         Returns:
-            embedding_list_pca (list): A list of embeddings after PCA.
+            low_embedding_list (list): A list of embeddings after dimensionality reduction.
         """
+        if method is None:
+            assert self.embedding_list[0].shape[1] <= 3, "The dimension of the embedding is less than 4. Please set 'method'."
+            low_embedding_list = self.embedding_list
 
-        pca = PCA(n_components = n_dim_pca)
-        n_object = self.embedding_list[0].shape[0]
-        embedding_list_cat = np.concatenate([self.embedding_list[i] for i in range(len(self.embedding_list))], axis = 0)
-        embedding_list_pca = pca.fit_transform(embedding_list_cat)
-        embedding_list_pca = [embedding_list_pca[i*n_object:(i+1)*n_object] for i in range(len(self.embedding_list))]
+        else:
+            emb_transformer = self.load_emb_transformer(method=method, n_dim=n_dim, **kwargs)
+            n_object = self.embedding_list[0].shape[0]
+            embedding_list_cat = np.concatenate([self.embedding_list[i] for i in range(len(self.embedding_list))], axis = 0)
+
+            low_embedding_list = emb_transformer.fit_transform(embedding_list_cat)
+            low_embedding_list = [low_embedding_list[i*n_object:(i+1)*n_object] for i in range(len(self.embedding_list))]
 
         if show_result:
+            assert method == "PCA", "show_result is only available for PCA."
             fig = plt.figure()
             ax = fig.add_subplot(1, 1, 1)
             plt.gca().get_xaxis().set_major_locator(ticker.MaxNLocator(integer=True))
-            ax.plot([0] + list( np.cumsum(pca.explained_variance_ratio_)), "-o")
+            ax.plot([0] + list(np.cumsum(emb_transformer.explained_variance_ratio_)), "-o")
             plt.xlabel("Number of principal components")
             plt.ylabel("Cumulative contribution rate")
             plt.grid()
             plt.show()
 
-        return embedding_list_pca
+        return low_embedding_list
+
+    def load_emb_transformer(
+        self,
+        method: str = "PCA",
+        n_dim: int = 3,
+        **kwargs
+    ) -> Any:
+
+        if method == "PCA":
+            emb_transformer = PCA(n_components=n_dim, **kwargs)
+
+        elif method == "TSNE":
+            emb_transformer = TSNE(n_components=n_dim, **kwargs)
+
+        elif method == "Isomap":
+            emb_transformer = Isomap(n_components=n_dim, **kwargs)
+
+        elif method == "MDS":
+            emb_transformer = MDS(n_components=n_dim, normalized_stress="auto", **kwargs)
+
+        else:
+            raise ValueError(f"Unknown embedding algorithm: {method}")
+
+        return emb_transformer
 
     def plot_embedding(
         self,
@@ -411,6 +462,9 @@ class VisualizeEmbedding():
 
         else:
             raise ValueError("'dim' is either 2 or 3")
+
+        # Adjust the scale of the axis.
+        ax.get_proj = lambda: np.dot(Axes3D.get_proj(ax), np.diag([0.9, 0.9, 0.9, 1]))
 
         ax.grid(True)
         ax.xaxis.set_ticklabels([])

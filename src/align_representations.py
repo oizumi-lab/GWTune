@@ -141,7 +141,7 @@ class VisualizationConfig:
         cbar_label: Optional[str]=None,
         xticks_size: int = 10,
         yticks_size: int = 10,
-        xticks_rotation: int = 90,
+        xticks_rotation: int = 0,
         yticks_rotation: int = 0,
         tick_format: str = '%.2f',
         title_size: int = 20,
@@ -197,7 +197,7 @@ class VisualizationConfig:
             yticks_size (int, optional):
                 Size of the yticks. Defaults to 10.
             xticks_rotation (int, optional):
-                Rotation angle of the xticks. Defaults to 90.
+                Rotation angle of the xticks. Defaults to 0.
             yticks_rotation (int, optional):
                 Rotation angle of the yticks. Defaults to 0.
             tick_format (Optional[str]):
@@ -456,7 +456,11 @@ class Representation:
         Returns:
             np.ndarray: The computed embeddings.
         """
-        MDS_embedding = manifold.MDS(n_components=dim, dissimilarity="precomputed", random_state=0)
+        MDS_embedding = manifold.MDS(
+            n_components=dim,
+            dissimilarity="precomputed",
+            normalized_stress="auto",
+            random_state=0)
         embedding = MDS_embedding.fit_transform(self.sim_mat)
         return embedding
 
@@ -677,7 +681,7 @@ class PairwiseAnalysis:
             self.filename = filename
 
         self.results_dir = results_dir
-        self.save_path = os.path.join(results_dir, self.data_name, self.filename, self.config.init_mat_plan)
+        self.save_path = os.path.join(results_dir, self.filename, self.config.init_mat_plan)
         self.figure_path = os.path.join(self.save_path, 'figure')
         self.data_path = os.path.join(self.save_path, 'data')
 
@@ -743,13 +747,11 @@ class PairwiseAnalysis:
         plt.clf()
         plt.close()
 
-    def RSA(self, metric: str = "spearman", method: str = "normal") -> float:
+    def RSA(self, metric: str = "spearman") -> float:
         """Conventional representation similarity analysis (RSA).
 
         Args:
             metric (str, optional): spearman or pearson. Defaults to "spearman".
-            method (str, optional): compute RSA from all ("all") or upper tri ("normal")
-                                    of the element in the matrices. Defaults to "normal".
 
         Returns:
             corr : RSA value
@@ -759,20 +761,13 @@ class PairwiseAnalysis:
 
         a, b = self._change_types_to_numpy(a, b)
 
-        if method == "normal":
-            upper_tri_a = a[np.triu_indices(a.shape[0], k=1)]
-            upper_tri_b = b[np.triu_indices(b.shape[0], k=1)]
+        upper_tri_a = a[np.triu_indices(a.shape[0], k=1)]
+        upper_tri_b = b[np.triu_indices(b.shape[0], k=1)]
 
-            if metric == "spearman":
-                corr, _ = spearmanr(upper_tri_a, upper_tri_b)
-            elif metric == "pearson":
-                corr, _ = pearsonr(upper_tri_a, upper_tri_b)
-
-        elif method == "all":
-            if metric == "spearman":
-                corr, _ = spearmanr(a.flatten(), b.flatten())
-            elif metric == "pearson":
-                corr, _ = pearsonr(a.flatten(), b.flatten())
+        if metric == "spearman":
+            corr, _ = spearmanr(upper_tri_a, upper_tri_b)
+        elif metric == "pearson":
+            corr, _ = pearsonr(upper_tri_a, upper_tri_b)
 
         return corr
 
@@ -1170,7 +1165,7 @@ class PairwiseAnalysis:
         OT_format: str = "default",
         return_data: bool = False,
         return_figure: bool = True,
-        visualization_config: 'VisualizationConfig' = VisualizationConfig(),
+        visualization_config: VisualizationConfig = VisualizationConfig(),
         fig_dir: Optional[str] = None,
         ticks: Optional[str] = None
     ) -> Any:
@@ -1948,18 +1943,15 @@ class AlignRepresentations:
 
         return pairwise_list
 
-    def RSA_get_corr(self, metric: str = "spearman", method: str = "normal") -> None:
+    def RSA_get_corr(self, metric: str = "spearman") -> None:
         """Conventional representation similarity analysis (RSA).
 
         Args:
             metric (str, optional):
                 spearman or pearson. Defaults to "spearman".
-            method (str, optional):
-                compute RSA from all ("all") or upper tri ("normal") of the element in the matrices.
-                Defaults to "normal".
         """
         for pairwise in self.pairwise_list:
-            corr = pairwise.RSA(metric=metric, method=method)
+            corr = pairwise.RSA(metric=metric)
             self.RSA_corr[pairwise.pair_name] = corr
             print(f"Correlation {pairwise.pair_name.replace('_', ' ')} : {corr}")
 
@@ -1990,7 +1982,7 @@ class AlignRepresentations:
         """
 
         if fig_dir is None:
-            fig_dir = os.path.join(self.main_results_dir, self.data_name, "individual_sim_mat", self.config.init_mat_plan)
+            fig_dir = os.path.join(self.main_results_dir, "individual_sim_mat", self.config.init_mat_plan)
             os.makedirs(fig_dir, exist_ok=True)
 
         for representation in self.representations_list:
@@ -2120,6 +2112,16 @@ class AlignRepresentations:
         else:
             raise ValueError("please 'sampler_seed' = True or False or int > 0.")
 
+
+        if self.config.to_types == "numpy":
+            if self.config.multi_gpu != False:
+                warnings.warn("numpy doesn't use GPU. Please 'multi_GPU = False'.", UserWarning)
+                self.config.multi_gpu = False
+
+            assert self.config.device == "cpu", "numpy doesn't use GPU. Please 'device = cpu'."
+
+            target_device = self.config.device
+
         if self.config.n_jobs > 1:
             OT_list = []
             processes = []
@@ -2134,21 +2136,18 @@ class AlignRepresentations:
             with pool:
                 for pair_number in range(len(self.pairwise_list)):
 
-                    if self.config.multi_gpu:
-                        target_device = "cuda:" + str(pair_number % torch.cuda.device_count())
-                    else:
-                        target_device = self.config.device
+                    if self.config.to_types == "torch":
+                        if self.config.multi_gpu == True:
+                            target_device = "cuda:" + str(pair_number % torch.cuda.device_count())
 
-                    if isinstance(self.config.multi_gpu, list):
-                        gpu_idx = pair_number % len(self.config.multi_gpu)
-                        target_device = "cuda:" + str(self.config.multi_gpu[gpu_idx])
+                        elif isinstance(self.config.multi_gpu, list):
+                            gpu_idx = pair_number % len(self.config.multi_gpu)
+                            target_device = "cuda:" + str(self.config.multi_gpu[gpu_idx])
+
+                        else:
+                            target_device = self.config.device
 
                     pairwise = self.pairwise_list[pair_number]
-
-                    if self.config.to_types == "numpy":
-                        if self.config.multi_gpu != False:
-                            warnings.warn("numpy doesn't use GPU. Please 'multi_GPU = False'.", UserWarning)
-                        target_device = self.config.device
 
                     if change_sampler_seed:
                         sampler_seed = first_sampler_seed + pair_number
@@ -2701,6 +2700,8 @@ class AlignRepresentations:
     def visualize_embedding(
         self,
         dim: int,
+        method: str = "PCA",
+        method_params: Optional[Dict[str, Any]] = None,
         pivot: Union[int, str] = 0,
         returned: str = "figure",
         visualization_config: VisualizationConfig = VisualizationConfig(),
@@ -2717,6 +2718,11 @@ class AlignRepresentations:
         Args:
             dim (int):
                 The number of dimensions in which the points are embedded.
+            method (str, optional):
+                The method used to reduce the dimensionality of the embedding. Options include "PCA", "TSNE", "Isomap" and "MDS".
+            method_params (Optional[Dict[str, Any]], optional):
+                Parameters used for the dimensionality reduction method.
+                See sklearn documentation for details. Defaults to None.
             pivot (Union[int, str], optional):
                 The index of the pivot Representation or the name of the pivot Representation. Defaults to 0.
             returned (str, optional):
@@ -2745,7 +2751,7 @@ class AlignRepresentations:
         """
 
         if fig_dir is None:
-            fig_dir = os.path.join(self.main_results_dir, self.data_name, "visualize_embedding", self.config.init_mat_plan)
+            fig_dir = os.path.join(self.main_results_dir, "visualize_embedding", self.config.init_mat_plan)
             os.makedirs(fig_dir, exist_ok=True)
 
         fig_path = os.path.join(fig_dir, f"{fig_name}.{visualization_config.visualization_params['fig_ext']}")
@@ -2775,6 +2781,8 @@ class AlignRepresentations:
             visualize_embedding = visualize_functions.VisualizeEmbedding(
                 embedding_list=embedding_list,
                 dim=dim,
+                method=method,
+                method_params=method_params,
                 category_name_list=category_name_list,
                 num_category_list=num_category_list,
                 category_idx_list=category_idx_list,
