@@ -1379,7 +1379,8 @@ class PairwiseAnalysis:
             raise ValueError("Invalid order parameter. Must be 'maximum' or 'minimum'.")
 
         # Count the number of rows where the diagonal is in the top k values
-        count = np.sum(np.isin(diagonal, topk_values))
+        count = np.sum([diagonal[i] in topk_values[i] for i in range(matrix.shape[0])])
+
 
         # Calculate the accuracy as the proportion of counts to the total number of rows
         accuracy = count / matrix.shape[0]
