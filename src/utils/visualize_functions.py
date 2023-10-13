@@ -446,13 +446,13 @@ class VisualizeEmbedding():
             ax.xaxis.pane.fill = False
             ax.yaxis.pane.fill = False
             ax.zaxis.pane.fill = False
-            ax.w_xaxis.gridlines.set_color('black')
-            ax.w_yaxis.gridlines.set_color('black')
+            ax.xaxis._axinfo["grid"].update({"color": "black"})
+            ax.yaxis._axinfo["grid"].update({"color": "black"})
             ax.xaxis.pane.set_edgecolor('w')
             ax.yaxis.pane.set_edgecolor('w')
             ax.zaxis.set_ticklabels([])
             ax.axes.get_zaxis().set_visible(True)
-            ax.w_zaxis.gridlines.set_color('black')
+            ax.zaxis._axinfo["grid"].update({"color": "black"})
             ax.zaxis.pane.set_edgecolor('w')
 
         elif self.dim == 2:
@@ -480,7 +480,7 @@ class VisualizeEmbedding():
                     ys = coords_i[:, 1],
                     zs = coords_i[:, 2],
                     marker = markers_list[i],
-                    color = color_labels,
+                    c = color_labels,
                     s = marker_size,
                     alpha = 1,
                     cmap=cmap,
@@ -493,7 +493,7 @@ class VisualizeEmbedding():
                     x = coords_i[:, 0],
                     y = coords_i[:, 1],
                     marker = markers_list[i],
-                    color = color_labels,
+                    c = color_labels,
                     s = marker_size,
                     alpha = 1,
                     cmap=cmap,
