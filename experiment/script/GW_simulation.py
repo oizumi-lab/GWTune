@@ -108,8 +108,8 @@ embedding_1 = add_random_offset(circle, max_offset=3)
 embedding_2 = add_independent_noise(embedding_1, max_noise=3)
 #sim_mat_1 = distance.cdist(embedding, embedding, "euclidean")
 #sim_mat_2 = shuffle_matrix(sim_mat_1, N_divide=500)
-np.save("../../data/simulation1_embedding1.npy", embedding_1)
-np.save("../../data/simulation1_embedding2.npy", embedding_2)
+#np.save("../../data/simulation1_embedding1.npy", embedding_1)
+#np.save("../../data/simulation1_embedding2.npy", embedding_2)
 
 Group1 = Representation(
     name="Group1",
@@ -133,9 +133,10 @@ config = OptimizationConfig(
 
 vis_config = VisualizationConfig(
     figsize=(8, 6), 
-    title_size = 15, 
-    cmap = "rocket",
+    title_size = 0, 
+    cmap = "rocket_r",
     cbar_ticks_size=10,
+    font="Arial"
 )
 
 vis_emb = VisualizationConfig(
@@ -257,9 +258,10 @@ config = OptimizationConfig(
 
 vis_config = VisualizationConfig(
     figsize=(8, 6), 
-    title_size = 15, 
-    cmap = "rocket",
+    title_size = 0, 
+    cmap = "rocket_r",
     cbar_ticks_size=10,
+    font="Arial"
 )
 
 alignment = AlignRepresentations(
@@ -281,8 +283,8 @@ alignment.RSA_get_corr()
 Group1.show_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_2", fig_name="Group1")
 Group2.show_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_2", fig_name="Group2")
 
-np.save("../../data/simulation2_embedding1.npy", Group1.embedding)
-np.save("../../data/simulation2_embedding2.npy", Group2.embedding)
+#np.save("../../data/simulation2_embedding1.npy", Group1.embedding)
+#np.save("../../data/simulation2_embedding2.npy", Group2.embedding)
 # %%
 # GW
 alignment.gw_alignment(
@@ -334,8 +336,8 @@ embedding_2 = rotate_points_around_center(circle, max_offset=0.35, start=N_point
 #new_points = np.array([[10, 10], [-10, -10]])
 #embedding_1 = np.append(embedding_1, new_points, axis=0)
 #embedding_2 = np.append(embedding_2, new_points, axis=0)
-np.save("../../data/simulation3_embedding1.npy", embedding_1)
-np.save("../../data/simulation3_embedding2.npy", embedding_2)
+#np.save("../../data/simulation3_embedding1.npy", embedding_1)
+#np.save("../../data/simulation3_embedding2.npy", embedding_2)
 
 Group1 = Representation(
     name="Group1",
@@ -364,9 +366,10 @@ alignment = AlignRepresentations(
 
 vis_config = VisualizationConfig(
     figsize=(8, 6), 
-    title_size = 15, 
-    cmap = "rocket",
+    title_size = 0, 
+    cmap = "rocket_r",
     cbar_ticks_size=10,
+    font="Arial"
 )
 
 # RSA

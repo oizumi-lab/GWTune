@@ -1271,10 +1271,11 @@ class PairwiseAnalysis:
         top_k_list: List[int],
         ot_to_evaluate: Optional[np.ndarray] = None,
         eval_type: str = "ot_plan",
+        eval_mat: Optional[np.ndarray] = None,
         metric: str = "cosine",
         barycenter: bool = False,
         supervised: bool = False,
-        category_mat: Optional[np.ndarray] = None
+        #category_mat: Optional[np.ndarray] = None
     ) -> pd.DataFrame:
         """Evaluation of the accuracy of the unsupervised alignment
 
@@ -1298,6 +1299,10 @@ class PairwiseAnalysis:
             eval_type (str, optional):
                 two ways to evaluate the accuracy as above. Defaults to "ot_plan".
 
+            eval_mat (Optional[np.ndarray], optional):
+                the matrix that represents grand truth matching.
+                If None, the diagonal matrix will be used.
+                
             metric (str, optional):
                 Please set the metric that can be used in "scipy.spatical.distance.cdist()". Defaults to "cosine".
 
@@ -1339,14 +1344,14 @@ class PairwiseAnalysis:
                 # Compute distances between each points
                 dist_mat = distance.cdist(self.target.embedding, new_embedding_source, metric)
 
-                acc = self._calc_accuracy_with_topk_diagonal(dist_mat, k=k, order="minimum")
+                acc = self._calc_accuracy_with_eval_mat(dist_mat, k=k, eval_mat=eval_mat, order="minimum")
 
             elif eval_type == "ot_plan":
-                acc = self._calc_accuracy_with_topk_diagonal(OT, k=k, order="maximum")
+                acc = self._calc_accuracy_with_eval_mat(OT, k=k, eval_mat=eval_mat, order="maximum")
 
-            elif eval_type == "category":
-                assert category_mat is not None
-                acc = self._calc_accuracy_with_topk_diagonal(OT, k=k, order="maximum", category_mat=category_mat)
+            #elif eval_type == "category":
+            #    assert category_mat is not None
+            #    acc = self._calc_accuracy_with_eval_mat(OT, k=k, eval_mat=eval_mat, order="maximum", category_mat=category_mat)
 
             acc_list.append(acc)
 
@@ -1388,6 +1393,34 @@ class PairwiseAnalysis:
 
         return accuracy
 
+    def _calc_accuracy_with_eval_mat(self, matrix, k, eval_mat=None, order="maximum"):
+        if eval_mat is None:
+            eval_mat = np.eye(matrix.shape[0])
+        else:
+            assert matrix.shape == eval_mat.shape
+        
+        # Get the top k values for each row
+        if order == "maximum":
+            topk_values = np.partition(matrix, -k)[:, -k:]
+        elif order == "minimum":
+            topk_values = np.partition(matrix, k - 1)[:, :k]
+        else:
+            raise ValueError("Invalid order parameter. Must be 'maximum' or 'minimum'.")
+        
+        count = 0
+        for i, row in enumerate(matrix):
+            indices = np.argwhere(eval_mat[i, :] == 1) # indices of grand truth
+            matching_values = row[indices] # and there values on a row
+        
+            # Count the number of rows where the matching values are included in the top k values
+            count += np.isin(matching_values, topk_values[i]).any()
+        
+        # Calculate the accuracy as the proportion of counts to the total number of rows
+        matching_rate = count / matrix.shape[0]
+        matching_rate *= 100
+        
+        return matching_rate
+    
     def procrustes(
         self,
         embedding_target: np.ndarray,
@@ -2538,7 +2571,8 @@ class AlignRepresentations:
         self,
         top_k_list: List[int],
         eval_type: str = "ot_plan",
-        category_mat: Optional[Any] = None,
+        eval_mat: Optional[np.ndarray] = None,
+        #category_mat: Optional[Any] = None,
         barycenter: bool = False,
         return_dataframe: bool = False
     ) -> Optional[pd.DataFrame]:
@@ -2570,7 +2604,7 @@ class AlignRepresentations:
         accuracy["top_n"] = top_k_list
 
         for pairwise in self.pairwise_list:
-            df = pairwise.eval_accuracy(top_k_list, eval_type=eval_type, metric=self.metric, barycenter=barycenter, category_mat=category_mat)
+            df = pairwise.eval_accuracy(top_k_list, eval_type=eval_type, eval_mat=eval_mat, metric=self.metric, barycenter=barycenter)
 
             accuracy = pd.merge(accuracy, df, on="top_n")
 
@@ -2584,9 +2618,9 @@ class AlignRepresentations:
             self.k_nearest_matching_rate = accuracy
             print("K nearest matching rate : \n", accuracy)
 
-        elif eval_type == "category":
-            self.category_level_accuracy = accuracy
-            print("category level accuracy : \n", accuracy)
+        #elif eval_type == "category":
+        #    self.category_level_accuracy = accuracy
+        #    print("category level accuracy : \n", accuracy)
 
         print("Mean : \n", accuracy.iloc[:, 1:].mean(axis="columns"))
 
@@ -2795,3 +2829,5 @@ class AlignRepresentations:
 
         elif returned == "row_data":
             return embedding_list
+
+# %%
