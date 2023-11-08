@@ -3,21 +3,24 @@ import copy
 import glob
 import itertools
 import os
+import re
 import shutil
 import sys
 import warnings
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from concurrent.futures import (ProcessPoolExecutor, ThreadPoolExecutor,
+                                as_completed)
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
 import numpy as np
 import optuna
 import ot
 import pandas as pd
 import seaborn as sns
 import torch
+from matplotlib.colors import LogNorm
 from scipy.spatial import distance
 from scipy.stats import pearsonr, spearmanr
 from sklearn import manifold
@@ -1165,7 +1168,7 @@ class PairwiseAnalysis:
         OT_format: str = "default",
         return_data: bool = False,
         return_figure: bool = True,
-        visualization_config: 'VisualizationConfig' = VisualizationConfig(),
+        visualization_config: VisualizationConfig = VisualizationConfig(),
         fig_dir: Optional[str] = None,
         ticks: Optional[str] = None
     ) -> Any:
@@ -1379,7 +1382,8 @@ class PairwiseAnalysis:
             raise ValueError("Invalid order parameter. Must be 'maximum' or 'minimum'.")
 
         # Count the number of rows where the diagonal is in the top k values
-        count = np.sum(np.isin(diagonal, topk_values))
+        # count = np.sum(np.isin(diagonal, topk_values))
+        count = np.sum([diagonal[i] in topk_values[i] for i in range(matrix.shape[0])])
 
         # Calculate the accuracy as the proportion of counts to the total number of rows
         accuracy = count / matrix.shape[0]
@@ -1707,7 +1711,9 @@ class PairwiseAnalysis:
         show_figure = kwargs.get('show_figure', True)
 
         plt.rcParams.update(plt.rcParamsDefault)
-        plt.style.use("seaborn-darkgrid")
+        styles = matplotlib.style.available
+        darkgrid_style = [s for s in styles if re.match(r"seaborn-.*-darkgrid", s)][0]
+        plt.style.use(darkgrid_style)
 
         plt.figure(figsize = figsize)
         plt.title("$\epsilon$ - GWD (" + self.pair_name.replace("_", " ") + ")", fontsize = title_size)
@@ -2348,7 +2354,9 @@ class AlignRepresentations:
 
         # default setting
         plt.rcParams.update(plt.rcParamsDefault)
-        plt.style.use("seaborn-darkgrid")
+        styles = matplotlib.style.available
+        darkgrid_style = [s for s in styles if re.match(r"seaborn-.*-darkgrid", s)][0]
+        plt.style.use(darkgrid_style)
 
         for pairwise in self.pairwise_list:
             pairwise.get_optimization_log(
@@ -2635,7 +2643,9 @@ class AlignRepresentations:
         """
         # default setting
         plt.rcParams.update(plt.rcParamsDefault)
-        plt.style.use("seaborn-darkgrid")
+        styles = matplotlib.style.available
+        darkgrid_style = [s for s in styles if re.match(r"seaborn-.*-darkgrid", s)][0]
+        plt.style.use(darkgrid_style)
         plt.figure(figsize=(5, 3))
 
         if scatter:
@@ -2700,6 +2710,8 @@ class AlignRepresentations:
     def visualize_embedding(
         self,
         dim: int,
+        method: str = "PCA",
+        method_params: Optional[Dict[str, Any]] = None,
         pivot: Union[int, str] = 0,
         returned: str = "figure",
         visualization_config: VisualizationConfig = VisualizationConfig(),
@@ -2716,6 +2728,11 @@ class AlignRepresentations:
         Args:
             dim (int):
                 The number of dimensions in which the points are embedded.
+            method (str, optional):
+                The method used to reduce the dimensionality of the embedding. Options include "PCA", "TSNE", "Isomap" and "MDS".
+            method_params (Optional[Dict[str, Any]], optional):
+                Parameters used for the dimensionality reduction method.
+                See sklearn documentation for details. Defaults to None.
             pivot (Union[int, str], optional):
                 The index of the pivot Representation or the name of the pivot Representation. Defaults to 0.
             returned (str, optional):
@@ -2774,6 +2791,8 @@ class AlignRepresentations:
             visualize_embedding = visualize_functions.VisualizeEmbedding(
                 embedding_list=embedding_list,
                 dim=dim,
+                method=method,
+                method_params=method_params,
                 category_name_list=category_name_list,
                 num_category_list=num_category_list,
                 category_idx_list=category_idx_list,

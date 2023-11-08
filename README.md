@@ -36,41 +36,42 @@ We outline instructions for installing the required packages using `poetry`, `co
     ```
 
 ### Step2
-After installing the packages above, install `torch` that is compatible with your environment.    
-For compatibility information, see the [official pytorch page](https://pytorch.org/get-started/locally/).  
+Although this toolbox works on CPU only, using a GPU will be more effective, especially when the number of points to align is large.    
+If you are using a GPU, install `torch` that is compatible with your environment.    
+See the [official pytorch page](https://pytorch.org/get-started/locally/) for compatibility information.
 
 ## Datasets for the main tutorial
-1. `color`: Human similarity judgements of 93 colors for 5 participant groups made from the data used in [Kawakita et al., 2023, PsyArxiv](https://psyarxiv.com/h3pqm/)
-2. `THINGS` : Human similarity judgments of 1854 objects for 4 participant groups made from [the THINGS dataset](https://things-initiative.org/)  
+1. `color`: Human similarity judgments of 93 colors from the data used in [Kawakita et al., 2023, PsyArxiv](https://psyarxiv.com/h3pqm/)
+2. `THINGS` : Human similarity judgments of 1854 objects from [the THINGS dataset](https://things-initiative.org/)  
 
-### Other tutorials datasets 
+### Other tutorial datasets 
 3. `AllenBrain`: Neuropixels recordings in the primary visual cortex of mice from [the Visual Coding - Neuropixels dataset](https://portal.brain-map.org/explore/circuits/visual-coding-neuropixels)    
-4. `DNN`: Internal representations of vision DNNs (ResNet50 and VGG19) for a subset of visual images from the ImageNet dataset   
-5. `simulation`: Synthetic data illustrating differences between supervised alignment and unsupervised alignment
+4. `DNN`: Internal representations of vision DNNs (ResNet50 and VGG19) for visual images from the ImageNet dataset   
+5. `simulation`: Synthetic data illustrating the differences between supervised and unsupervised alignment
 
-### Using and Citing the toolbox
+### Using and Citing the Toolbox
 If you use this toolbox in your research and find it useful, please cite the following papers and give a star ⭐.
 
 [1] Toolbox for Gromov-Wasserstein optimal transport: Application to unsupervised alignment in neuroscience   
-Masaru Sasaki\*, Ken Takeda\*, Kota Abe, Masafumi Oizumi    
+Masaru Sasaki&dagger;, Ken Takeda&dagger;, Kota Abe, Masafumi Oizumi    
 bioRxiv: To be uploaded   
-\*equal contribution   
+&dagger;: equal contribution   
 
 [2] Is my "red" your "red"?: Unsupervised alignment of qualia structures via optimal transport.  
-Genji Kawakita\*, Ariel Zeleznikow-Johnston\*, Ken Takeda\*, Naotsugu Tsuchiya, Masafumi Oizumi  
+Genji Kawakita&dagger;, Ariel Zeleznikow-Johnston&dagger;, Ken Takeda&dagger;, Naotsugu Tsuchiya&Dagger;, Masafumi Oizumi&Dagger;  
 PsyArxiv: https://psyarxiv.com/h3pqm/  
-*equal contribution
+&dagger;, &Dagger;: equal contribution
 
 ## References
-If you are interested in the details of dataset used in the tutorials or in the mathematical details of unsupervised alignment based on GWOT, please refer to the papers above [1,2].  
+If you are interested in the details of the datasets used in the tutorials or in the mathematical details of unsupervised alignment based on GWOT, please refer to the above papers [1,2].  
 
 ## Creators and Maintainers
-This toolbox has been created and is maintaned by:
+This toolbox has been created and is maintained by:
 
 - Masaru Sasaki
 - Ken Takeda
-- Kouta Abe
+- Kota Abe
 - Masafumi Oizumi
 
-## Acknowledgments
+## Acknowledgements
 We thank Genji Kawakita for early code contributions. We also thank Ariel Zeleznikow-Johnston and Naotsugu Tsuchiya for providing the data on color similarity judgments.
