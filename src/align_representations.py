@@ -2579,6 +2579,7 @@ class AlignRepresentations:
         top_k_list: List[int],
         eval_type: str = "ot_plan",
         eval_mat: Optional[np.ndarray] = None,
+        ot_to_evaluate = None,
         #category_mat: Optional[Any] = None,
         barycenter: bool = False,
         return_dataframe: bool = False
@@ -2611,7 +2612,7 @@ class AlignRepresentations:
         accuracy["top_n"] = top_k_list
 
         for pairwise in self.pairwise_list:
-            df = pairwise.eval_accuracy(top_k_list, eval_type=eval_type, eval_mat=eval_mat, metric=self.metric, barycenter=barycenter)
+            df = pairwise.eval_accuracy(top_k_list, ot_to_evaluate= ot_to_evaluate, eval_type=eval_type, eval_mat=eval_mat, metric=self.metric, barycenter=barycenter)
 
             accuracy = pd.merge(accuracy, df, on="top_n")
 
