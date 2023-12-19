@@ -302,7 +302,7 @@ class VisualizationConfig:
             'category_line_style': category_line_style,
             'plot_eps_log':plot_eps_log,
             'lim_eps':lim_eps,
-            'lim_ged':lim_gwd,
+            'lim_gwd':lim_gwd,
             'lim_acc':lim_acc,
         }
 
