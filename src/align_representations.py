@@ -156,6 +156,7 @@ class VisualizationConfig:
         zlabel: Optional[str] = None,
         zlabel_size: int = 15,
         color_labels: Optional[List[str]] = None,
+        color_label_width = None,
         color_hue: Optional[str] = None,
         colorbar_label: Optional[str] = None,
         colorbar_range: List[float] = [0., 1.],
@@ -286,6 +287,7 @@ class VisualizationConfig:
             'zlabel': zlabel,
             'zlabel_size': zlabel_size,
             'color_labels': color_labels,
+            'color_label_width': color_label_width,
             'color_hue': color_hue,
             'colorbar_label': colorbar_label,
             'colorbar_range': colorbar_range,
@@ -877,7 +879,7 @@ class PairwiseAnalysis:
 
         OT = self.show_OT(
             ot_to_plot = None,
-            title=f"$\Gamma$ ({self.pair_name.replace('_', ' ')})",
+            #title=f"$\Gamma$ ({self.pair_name.replace('_', ' ')})",
             return_data=return_data,
             return_figure=return_figure,
             OT_format=OT_format,
