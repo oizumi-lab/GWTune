@@ -172,39 +172,40 @@ vis_emb_2 = VisualizationConfig(
 )
 
 vis_log = VisualizationConfig(
-    figsize=(10, 6), 
+    figsize=(8, 6), 
     title_size = 0, 
     cmap = "viridis",
-    cbar_ticks_size=20,
+    cbar_ticks_size=23,
     font="Arial",
     xlabel_size=20,
     xticks_size=20,
     ylabel_size=20,
     yticks_size=20,
     cbar_label_size=20,
+    marker_size=150,
     plot_eps_log=True,
     fig_ext='svg',
 )
 
 # %%
 vis_emb3d = VisualizationConfig(
-    figsize=(12, 12), 
+    figsize=(8, 8), 
     legend_size=20,
     marker_size=60,
     color_labels=colors,
     fig_ext='svg',
     markers_list=['o', 'X'],
-    xlabel="PC1",
-    ylabel="PC2",
-    zlabel="PC3",
+    # xlabel="PC1",
+    # ylabel="PC2",
+    # zlabel="PC3",
     font="sans-serif",
     cmap="cool",
     # colorbar_label="short movies",
     # colorbar_range=[0, len(embedding_1)],
     colorbar_shrink=0.8,
-    xlabel_size=20,
-    ylabel_size=20,
-    zlabel_size=20,
+    # xlabel_size=20,
+    # ylabel_size=20,
+    # zlabel_size=20,
 )
 
 
@@ -279,8 +280,8 @@ print(new_target.shape)
 
 # %%
 new_rep_list = [
-    Representation(name="1", embedding=source),
-    Representation(name="2", embedding=new_target),
+    Representation(name="Data 1", embedding=source),
+    Representation(name="Data 2", embedding=new_target),
 ]
 
 # %%
