@@ -3,6 +3,7 @@ from typing import Any, List, Tuple, Optional
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+from matplotlib.patches import Rectangle
 import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from sklearn.decomposition import PCA
@@ -102,6 +103,9 @@ def get_color_labels_for_category(
 
     return color_labels, main_colors
 
+def add_colored_label(ax, x, y, bgcolor, width=1, height=1):
+    rect = Rectangle((x, y), width, height, facecolor=bgcolor)
+    ax.add_patch(rect)
 
 def show_heatmap(
     matrix: Any,
@@ -163,6 +167,9 @@ def show_heatmap(
     
     font = kwargs.get('font', 'Noto Sans CJK JP')
     show_figure = kwargs.get('show_figure', True)
+    
+    color_labels = kwargs.get('color_labels', None)
+    color_label_width = kwargs.get('color_label_width', None)
 
     plt.style.use("default")
     plt.rcParams["grid.color"] = "black"
@@ -214,6 +221,18 @@ def show_heatmap(
 
     plt.xlabel(xlabel, size = xlabel_size)
     plt.ylabel(ylabel, size = ylabel_size)
+    
+    if color_labels is not None:
+        for idx, color in enumerate(color_labels):
+            add_colored_label(ax, -color_label_width, idx, color, width=color_label_width)
+            add_colored_label(ax, idx, matrix.shape[0], color, height=color_label_width)
+
+        ax.set_aspect('equal')
+        ax.set_xlim(-color_label_width, matrix.shape[1])
+        ax.set_ylim(matrix.shape[0] + color_label_width, 0)
+        
+        for spine in ax.spines.values():
+            spine.set_visible(False)
 
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.1)

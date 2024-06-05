@@ -153,6 +153,7 @@ class VisualizationConfig:
         zlabel: Optional[str] = None,
         zlabel_size: int = 15,
         color_labels: Optional[List[str]] = None,
+        color_label_width = None,
         color_hue: Optional[str] = None,
         colorbar_label: Optional[str] = None,
         colorbar_range: List[float] = [0., 1.],
@@ -283,6 +284,7 @@ class VisualizationConfig:
             'zlabel': zlabel,
             'zlabel_size': zlabel_size,
             'color_labels': color_labels,
+            'color_label_width': color_label_width,
             'color_hue': color_hue,
             'colorbar_label': colorbar_label,
             'colorbar_range': colorbar_range,
@@ -466,6 +468,7 @@ class Representation:
         visualization_config: VisualizationConfig = VisualizationConfig(),
         fig_dir: Optional[str] = None,
         ticks: Optional[str] = None,
+        title = None
     ) -> None:
         """Show the dissimilarity matrix of the representation.
 
@@ -490,11 +493,11 @@ class Representation:
         else:
             default_fig_path = None
             sorted_fig_path = None
-
+        
         if sim_mat_format == "default" or sim_mat_format == "both":
             visualize_functions.show_heatmap(
                 self.sim_mat,
-                title=self.name,
+                title=title,
                 save_file_name=default_fig_path,
                 ticks=ticks,
                 category_name_list=None,
@@ -879,7 +882,7 @@ class PairwiseAnalysis:
 
         OT = self.show_OT(
             ot_to_plot = None,
-            title=f"$\Gamma$ ({self.pair_name.replace('_', ' ')})",
+            #title=f"$\Gamma$ ({self.pair_name.replace('_', ' ')})",
             return_data=return_data,
             return_figure=return_figure,
             OT_format=OT_format,
@@ -1095,7 +1098,7 @@ class PairwiseAnalysis:
 
         # figure plotting epsilon as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
-        plt.title(f"epsilon - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
+        #plt.title(f"epsilon - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
         plt.scatter(df_trial["params_eps"], df_trial["value"], c = 100 * df_trial["user_attrs_best_acc"], s = marker_size, cmap=cmap)
 
         plt.xlabel("epsilon", fontsize=xlabel_size)
@@ -1134,7 +1137,7 @@ class PairwiseAnalysis:
         # figure plotting accuracy as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
         plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap)
-        plt.title(f"Matching Rate - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
+        #plt.title(f"Matching Rate - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
         plt.xlabel("Matching Rate (%)", fontsize=xlabel_size)
         plt.xticks(fontsize=xticks_size)
         plt.ylabel("GWD", fontsize=ylabel_size)
@@ -1276,10 +1279,11 @@ class PairwiseAnalysis:
         top_k_list: List[int],
         ot_to_evaluate: Optional[np.ndarray] = None,
         eval_type: str = "ot_plan",
+        eval_mat: Optional[np.ndarray] = None,
         metric: str = "cosine",
         barycenter: bool = False,
         supervised: bool = False,
-        category_mat: Optional[np.ndarray] = None
+        #category_mat: Optional[np.ndarray] = None
     ) -> pd.DataFrame:
         """Evaluation of the accuracy of the unsupervised alignment
 
@@ -1303,6 +1307,10 @@ class PairwiseAnalysis:
             eval_type (str, optional):
                 two ways to evaluate the accuracy as above. Defaults to "ot_plan".
 
+            eval_mat (Optional[np.ndarray], optional):
+                the matrix that represents grand truth matching.
+                If None, the diagonal matrix will be used.
+                
             metric (str, optional):
                 Please set the metric that can be used in "scipy.spatical.distance.cdist()". Defaults to "cosine".
 
@@ -1344,14 +1352,14 @@ class PairwiseAnalysis:
                 # Compute distances between each points
                 dist_mat = distance.cdist(self.target.embedding, new_embedding_source, metric)
 
-                acc = self._calc_accuracy_with_topk_diagonal(dist_mat, k=k, order="minimum")
+                acc = self._calc_accuracy_with_eval_mat(dist_mat, k=k, eval_mat=eval_mat, order="minimum")
 
             elif eval_type == "ot_plan":
-                acc = self._calc_accuracy_with_topk_diagonal(OT, k=k, order="maximum")
+                acc = self._calc_accuracy_with_eval_mat(OT, k=k, eval_mat=eval_mat, order="maximum")
 
-            elif eval_type == "category":
-                assert category_mat is not None
-                acc = self._calc_accuracy_with_topk_diagonal(OT, k=k, order="maximum", category_mat=category_mat)
+            #elif eval_type == "category":
+            #    assert category_mat is not None
+            #    acc = self._calc_accuracy_with_eval_mat(OT, k=k, eval_mat=eval_mat, order="maximum", category_mat=category_mat)
 
             acc_list.append(acc)
 
@@ -1384,13 +1392,42 @@ class PairwiseAnalysis:
             raise ValueError("Invalid order parameter. Must be 'maximum' or 'minimum'.")
 
         # Count the number of rows where the diagonal is in the top k values
-        count = np.sum(np.isin(diagonal, topk_values))
-
+        #count = np.sum(np.isin(diagonal, topk_values))
+        count = np.sum([diagonal[i] in topk_values[i] for i in range(matrix.shape[0])])
+        
         # Calculate the accuracy as the proportion of counts to the total number of rows
         accuracy = count / matrix.shape[0]
         accuracy *= 100
 
         return accuracy
+    
+    def _calc_accuracy_with_eval_mat(self, matrix, k, eval_mat=None, order="maximum"):
+        if eval_mat is None:
+            eval_mat = np.eye(matrix.shape[0])
+        else:
+            assert matrix.shape == eval_mat.shape
+        
+        # Get the top k values for each row
+        if order == "maximum":
+            topk_values = np.partition(matrix, -k)[:, -k:]
+        elif order == "minimum":
+            topk_values = np.partition(matrix, k - 1)[:, :k]
+        else:
+            raise ValueError("Invalid order parameter. Must be 'maximum' or 'minimum'.")
+        
+        count = 0
+        for i, row in enumerate(matrix):
+            indices = np.argwhere(eval_mat[i, :] == 1) # indices of grand truth
+            matching_values = row[indices] # and there values on a row
+        
+            # Count the number of rows where the matching values are included in the top k values
+            count += np.isin(matching_values, topk_values[i]).any()
+        
+        # Calculate the accuracy as the proportion of counts to the total number of rows
+        matching_rate = count / matrix.shape[0]
+        matching_rate *= 100
+        
+        return matching_rate
 
     def procrustes(
         self,
@@ -2538,7 +2575,9 @@ class AlignRepresentations:
         self,
         top_k_list: List[int],
         eval_type: str = "ot_plan",
-        category_mat: Optional[Any] = None,
+        eval_mat: Optional[np.ndarray] = None,
+        ot_to_evaluate = None, 
+        #category_mat: Optional[Any] = None,
         barycenter: bool = False,
         return_dataframe: bool = False
     ) -> Optional[pd.DataFrame]:
@@ -2570,7 +2609,7 @@ class AlignRepresentations:
         accuracy["top_n"] = top_k_list
 
         for pairwise in self.pairwise_list:
-            df = pairwise.eval_accuracy(top_k_list, eval_type=eval_type, metric=self.metric, barycenter=barycenter, category_mat=category_mat)
+            df = pairwise.eval_accuracy(top_k_list, eval_type=eval_type, ot_to_evaluate=ot_to_evaluate, eval_mat=eval_mat, metric=self.metric, barycenter=barycenter)
 
             accuracy = pd.merge(accuracy, df, on="top_n")
 
@@ -2584,9 +2623,9 @@ class AlignRepresentations:
             self.k_nearest_matching_rate = accuracy
             print("K nearest matching rate : \n", accuracy)
 
-        elif eval_type == "category":
-            self.category_level_accuracy = accuracy
-            print("category level accuracy : \n", accuracy)
+        #elif eval_type == "category":
+        #    self.category_level_accuracy = accuracy
+        #    print("category level accuracy : \n", accuracy)
 
         print("Mean : \n", accuracy.iloc[:, 1:].mean(axis="columns"))
 
@@ -2711,6 +2750,7 @@ class AlignRepresentations:
         legend: bool = True,
         fig_dir: Optional[str] = None,
         fig_name: str = "Aligned_embedding",
+        name_list = None
     ) -> Optional[Union[plt.Figure, List[np.ndarray]]]:
         """Visualizes the aligned embedding in the specified number of dimensions.
 
@@ -2759,11 +2799,13 @@ class AlignRepresentations:
         else:
             assert self.barycenter is not None
 
-        name_list = []
+        if name_list is None:
+            name_list = []
         embedding_list = []
         for i in range(len(self.representations_list)):
             embedding_list.append(self.representations_list[i].embedding)
-            name_list.append(self.representations_list[i].name)
+            if name_list is None:
+                name_list.append(self.representations_list[i].name)
 
         if returned == "figure":
             if category_idx_list is None:
@@ -2783,6 +2825,8 @@ class AlignRepresentations:
             visualize_embedding.plot_embedding(
                 name_list=name_list, title=title, legend=legend, save_dir=fig_path, **visualization_config()
             )
+            
+            return visualize_embedding.embedding_list
 
         elif returned == "row_data":
             return embedding_list
