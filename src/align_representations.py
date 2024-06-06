@@ -157,7 +157,6 @@ class VisualizationConfig:
         zlabel_size: int = 15,
         color_labels: Optional[List[str]] = None,
         color_label_width = None,
-        color_label_width = None,
         color_hue: Optional[str] = None,
         colorbar_label: Optional[str] = None,
         colorbar_range: List[float] = [0., 1.],
