@@ -26,11 +26,11 @@ from sklearn import manifold
 from sqlalchemy import URL, create_engine
 from sqlalchemy_utils import create_database, database_exists, drop_database
 from tqdm.auto import tqdm
-
+from sklearn.base import TransformerMixin
 sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
 from .gw_alignment import GW_Alignment
 from .histogram_matching import SimpleHistogramMatching
-from .utils import backend, gw_optimizer, visualize_functions
+from .utils import backend, gw_optimizer, visualize_functions, utils_functions
 
 
 # %%
@@ -599,16 +599,18 @@ class Representation:
                 num_category_list = self.num_category_list
                 category_idx_list = self.category_idx_list
 
-        visualize_embedding = visualize_functions.VisualizeEmbedding(
+        visualize_functions.plot_embedding(
             embedding_list=[self.embedding],
             dim=dim,
+            name_list=[self.name], 
             category_name_list=category_name_list,
             num_category_list=num_category_list,
             category_idx_list=category_idx_list,
-        )
-
-        visualize_embedding.plot_embedding(
-            name_list=[self.name], title=title, legend=legend, save_dir=fig_path, **visualization_config()
+            title=title, 
+            has_legend=legend,
+            fig_name=fig_name, 
+            fig_dir=fig_path, 
+            **visualization_config()
         )
 
 
@@ -2710,10 +2712,9 @@ class AlignRepresentations:
     def visualize_embedding(
         self,
         dim: int,
-        method: str = "PCA",
-        method_params: Optional[Dict[str, Any]] = None,
-        pivot: Union[int, str] = 0,
-        returned: str = "figure",
+        method: Optional[str] = "PCA",
+        emb_transformer: Optional[TransformerMixin] = None,
+        pivot: Union[None, int, str] = None,
         visualization_config: VisualizationConfig = VisualizationConfig(),
         category_name_list: Optional[List[str]] = None,
         num_category_list: Optional[List[int]] = None,
@@ -2722,21 +2723,23 @@ class AlignRepresentations:
         legend: bool = True,
         fig_dir: Optional[str] = None,
         fig_name: str = "Aligned_embedding",
+        **kwargs,
     ) -> Optional[Union[plt.Figure, List[np.ndarray]]]:
-        """Visualizes the aligned embedding in the specified number of dimensions.
+        """
+        2024.6.19 re-wrote
+        Visualizes the aligned embedding in the specified number of dimensions.
 
         Args:
             dim (int):
                 The number of dimensions in which the points are embedded.
             method (str, optional):
                 The method used to reduce the dimensionality of the embedding. Options include "PCA", "TSNE", "Isomap" and "MDS".
-            method_params (Optional[Dict[str, Any]], optional):
+            emb_transformer (Optional[TransformerMixin], optional):
                 Parameters used for the dimensionality reduction method.
                 See sklearn documentation for details. Defaults to None.
-            pivot (Union[int, str], optional):
-                The index of the pivot Representation or the name of the pivot Representation. Defaults to 0.
-            returned (str, optional):
-                "figure" or "row_data. Defaults to "figure".
+            pivot (Union[None, int, str], optional):
+                The index of the pivot Representation or the name of the pivot Representation for Procrustes.
+                If None, no Procrustes analysis was done, and PCA will be done on just concatenated (in axis=0) data. Defaults to None.
             visualization_config (VisualizationConfig, optional):
                 Container of parameters used for figure. Defaults to VisualizationConfig().
             category_name_list (Optional[List[str]], optional):
@@ -2763,44 +2766,53 @@ class AlignRepresentations:
         if fig_dir is None:
             fig_dir = os.path.join(self.main_results_dir, "visualize_embedding", self.config.init_mat_plan)
             os.makedirs(fig_dir, exist_ok=True)
+        
+        name_list = []
+        embedding_list = []
+        
+        # get sort idx
+        sort_idx = (np.concatenate(category_idx_list) if category_idx_list is not None else None)
 
-        fig_path = os.path.join(fig_dir, f"{fig_name}.{visualization_config.visualization_params['fig_ext']}")
+        if (sort_idx is None) and (self.representations_list[0].category_idx_list is not None):
+            sort_idx = np.concatenate(self.representations_list[0].category_idx_list)
 
-        if pivot != "barycenter":
+        if sort_idx is None:
+            sort_idx = np.arange(self.representations_list[0].embedding.shape[0])
+            
+        for i in range(len(self.representations_list)):
+            embedding_list.append(self.representations_list[i].embedding[sort_idx, :])
+            name_list.append(self.representations_list[i].name)
+
+        
+        if pivot == None:
+            embedding_list, _ = utils_functions.obtain_embedding(
+                embedding_list,
+                dim=dim, 
+                emb_name=method, 
+                emb_transformer=emb_transformer,
+                **kwargs,
+            )
+            
+        elif pivot != "barycenter":
             self._procrustes_to_pivot(pivot)
-            #for i in range(len(self.pairwise_list) // 2):
-            #    pair = self.pairwise_list[i]
-            #    pair.source.embedding = pair.get_new_source_embedding()
-
+            fig_name = "procrustes"
         else:
             assert self.barycenter is not None
 
-        name_list = []
-        embedding_list = []
-        for i in range(len(self.representations_list)):
-            embedding_list.append(self.representations_list[i].embedding)
-            name_list.append(self.representations_list[i].name)
-
-        if returned == "figure":
-            if category_idx_list is None:
-                if self.representations_list[0].category_idx_list is not None:
-                    category_name_list = self.representations_list[0].category_name_list
-                    num_category_list = self.representations_list[0].num_category_list
-                    category_idx_list = self.representations_list[0].category_idx_list
-
-            visualize_embedding = visualize_functions.VisualizeEmbedding(
-                embedding_list=embedding_list,
-                dim=dim,
-                method=method,
-                method_params=method_params,
-                category_name_list=category_name_list,
-                num_category_list=num_category_list,
-                category_idx_list=category_idx_list,
-            )
-
-            visualize_embedding.plot_embedding(
-                name_list=name_list, title=title, legend=legend, save_dir=fig_path, **visualization_config()
-            )
-
-        elif returned == "row_data":
-            return embedding_list
+        if category_idx_list is None:
+            if self.representations_list[0].category_idx_list is not None:
+                category_name_list = self.representations_list[0].category_name_list
+                num_category_list = self.representations_list[0].num_category_list
+        
+        visualize_functions.plot_embedding(
+            embedding_list=embedding_list,
+            dim=dim,
+            name_list=name_list,
+            category_name_list=category_name_list,
+            num_category_list=num_category_list,
+            title=title, 
+            has_legend=legend,
+            fig_name=fig_name,
+            fig_dir=fig_dir, 
+            **visualization_config(),
+        )
