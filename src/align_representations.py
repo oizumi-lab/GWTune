@@ -1148,6 +1148,10 @@ class PairwiseAnalysis:
         if lim_gwd is not None:
             plt.ylim(lim_gwd)
 
+        ymin, ymax = plt.xlim(lim_acc)
+        if ymax > 104:
+            plt.xlim(lim_acc, 100)
+
         plt.tight_layout()
 
         plt.savefig(os.path.join(fig_dir, f"acc_gwd_eps({self.pair_name}).{fig_ext}"))
@@ -2752,6 +2756,8 @@ class AlignRepresentations:
                 Directory path where the generated figure will be saved. If None, the figure will not be saved. Defaults to None.
             fig_name (str, optional):
                 Name of the saved figure if `fig_dir` is specified. Defaults to "Aligned_embedding.png".
+            **kwargs:
+                Additional arguments for the dimensionality reduction method.
 
         Returns:
             Optional[Union[plt.Figure, List[np.ndarray]]]:
@@ -2766,34 +2772,47 @@ class AlignRepresentations:
         name_list = []
         embedding_list = []
         
-        # get sort idx
-        if category_idx_list is not None:
-            sort_idx = np.concatenate(category_idx_list)  
-        elif self.representations_list[0].category_idx_list is not None:
-            sort_idx = np.concatenate(self.representations_list[0].category_idx_list)        
-        else:
-            sort_idx = np.arange(self.representations_list[0].embedding.shape[0]) # This means that the order of data is not changed
-            
-        for i in range(len(self.representations_list)):
-            name_list.append(self.representations_list[i].name)
-            embedding_list.append(self.representations_list[i].embedding[sort_idx, :])
-            
+        # chooose pivot.  
         if pivot == None:
-            embedding_list, _ = utils_functions.obtain_embedding(
-                embedding_list,
-                dim=dim, 
-                emb_name=method, 
-                emb_transformer=emb_transformer,
-                **kwargs,
-            )
-            
-        elif pivot != "barycenter":
+            pass
+        
+        elif isinstance(pivot, int):
             self._procrustes_to_pivot(pivot)
             fig_name = "procrustes"
         
-        else:
+        elif pivot == "barycenter":
             assert self.barycenter is not None
-
+            self._procrustes_to_pivot(pivot)
+            fig_name = "barycenter"
+        
+        else:
+            raise ValueError("pivot must be None, int or 'barycenter'.")
+            
+        # get sort idx
+        if category_idx_list is not None:
+            print("New category information is given.")
+            sort_idx = np.concatenate(category_idx_list)  
+        elif self.representations_list[0].category_idx_list is not None:
+            print("Category information was already given.")
+            sort_idx = np.concatenate(self.representations_list[0].category_idx_list)        
+        else:
+            print("No category information is given.")
+            sort_idx = np.arange(self.representations_list[0].embedding.shape[0]) # This means that the order of data is not changed
+        
+        # sort the embedding after pivot.
+        for i in range(len(self.representations_list)):
+            name_list.append(self.representations_list[i].name)
+            embedding_list.append(self.representations_list[i].embedding[sort_idx, :])
+        
+        # obtain the reduced dimension embedding list
+        embedding_list, _ = utils_functions.obtain_embedding(
+            embedding_list,
+            dim=dim, 
+            emb_name=method, 
+            emb_transformer=emb_transformer,
+            **kwargs,
+        )
+        
         if category_idx_list is None:
             if self.representations_list[0].category_idx_list is not None:
                 category_name_list = self.representations_list[0].category_name_list

@@ -105,6 +105,7 @@ def obtain_embedding(
     emb_transformer: Optional[Any] = None,
     **kwargs
 ) -> Tuple[List[np.ndarray], Any]:
+    
     # preprocessing
     X = np.vstack(embedding_list)
 
@@ -116,12 +117,9 @@ def obtain_embedding(
 
     # fit_transform transformer
     new_X = emb_transformer.fit_transform(X)
-    new_idx_list = np.cumsum([0] + [len(embedding) for embedding in embedding_list])
 
     # use transformer
-    new_embedding_list = []
-    for start_idx, end_idx in zip(new_idx_list[:-1], new_idx_list[1:]):
-        new_embedding_list.append(new_X[start_idx:end_idx])
+    new_embedding_list = [new_X[i * embedding_list[i].shape[0]: (i+1) * embedding_list[i].shape[0]] for i in range(len(embedding_list))]
 
     return new_embedding_list, emb_transformer
 
