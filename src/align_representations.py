@@ -2771,19 +2771,17 @@ class AlignRepresentations:
         embedding_list = []
         
         # get sort idx
-        sort_idx = (np.concatenate(category_idx_list) if category_idx_list is not None else None)
-
-        if (sort_idx is None) and (self.representations_list[0].category_idx_list is not None):
-            sort_idx = np.concatenate(self.representations_list[0].category_idx_list)
-
-        if sort_idx is None:
-            sort_idx = np.arange(self.representations_list[0].embedding.shape[0])
+        if category_idx_list is not None:
+            sort_idx = np.concatenate(category_idx_list)  
+        elif self.representations_list[0].category_idx_list is not None:
+            sort_idx = np.concatenate(self.representations_list[0].category_idx_list)        
+        else:
+            sort_idx = np.arange(self.representations_list[0].embedding.shape[0]) # This means that the order of data is not changed
             
         for i in range(len(self.representations_list)):
-            embedding_list.append(self.representations_list[i].embedding[sort_idx, :])
             name_list.append(self.representations_list[i].name)
-
-        
+            embedding_list.append(self.representations_list[i].embedding[sort_idx, :])
+            
         if pivot == None:
             embedding_list, _ = utils_functions.obtain_embedding(
                 embedding_list,
@@ -2796,6 +2794,7 @@ class AlignRepresentations:
         elif pivot != "barycenter":
             self._procrustes_to_pivot(pivot)
             fig_name = "procrustes"
+        
         else:
             assert self.barycenter is not None
 
