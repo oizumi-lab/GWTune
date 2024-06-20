@@ -2675,7 +2675,7 @@ class AlignRepresentations:
         the_others, pivot_idx_list = self._check_pairs(pivot)
 
         # check whether 'pair_list' includes all pairs between the pivot and the other Representations
-        assert len(the_others) == len(self.representations_list)-1, "'pair_list' must include all pairs between the pivot and the other Representations."
+        assert len(the_others) == len(self.representations_list) - 1, "'pair_list' must include all pairs between the pivot and the other Representations."
 
         for pair_idx, pivot_idx in pivot_idx_list:
             pairwise = self.pairwise_list[pair_idx]
