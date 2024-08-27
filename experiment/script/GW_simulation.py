@@ -880,7 +880,7 @@ def generate_cluster_centers(n_clusters, size=1.0, seed=42):
     centers = []
     for _ in range(n_clusters):
         # クラスターの中心をランダムに決定
-        center_x, center_y = np.random.normal((0, 0), size, 2)
+        center_x, center_y = np.random.normal((0, 0), size, 3)
         centers.append((center_x, center_y))
     
     return centers
@@ -889,12 +889,13 @@ def generate_clusters(n_points_per_cluster, centers, spread=1.0, seed=42):
     np.random.seed(seed)  # 乱数シードの設定（再現性のため）
 
     # set the emnpty 2d array
-    clusters = np.empty((0, 2))
+    clusters = np.empty((0, 3))
     for center in centers:
         # クラスターの中心からの距離が spread 以内の範囲にランダムに点を生成
         points_x = np.random.normal(center[0], spread, n_points_per_cluster)
         points_y = np.random.normal(center[1], spread, n_points_per_cluster)
-        points = np.column_stack((points_x, points_y))
+        points_z = np.random.normal(center[2], spread, n_points_per_cluster)
+        points = np.column_stack((points_x, points_y, points_z))
         # stack the points
         clusters = np.vstack((clusters, points))
     return clusters
