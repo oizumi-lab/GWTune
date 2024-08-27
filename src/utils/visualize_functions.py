@@ -4,6 +4,7 @@ from typing import Any, List, Tuple, Optional
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from matplotlib.patches import Rectangle
+from matplotlib.patches import Rectangle
 import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from mpl_toolkits.mplot3d import Axes3D
@@ -109,7 +110,6 @@ def add_colored_label(ax, x, y, bgcolor, width=1, height=1):
     rect = Rectangle((x, y), width, height, facecolor=bgcolor)
     ax.add_patch(rect)
 
-
 def show_heatmap(
     matrix: Any,
     title: Optional[str],
@@ -170,7 +170,7 @@ def show_heatmap(
 
     font = kwargs.get('font', 'Noto Sans CJK JP')
     show_figure = kwargs.get('show_figure', True)
-
+    
     color_labels = kwargs.get('color_labels', None)
     color_label_width = kwargs.get('color_label_width', None)
 
@@ -225,7 +225,7 @@ def show_heatmap(
 
     plt.xlabel(xlabel, size = xlabel_size)
     plt.ylabel(ylabel, size = ylabel_size)
-
+    
     if color_labels is not None:
         for idx, color in enumerate(color_labels):
             add_colored_label(ax, -color_label_width, idx, color, width=color_label_width)
@@ -237,7 +237,6 @@ def show_heatmap(
         
         for spine in ax.spines.values():
             spine.set_visible(False)
-
 
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.1)
