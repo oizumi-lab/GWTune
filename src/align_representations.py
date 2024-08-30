@@ -1137,14 +1137,14 @@ class PairwiseAnalysis:
 
         # figure plotting accuracy as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
-        plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap)
+        fig = plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap, s = marker_size)
         #plt.title(f"Matching Rate - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
         plt.xlabel("Matching Rate (%)", fontsize=xlabel_size)
         plt.xticks(fontsize=xticks_size)
         plt.ylabel("GWD", fontsize=ylabel_size)
         plt.yticks(fontsize=yticks_size)
 
-        cbar = plt.colorbar(format = cbar_format, norm=norm)
+        cbar = plt.colorbar(fig, format=cbar_format, norm=norm)
         cbar.set_label(label='epsilon', size=cbar_label_size)
         cbar.ax.tick_params(labelsize=cbar_ticks_size)
 
