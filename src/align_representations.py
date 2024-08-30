@@ -1361,36 +1361,30 @@ class PairwiseAnalysis:
     def _calc_accuracy_with_topk_diagonal(self, matrix, k, order="maximum", category_mat=None):
         # Get the diagonal elements
         if category_mat is None:
-            diagonal = np.diag(matrix)
+            category_mat = np.eye(matrix.shape[0])
         else:
-            category_mat = category_mat.values
-
-            diagonal = []
-            for i in range(matrix.shape[0]):
-                category = category_mat[i]
-
-                matching_rows = np.where(np.all(category_mat == category, axis=1))[0]
-                matching_elements = matrix[i, matching_rows] # get the columns of which category are the same as i-th row
-
-                diagonal.append(np.max(matching_elements))
-
+            assert matrix.shape == category_mat.shape
+        
         # Get the top k values for each row
         if order == "maximum":
-            topk_values = np.partition(matrix, -k)[:, -k:]
+            topk_values = np.argpartition(matrix, -k)[:, -k:]
         elif order == "minimum":
-            topk_values = np.partition(matrix, k - 1)[:, :k]
+            topk_values = np.argpartition(matrix, k - 1)[:, :k]
         else:
             raise ValueError("Invalid order parameter. Must be 'maximum' or 'minimum'.")
-
-        # Count the number of rows where the diagonal is in the top k values
-        count = np.sum([diagonal[i] in topk_values[i] for i in range(matrix.shape[0])])
-
+        
+        count = 0
+        for i, row in enumerate(topk_values):
+            indices = np.argwhere(category_mat[i, :] == 1) # indices of grand truth
+            
+            # Count the number of indices for each row where the indices of matching values are included in the top k values
+            count += np.isin(indices, row).any()
 
         # Calculate the accuracy as the proportion of counts to the total number of rows
-        accuracy = count / matrix.shape[0]
-        accuracy *= 100
-
-        return accuracy
+        matching_rate = count / matrix.shape[0]
+        matching_rate *= 100
+        
+        return matching_rate
 
     def procrustes(
         self,
