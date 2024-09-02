@@ -32,7 +32,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
 from .gw_alignment import GW_Alignment
 from .histogram_matching import SimpleHistogramMatching
 from .utils import backend, gw_optimizer, visualize_functions
-
+from .utils.init_matrix import InitMatrix
 
 # %%
 class OptimizationConfig:
@@ -817,6 +817,7 @@ class PairwiseAnalysis:
         save_dataframe: bool = False,
         target_device: Optional[str] = None,
         sampler_seed: int = 42,
+        fix_random_init_seed: bool = False,
     ):
         """Compute entropic GWOT.
 
@@ -870,6 +871,7 @@ class PairwiseAnalysis:
             compute_OT,
             target_device=target_device,
             sampler_seed=sampler_seed,
+            fix_random_init_seed=fix_random_init_seed,
         )
 
         if fig_dir is None:
@@ -922,7 +924,8 @@ class PairwiseAnalysis:
         self,
         compute_OT: bool,
         target_device: Optional[str] = None,
-        sampler_seed: int = 42
+        sampler_seed: int = 42,
+        fix_random_init_seed:bool = False,
     ) -> Tuple[np.ndarray, pd.DataFrame]:
         """Computes or loads the entropic Gromov-Wasserstein Optimal Transport (GWOT).
 
@@ -957,6 +960,7 @@ class PairwiseAnalysis:
             compute_OT = compute_OT,
             target_device = target_device,
             sampler_seed = sampler_seed,
+            fix_random_init_seed = fix_random_init_seed,
         )
 
         best_trial = study.best_trial
@@ -977,6 +981,7 @@ class PairwiseAnalysis:
         compute_OT: bool = False,
         target_device: Optional[str] = None,
         sampler_seed: int = 42,
+        fix_random_init_seed: bool = False,
         n_jobs_for_pairwise_analysis: int = 1
     ) -> optuna.study.Study:
         """Run or load an optimization study for Gromov-Wasserstein Optimal Transport (GWOT).
@@ -1023,6 +1028,7 @@ class PairwiseAnalysis:
                 to_types=self.config.to_types,
                 data_type=self.config.data_type,
                 sinkhorn_method=self.config.sinkhorn_method,
+                fix_random_init_seed=None if fix_random_init_seed is False else int(self.config.num_trial * self.config.n_iter),
             )
 
             # setting for optimization
@@ -1040,6 +1046,9 @@ class PairwiseAnalysis:
                 target_device = self.config.device
 
             # 2. run optimzation
+            if self.config.init_mat_plan == "random":
+                print(f"fix seed: {fix_random_init_seed}")
+            
             study = opt.run_study(
                 gw,
                 target_device,
@@ -1110,7 +1119,11 @@ class PairwiseAnalysis:
 
         if plot_eps_log:
             plt.xscale('log')
-            norm = LogNorm()
+            
+            if lim_eps is None:
+                norm = LogNorm(vmin=self.config.eps_list[0], vmax=self.config.eps_list[1])
+            else:
+                norm = LogNorm(vmin=lim_eps[0], vmax=lim_eps[1])
         else:
             norm = None
 
@@ -1137,14 +1150,14 @@ class PairwiseAnalysis:
 
         # figure plotting accuracy as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
-        fig = plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap, s = marker_size)
+        plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap, norm=norm, s = marker_size)
         #plt.title(f"Matching Rate - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
         plt.xlabel("Matching Rate (%)", fontsize=xlabel_size)
         plt.xticks(fontsize=xticks_size)
         plt.ylabel("GWD", fontsize=ylabel_size)
         plt.yticks(fontsize=yticks_size)
 
-        cbar = plt.colorbar(fig, format=cbar_format, norm=norm)
+        cbar = plt.colorbar(format = cbar_format)
         cbar.set_label(label='epsilon', size=cbar_label_size)
         cbar.ax.tick_params(labelsize=cbar_ticks_size)
 
@@ -1152,7 +1165,7 @@ class PairwiseAnalysis:
 
         ymin, ymax = plt.xlim(lim_acc)
         if ymax > 100:
-            plt.xlim(lim_acc, 100)
+            plt.xlim(lim_acc, 105)
 
         if lim_gwd is not None:
             plt.ylim(lim_gwd)
@@ -1777,6 +1790,82 @@ class PairwiseAnalysis:
 
         plt.clf()
         plt.close()
+    
+    def random_test_gwot_no_entropy(
+        self,
+        num_seed: int = 1,
+        max_iter: int = 10000,
+    ):
+        """
+        test function of the GWOT without entropy regularization by starting random init matrix.
+        args:
+            num_seed : the number of seeds to test.
+            max_iter : the number of iterations to run the GWOT.
+        """
+        
+        back_end = backend.Backend("cpu", "numpy", "double")
+        
+        p = ot.unif(len(self.source.sim_mat))
+        q = ot.unif(len(self.target.sim_mat))
+
+        init_mat_builder = InitMatrix(len(self.source.sim_mat), len(self.target.sim_mat))
+        seeds = np.arange(num_seed)
+        init_mat_list = [init_mat_builder.make_initial_T("random", seed) for seed in seeds]
+
+        acc_list = []
+        gwd_list = []
+        computed_seed = []
+        
+        save_path = os.path.join(self.results_dir, "no_ent_rand_test", "OT")
+        os.makedirs(save_path, exist_ok=True)
+        
+        sim_mat1, sim_mat2, p, q = back_end(self.source.sim_mat, self.target.sim_mat, p, q)
+        
+        for idx, init_mat in tqdm(enumerate(init_mat_list)):
+            save_ot_path = save_path + f"/gw_{idx}.npy"
+            
+            if os.path.exists(save_ot_path):
+                continue
+            else:
+                new_ot_mat, log0 = ot.gromov.gromov_wasserstein(
+                    sim_mat1,
+                    sim_mat2,
+                    p,
+                    q,
+                    loss_fun = 'square_loss',
+                    log=True,
+                    G0 = init_mat,
+                    max_iter = max_iter,
+                )
+                
+                gw = new_ot_mat
+                gw_loss = log0["gw_dist"]
+            
+                back_end.save_computed_results(gw, save_path, idx)
+                
+                acc = self._calc_accuracy_with_eval_mat(gw, k=1, eval_mat=None, order="maximum")
+                
+                computed_seed.append(seeds[idx])
+                acc_list.append(acc)
+                gwd_list.append(gw_loss)
+        
+        if len(acc_list) == 0:
+            print(f"all {num_seed} seeds are already computed.", end="\r")
+            
+        else:
+            new_df = pd.DataFrame({"seed": computed_seed, "acc": acc_list, "gwd": gwd_list}, index=computed_seed)
+        
+        
+        if not os.path.exists(os.path.dirname(save_path) + "/result.csv"):
+            new_df.to_csv(os.path.dirname(save_path) + "/result.csv")
+            return new_df
+            
+        else:
+            df = pd.read_csv(os.path.dirname(save_path) + "/result.csv", index_col=0)
+            if len(acc_list) != 0:
+                df = pd.concat([df, new_df])
+                df.to_csv(os.path.dirname(save_path) + "/result.csv")
+            return df
 
 
 class AlignRepresentations:
@@ -2059,6 +2148,7 @@ class AlignRepresentations:
         target_device=None,
         change_sampler_seed=False,
         sampler_seed=42,
+        fix_random_init_seed=False,
     ):
 
         OT_list = []
@@ -2079,6 +2169,7 @@ class AlignRepresentations:
                 save_dataframe=save_dataframe,
                 target_device=target_device,
                 sampler_seed=sampler_seed,
+                fix_random_init_seed=fix_random_init_seed,
             )
 
             OT_list.append(OT)
@@ -2099,6 +2190,7 @@ class AlignRepresentations:
         save_dataframe: bool = False,
         change_sampler_seed: bool = False,
         fix_sampler_seed: int = 42,
+        fix_random_init_seed = False,
         parallel_method: str = "multithread",
     ) -> Optional[List[np.ndarray]]:
         """compute GWOT for each pair.
@@ -2215,6 +2307,7 @@ class AlignRepresentations:
                         save_dataframe=save_dataframe,
                         target_device=target_device,
                         sampler_seed=sampler_seed,
+                        fix_random_init_seed=fix_random_init_seed,
                     )
 
                     processes.append(future)
@@ -2234,6 +2327,7 @@ class AlignRepresentations:
                     fig_dir=fig_dir,
                     ticks=ticks,
                     save_dataframe=save_dataframe,
+                    fix_random_init_seed=fix_random_init_seed,
                 )
 
         if self.config.n_jobs == 1:
@@ -2250,6 +2344,7 @@ class AlignRepresentations:
                 save_dataframe=save_dataframe,
                 change_sampler_seed=change_sampler_seed,
                 sampler_seed=first_sampler_seed,
+                fix_random_init_seed=fix_random_init_seed,
             )
 
         if self.config.n_jobs < 1:
