@@ -503,7 +503,7 @@ class VisualizeEmbedding():
                     c = color_labels,
                     s = marker_size,
                     alpha = 1,
-                    cmap=cmap,
+                    # cmap=cmap,
                 )
 
                 ax.scatter([], [], [], marker = markers_list[i], color = "black", s = marker_size, alpha = 1, label = name_list[i].replace("_", " "))
@@ -516,7 +516,7 @@ class VisualizeEmbedding():
                     c = color_labels,
                     s = marker_size,
                     alpha = 1,
-                    cmap=cmap,
+                    # cmap=cmap,
                 )
 
                 ax.scatter(x = [], y = [], marker = markers_list[i], color = "black", s = marker_size, alpha = 1, label = name_list[i].replace("_", " "))

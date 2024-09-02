@@ -1,5 +1,10 @@
 #%%
 import os, sys
+set_cpu = 4
+os.environ["OPENBLAS_NUM_THREADS"] = str(set_cpu)
+os.environ["MKL_NUM_THREADS"] = str(set_cpu)
+os.environ["OMP_NUM_THREADS"] = str(set_cpu)
+
 sys.path.append(os.path.join(os.getcwd(), '../../'))
 
 import numpy as np
@@ -69,9 +74,13 @@ def rotate_points_around_center(points, max_offset, start=0, seed=0):
 
 #%%
 ### Pattern 4
+dataset = "Simulation"
+# dataset = "Simulation_noise"
 
+#%%
 # 絡まった紐の座標を生成する関数
 def tangled_rope(num_points=100, num_loops=3, radius=1, beta=0.3, pattern=1):
+    
     t = np.linspace(0, 2 * np.pi * num_loops, num_points)
     
     # set radius as a function of t
@@ -80,10 +89,19 @@ def tangled_rope(num_points=100, num_loops=3, radius=1, beta=0.3, pattern=1):
     elif pattern == 2:
         radius = radius + beta * t / (2 * np.pi) + np.sin(t / (2 * np.pi))
     
-    x = np.sin(t) * radius
-    y = np.cos(t) * radius
-    z = t / (2 * np.pi)
+    np.random.seed(pattern)
+    noize = np.random.normal(0, 0.1, num_points)
     
+    if dataset == "Simulation_noise":   
+        x = np.sin(t) * radius + noize
+        y = np.cos(t) * radius + noize
+        z = t / (2 * np.pi) + noize
+    
+    elif dataset == "Simulation":
+        x = np.sin(t) * radius
+        y = np.cos(t) * radius
+        z = t / (2 * np.pi)
+        
     embedding = np.column_stack((x, y, z))
     return embedding
 
@@ -115,27 +133,28 @@ def plot(embedding):
     plt.show()
     return colors
     
-
+#%%
 colors = plot(embedding_1)
 colors = plot(embedding_2)
 # %%
 Group1 = Representation(
-    name="1",
+    name="Data 1",
     metric="euclidean",
     embedding=embedding_1,
 )
 
 # %%
 Group2 = Representation(
-    name="2",
+    name="Data 2",
     metric="euclidean",
     embedding=embedding_2,
 )
 
 # %%
 config = OptimizationConfig(
-    eps_list=[0.1, 1],
-    num_trial=50,
+    eps_list=[1e-3, 1],
+    num_trial=200,
+    sinkhorn_method = 'sinkhorn_log',
     db_params={"drivername": "sqlite"},
     n_iter=1,
 )
@@ -182,7 +201,7 @@ vis_log = VisualizationConfig(
     ylabel_size=20,
     yticks_size=20,
     cbar_label_size=20,
-    marker_size=150,
+    marker_size=60,
     plot_eps_log=True,
     fig_ext='svg',
 )
@@ -213,8 +232,8 @@ vis_emb3d = VisualizationConfig(
 alignment = AlignRepresentations(
     config=config,
     representations_list=[Group1, Group2],
-    main_results_dir="../results/Simulation_4",
-    data_name="Simulation_4"
+    main_results_dir=f"../results/{dataset}",
+    data_name=dataset,
 )
 
 #%%
@@ -241,17 +260,39 @@ alignment.gw_alignment(
     compute_OT=compute_OT,
     delete_results=False,
     visualization_config=vis_config,
+    save_dataframe=True,
+    fix_random_init_seed=True,
 )
 
 # %%
 alignment.show_optimization_log(
-    fig_dir="../results/Simulation_4",
+    fig_dir=f"../results/{dataset}",
     visualization_config=vis_log,
 )
 
-alignment.visualize_embedding(dim=3, visualization_config=vis_emb3d)
+# %%
+_emb = alignment.visualize_embedding(dim=3, visualization_config=vis_emb3d, name_list=["Data 1", "Data 2"])
 
+# %%
 alignment.calc_accuracy(top_k_list=[1, 3, 5], eval_type="ot_plan")
+
+# %%
+pair = alignment.pairwise_list[0]
+
+#%%
+df = pair.random_test_gwot_no_entropy(num_seed = 200)
+
+#%%
+plt.scatter(df["acc"], df["gwd"])
+plt.title(f"GWOT no entropy \n {pair.data_name} / {pair.pair_name.replace('_', ' ')}")
+plt.xlabel("Accuracy (%)")
+plt.ylabel("GWD")
+plt.xlim(-5, 105)
+plt.grid(True)
+plt.show()
+
+#%%
+df.sort_values("gwd", ascending=True).head(10)
 
 
 # %%
@@ -288,8 +329,8 @@ new_rep_list = [
 ar = AlignRepresentations(
     config=config,
     representations_list=new_rep_list,
-    main_results_dir="../results/Simulation_4",
-    data_name="Simulation_4"
+    main_results_dir=f"../results/{dataset}",
+    data_name=dataset,
 )
 
 # %%

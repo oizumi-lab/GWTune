@@ -52,6 +52,7 @@ class GW_Alignment:
         to_types: str = "torch",
         data_type: str = "double",
         sinkhorn_method: str = "sinkhorn",
+        fix_random_init_seed: Optional[int] = None,
     ) -> None:
         """Initialize the Gromov-Wasserstein alignment object.
 
@@ -98,6 +99,7 @@ class GW_Alignment:
             max_iter=max_iter,
             numItermax=numItermax,
             n_iter=n_iter,
+            fix_random_init_seed=fix_random_init_seed,
         )
 
     def define_eps_range(
@@ -227,7 +229,8 @@ class MainGromovWasserstainComputation:
         data_type: str = 'double',
         max_iter: int = 1000,
         numItermax: int = 1000,
-        n_iter: int = 20
+        n_iter: int = 20,
+        fix_random_init_seed:Optional[int] = None,
     ) -> None:
         """Initialize the Gromov-Wasserstein alignment computation object.
 
@@ -272,7 +275,12 @@ class MainGromovWasserstainComputation:
         self.n_iter = n_iter
 
         self.back_end = Backend("cpu", self.to_types, self.data_type)
-
+        
+        self.fix_random_init_seed = fix_random_init_seed
+        
+        if self.fix_random_init_seed is not None:
+            self.fix_seed = [i for i in range(fix_random_init_seed)]
+        
     def entropic_gw(
         self,
         device: str,
@@ -578,11 +586,14 @@ class MainGromovWasserstainComputation:
             self.best_gw_loss = float("inf")
 
             if init_mat_plan in ["random", "permutation"]:
-                pbar = tqdm(np.random.randint(0, 100000, self.n_iter))
+                if self.fix_random_init_seed is None:
+                    pbar = tqdm(np.random.randint(0, 100000, self.n_iter))
+                else:
+                    pbar = tqdm([self.fix_seed.pop(i) for i in range(self.n_iter)])
 
             if init_mat_plan == "user_define":
                 pbar = tqdm(self.init_mat_builder.user_define_init_mat_list)
-
+            
             pbar.set_description(f"Trial No.{trial.number}, eps:{eps:.3e}")
 
             for i, seed in enumerate(pbar):
