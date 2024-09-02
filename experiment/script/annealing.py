@@ -9,6 +9,8 @@ import pickle as pkl
 import tqdm
 from scipy.spatial.distance import cdist
 
+ot.gromov.entropic_gromov_wasserstein
+
 #%%
 def entropic_gromov_wasserstein(C1, C2, p, q, loss_fun, epsilon,T=None,
                                 max_iter=1000, tol=1e-9, verbose=False, log=False):
@@ -116,13 +118,13 @@ def gromov_wasserstein(C1, C2, p=None, q=None, loss_fun='square_loss', symmetric
 #%%
 # set up the parameters
 eps_steps = 100
-eps_range = [1e-4, 10]
+eps_range = [1e-1, 100]
 
 epsilons = np.logspace(np.log10(eps_range[1]), np.log10(eps_range[0]), eps_steps)
 
 #%%
 # load the data
-data = "AllenBrain"
+data = "THINGS"
 
 if data == "color":
     data_path = "../../data/color/num_groups_5_seed_0_fill_val_3.5.pickle"
@@ -138,6 +140,12 @@ if data == "AllenBrain":
     emb2 = np.load("../../data/AllenBrain/pseudo_mouse_B_emb.npy")
     sim_mat1 = cdist(emb1, emb1, metric="cosine")
     sim_mat2 = cdist(emb2, emb2, metric="cosine")
+    
+if data == "THINGS":
+    emb1 = np.load("../../data/THINGS/male_embeddings.npy")[0]
+    emb2 = np.load("../../data/THINGS/female_embeddings.npy")[0]
+    sim_mat1 = cdist(emb1, emb1, metric="euclidean")
+    sim_mat2 = cdist(emb2, emb2, metric="euclidean")
     
 
 p = np.ones(sim_mat1.shape[0]) / sim_mat1.shape[0]
