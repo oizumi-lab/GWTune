@@ -2708,7 +2708,7 @@ class AlignRepresentations:
         dim: int,
         method: Optional[str] = "PCA",
         emb_transformer: Optional[TransformerMixin] = None,
-        pivot: Union[None, int, str] = None,
+        pivot: Union[None, int, str] = 0,
         visualization_config: VisualizationConfig = VisualizationConfig(),
         category_name_list: Optional[List[str]] = None,
         num_category_list: Optional[List[int]] = None,
@@ -2733,7 +2733,7 @@ class AlignRepresentations:
                 See sklearn documentation for details. Defaults to None.
             pivot (Union[None, int, str], optional):
                 The index of the pivot Representation or the name of the pivot Representation for Procrustes.
-                If None, no Procrustes analysis was done, and PCA will be done on just concatenated (in axis=0) data. Defaults to None.
+                If None, no Procrustes analysis was done, and PCA will be done on just concatenated (in axis=0) data. Defaults to 0.
             visualization_config (VisualizationConfig, optional):
                 Container of parameters used for figure. Defaults to VisualizationConfig().
             category_name_list (Optional[List[str]], optional):

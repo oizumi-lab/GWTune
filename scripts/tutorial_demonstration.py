@@ -227,5 +227,5 @@ ar = AlignRepresentations(
 # embedding alignment
 emb_name = "PCA" #"TSNE", "PCA", "MDS"
 dim=3
-ar.visualize_embedding(dim=3, method=emb_name, visualization_config=vis_emb3d, fig_dir="../results/demonstration")
+ar.visualize_embedding(dim=3, pivot=None, method=emb_name, visualization_config=vis_emb3d, fig_dir="../results/demonstration")
 #%%
