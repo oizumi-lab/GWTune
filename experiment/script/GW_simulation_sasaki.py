@@ -15,7 +15,6 @@ from scipy.spatial import distance
 
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.colors import Normalize
 from matplotlib.cm import ScalarMappable
 
@@ -74,8 +73,8 @@ def rotate_points_around_center(points, max_offset, start=0, seed=0):
 
 #%%
 ### Pattern 4
-dataset = "Simulation"
-# dataset = "Simulation_noise"
+# dataset = "Simulation"
+dataset = "Simulation_noise"
 
 #%%
 # 絡まった紐の座標を生成する関数
@@ -90,7 +89,7 @@ def tangled_rope(num_points=100, num_loops=3, radius=1, beta=0.3, pattern=1):
         radius = radius + beta * t / (2 * np.pi) + np.sin(t / (2 * np.pi))
     
     np.random.seed(pattern)
-    noize = np.random.normal(0, 0.1, num_points)
+    noize = np.random.normal(0, 0.05, num_points)
     
     if dataset == "Simulation_noise":   
         x = np.sin(t) * radius + noize
