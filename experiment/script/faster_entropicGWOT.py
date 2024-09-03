@@ -786,7 +786,7 @@ if __name__ == "__main__":
 
     #T_init = np.outer(p, q)
     
-    epsilon = 1
+    epsilon = 5
     n_init = 10
     
     # compare the time of calculation
@@ -857,6 +857,58 @@ if __name__ == "__main__":
     print("Normal GWOT time: ", t_end - t_start)
     print("Best GW distance: ", best_gwd)
     
+    
+    #%%
+    # compare the time of calculation of emd and sinkhorn
+    # set the random data
+    n = 100
+    np.random.seed(0)
+    a = np.ones(n) / n
+    b = np.ones(n) / n
+    M = np.random.rand(n, n)
+    
+    epsilons = np.logspace(-3.5, 0, 100)
+    
+    # count the time of calculation
+    t_start = time.time()
+    ot.emd(a, b, M, numItermax=100000, log=False)
+    t_end = time.time()
+    t_emd = t_end - t_start
+    print("emd time: ", t_emd)
+    
+    t_sinkhorn = []
+    for eps in epsilons:
+        t_start = time.time()
+        ot.bregman.sinkhorn(a, b, M, eps, numItermax=100000, log=False)
+        t_end = time.time()
+        
+        t = t_end - t_start
+        print(f"epsilon: {eps} \n sinkhorn time: ", t)
+        t_sinkhorn.append(t)
+    
+    #t_sinkhorn_log = []
+    #for eps in epsilons:
+    #    t_start = time.time()
+    #    ot.bregman.sinkhorn_log(a, b, M, eps, numItermax=100000, log=True)
+    #    t_end = time.time()
+    #    
+    #    t = t_end - t_start
+    #    print(f"epsilon: {eps} \n sinkhorn time: ", t)
+    #    t_sinkhorn_log.append(t)
+    
+    #%%
+    # plot the time of calculation
+    plt.figure()
+    plt.plot(epsilons, t_sinkhorn, label="sinkhorn")
+    #plt.plot(epsilons, t_sinkhorn_log, label="sinkhorn_log")
+    plt.axhline(y=t_emd, color='r', linestyle='-', label="emd")
+    plt.xscale("log")
+    plt.yscale("log")
+    plt.xlabel("epsilon")
+    plt.ylabel("time")
+    plt.title(f"Time of calculation of emd and sinkhorn \n N = {n}")
+    plt.legend()
+    plt.show()
     
     
     
