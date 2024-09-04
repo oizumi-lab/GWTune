@@ -593,7 +593,8 @@ class Representation:
         """
 
         if fig_dir is not None:
-            fig_path = os.path.join(fig_dir, fig_name)
+            fig_ext=visualization_config.visualization_params["fig_ext"]
+            fig_path = os.path.join(fig_dir, f"{fig_name}.{fig_ext}")
         else:
             fig_path = None
 
@@ -611,6 +612,7 @@ class Representation:
             category_idx_list=category_idx_list,
         )
 
+        
         visualize_embedding.plot_embedding(
             name_list=[self.name], title=title, legend=legend, save_dir=fig_path, **visualization_config()
         )

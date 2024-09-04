@@ -89,7 +89,7 @@ def tangled_rope(num_points=100, num_loops=3, radius=1, beta=0.3, pattern=1):
         radius = radius + beta * t / (2 * np.pi) + np.sin(t / (2 * np.pi))
     
     np.random.seed(pattern)
-    noize = np.random.normal(0, 0.05, num_points)
+    noize = np.random.normal(0, 0.07, num_points)
     
     if dataset == "Simulation_noise":   
         x = np.sin(t) * radius + noize
@@ -137,14 +137,14 @@ colors = plot(embedding_1)
 colors = plot(embedding_2)
 # %%
 Group1 = Representation(
-    name="Data 1",
+    name="Embedding X",
     metric="euclidean",
     embedding=embedding_1,
 )
 
 # %%
 Group2 = Representation(
-    name="Data 2",
+    name="Embedding Y",
     metric="euclidean",
     embedding=embedding_2,
 )
@@ -152,19 +152,35 @@ Group2 = Representation(
 # %%
 config = OptimizationConfig(
     eps_list=[1e-3, 1],
-    num_trial=200,
+    num_trial=100,
     sinkhorn_method = 'sinkhorn_log',
     db_params={"drivername": "sqlite"},
     n_iter=1,
 )
 
 # %%
-vis_config = VisualizationConfig(
+vis_sim_mat= VisualizationConfig(
     figsize=(10, 10), 
     title_size = 0, 
     cmap = "rocket_r",
-    cbar_ticks_size=20,
+    cbar_ticks_size=30,
     font="Arial",
+    cbar_label="Dissimilarity",
+    cbar_label_size=40,
+    color_labels=colors,
+    color_label_width=3,
+    fig_ext='svg',
+)
+
+#%%
+vis_ot = VisualizationConfig(
+    figsize=(10, 10), 
+    title_size = 0, 
+    cmap = "rocket_r",
+    cbar_ticks_size=30,
+    font="Arial",
+    cbar_label="Probability",
+    cbar_label_size=40,
     color_labels=colors,
     color_label_width=3,
     fig_ext='svg',
@@ -216,7 +232,7 @@ vis_emb3d = VisualizationConfig(
     # xlabel="PC1",
     # ylabel="PC2",
     # zlabel="PC3",
-    font="sans-serif",
+    font="Arial",
     cmap="cool",
     # colorbar_label="short movies",
     # colorbar_range=[0, len(embedding_1)],
@@ -238,7 +254,7 @@ alignment = AlignRepresentations(
 #%%
 # RSA
 alignment.show_sim_mat(
-    visualization_config=vis_config, 
+    visualization_config=vis_sim_mat, 
     show_distribution=False,
 )
 
@@ -247,8 +263,8 @@ alignment.RSA_get_corr()
 
 #%%
 # show embeddings
-Group1.show_embedding(dim=3, visualization_config=vis_emb, fig_name="Group1", legend=False)
-Group2.show_embedding(dim=3, visualization_config=vis_emb_2, fig_name="Group2", legend=False)
+Group1.show_embedding(dim=3, fig_dir=f"../results/{dataset}", visualization_config=vis_emb, fig_name="Embedding X", legend=False)
+Group2.show_embedding(dim=3, fig_dir=f"../results/{dataset}", visualization_config=vis_emb_2, fig_name="Embedding Y", legend=False)
 
 # %%
 # GW
@@ -258,7 +274,7 @@ compute_OT=False
 alignment.gw_alignment(
     compute_OT=compute_OT,
     delete_results=False,
-    visualization_config=vis_config,
+    visualization_config=vis_ot,
     save_dataframe=True,
     fix_random_init_seed=True,
 )
@@ -269,11 +285,40 @@ alignment.show_optimization_log(
     visualization_config=vis_log,
 )
 
-# %%
-_emb = alignment.visualize_embedding(dim=3, visualization_config=vis_emb3d, name_list=["Data 1", "Data 2"])
+#%%
+study = alignment.pairwise_list[0]._run_optimization(compute_OT = False)
+df_trial = study.trials_dataframe()
+
+#%%
+plt.figure(figsize=(8,6))
+plt.scatter(df_trial["params_eps"], df_trial["value"], s = 60)
+plt.xlabel("epsilon", fontsize=20)
+plt.ylabel("GWD", fontsize=20)
+plt.xscale('log')
+
+plt.tick_params(axis='x', which='both', labelsize=20, rotation=0)
+plt.tick_params(axis='y', which='major', labelsize=20)
+plt.tight_layout()
+plt.savefig(f"../results/{dataset}/eps_gwd.svg")
+plt.show()
 
 # %%
-alignment.calc_accuracy(top_k_list=[1, 3, 5], eval_type="ot_plan")
+_emb = alignment.visualize_embedding(dim=3, visualization_config=vis_emb3d, name_list=["Embedding X", "Embedding Y"])
+
+# %%
+df = alignment.calc_accuracy(top_k_list=[1, 3, 5], eval_type="ot_plan", return_dataframe=True)
+
+# %%
+df_plot = df
+df_plot.index = ["Top 1", "Top 3", "Top 5"]
+df_plot.T.plot(kind='bar', figsize=(8, 6), fontsize=20, rot=0)
+plt.xticks([])
+plt.xlabel("Top k",fontsize=20)
+plt.ylabel("Matching Rate (%)", fontsize=20)
+plt.legend(fontsize=15)
+plt.tight_layout()
+plt.savefig(f"../results/{dataset}/top_k_matching_rate.svg")
+plt.show()
 
 # %%
 pair = alignment.pairwise_list[0]
@@ -320,8 +365,8 @@ print(new_target.shape)
 
 # %%
 new_rep_list = [
-    Representation(name="Data 1", embedding=source),
-    Representation(name="Data 2", embedding=new_target),
+    Representation(name="Embedding X", embedding=source),
+    Representation(name="Embedding Y", embedding=new_target),
 ]
 
 # %%
