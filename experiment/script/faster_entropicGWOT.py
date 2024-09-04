@@ -865,7 +865,7 @@ if __name__ == "__main__":
     
     # cpu vs gpu
     # float vs double
-    n = 2000
+    n = 100
     np.random.seed(0)
     a = np.ones(n) / n
     b = np.ones(n) / n
@@ -873,7 +873,7 @@ if __name__ == "__main__":
     
     epsilons = np.logspace(-3.5, 0, 100)
     devices = ["cpu", "cuda"]
-    types = ["float32", "float64"]
+    types = ["float64"]
     
     # count the time of calculation
     t_start = time.time()
@@ -923,7 +923,7 @@ if __name__ == "__main__":
     plt.title(f"Time of calculation of emd and sinkhorn \n N={n}")
     plt.legend()
     plt.show()
-    plt.savefig(f"../../figures/time_of_calculation_emd_sinkhorn_{n}.png")
+    #plt.savefig(f"../../figures/time_of_calculation_emd_sinkhorn_{n}.png")
     plt.gcf().clear()
     
     
