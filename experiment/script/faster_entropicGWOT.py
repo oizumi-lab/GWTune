@@ -754,7 +754,7 @@ if __name__ == "__main__":
     
     #%%
     # load data
-    data = "color"
+    data = "THINGS"
 
     if data == "color":
         data_path = "../../data/color/num_groups_5_seed_0_fill_val_3.5.pickle"
@@ -900,15 +900,55 @@ if __name__ == "__main__":
                 t_sinkhorn.append(t)
             t_sinkhorn_all[(device, dtype)] = t_sinkhorn
     
-    #t_sinkhorn_log = []
-    #for eps in epsilons:
-    #    t_start = time.time()
-    #    ot.bregman.sinkhorn_log(a, b, M, eps, numItermax=100000, log=True)
-    #    t_end = time.time()
-    #    
-    #    t = t_end - t_start
-    #    print(f"epsilon: {eps} \n sinkhorn time: ", t)
-    #    t_sinkhorn_log.append(t)
+    #%%
+    # plot the time of calculation
+    
+    # sinkhorn_log
+    # float vs double
+    
+    import os, sys
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+    from src.utils.init_matrix import InitMatrix
+    from tqdm import tqdm
+    import matplotlib.pyplot as plt
+    import time
+    import torch
+    import ot
+    import numpy as np
+    
+    
+    n = 100
+    np.random.seed(0)
+    a = np.ones(n) / n
+    b = np.ones(n) / n
+    M = np.random.rand(n, n)
+    
+    epsilons = np.logspace(-3.5, 0, 100)
+    devices = ["cuda"]
+    types = ["float", "double"]
+    
+    # count the time of calculation
+    t_start = time.time()
+    ot.emd(a, b, M, numItermax=100000, log=False)
+    t_end = time.time()
+    t_emd = t_end - t_start
+    print("emd time: ", t_emd)
+    
+    t_sinkhorn_all = {}
+    for device in devices:
+        for dtype in types:
+            t_sinkhorn_log = []
+            dtype = torch.float32 if dtype == "float" else torch.double
+            a, b, M = torch.tensor(a, device=device, dtype=dtype), torch.tensor(b, device=device, dtype=dtype), torch.tensor(M, device=device, dtype=dtype)
+            
+            for eps in epsilons:
+                t_start = time.time()
+                ot.bregman.sinkhorn_log(a, b, M, eps, numItermax=100000, log=True)
+                t_end = time.time()
+                
+                t = t_end - t_start
+                print(f"epsilon: {eps} \n sinkhorn time: ", t)
+                t_sinkhorn_log.append(t)
     
     #%%
     # plot the time of calculation

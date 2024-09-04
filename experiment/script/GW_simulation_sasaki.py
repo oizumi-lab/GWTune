@@ -307,7 +307,7 @@ _emb = alignment.visualize_embedding(dim=3, visualization_config=vis_emb3d, name
 
 # %%
 df = alignment.calc_accuracy(top_k_list=[1, 3, 5], eval_type="ot_plan", return_dataframe=True)
-
+print(df)
 # %%
 df_plot = df
 df_plot.index = ["Top 1", "Top 3", "Top 5"]
