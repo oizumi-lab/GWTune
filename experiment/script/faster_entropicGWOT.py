@@ -749,9 +749,10 @@ if __name__ == "__main__":
     from tqdm import tqdm
     import matplotlib.pyplot as plt
     import time
+    import torch
     
     
-    
+    #%%
     # load data
     data = "color"
 
@@ -861,13 +862,18 @@ if __name__ == "__main__":
     #%%
     # compare the time of calculation of emd and sinkhorn
     # set the random data
-    n = 100
+    
+    # cpu vs gpu
+    # float vs double
+    n = 2000
     np.random.seed(0)
     a = np.ones(n) / n
     b = np.ones(n) / n
     M = np.random.rand(n, n)
     
     epsilons = np.logspace(-3.5, 0, 100)
+    devices = ["cpu", "cuda"]
+    types = ["float32", "float64"]
     
     # count the time of calculation
     t_start = time.time()
@@ -876,15 +882,23 @@ if __name__ == "__main__":
     t_emd = t_end - t_start
     print("emd time: ", t_emd)
     
-    t_sinkhorn = []
-    for eps in epsilons:
-        t_start = time.time()
-        ot.bregman.sinkhorn(a, b, M, eps, numItermax=100000, log=False)
-        t_end = time.time()
-        
-        t = t_end - t_start
-        print(f"epsilon: {eps} \n sinkhorn time: ", t)
-        t_sinkhorn.append(t)
+    t_sinkhorn_all = {}
+    for device in devices:
+        for dtype in types:
+            t_sinkhorn = []
+            dtype = torch.float32 if dtype == "float32" else torch.float64
+            a, b, M = torch.tensor(a, device=device, dtype=dtype), torch.tensor(b, device=device, dtype=dtype), torch.tensor(M, device=device, dtype=dtype)
+            
+            for eps in epsilons:
+                t_start = time.time()
+                #ot.bregman.sinkhorn(a, b, M, eps, numItermax=100000, log=False)
+                ot.bregman.sinkhorn(a, b, M, eps, numItermax=100000, log=False, device=device, dtype=dtype)
+                t_end = time.time()
+
+                t = t_end - t_start
+                print(f"epsilon: {eps} \n sinkhorn time: ", t)
+                t_sinkhorn.append(t)
+            t_sinkhorn_all[(device, dtype)] = t_sinkhorn
     
     #t_sinkhorn_log = []
     #for eps in epsilons:
@@ -899,16 +913,18 @@ if __name__ == "__main__":
     #%%
     # plot the time of calculation
     plt.figure()
-    plt.plot(epsilons, t_sinkhorn, label="sinkhorn")
-    #plt.plot(epsilons, t_sinkhorn_log, label="sinkhorn_log")
+    for key, value in t_sinkhorn_all.items():
+        plt.plot(epsilons, value, label=f"sinkhorn_{key[0]}_{key[1]}")
     plt.axhline(y=t_emd, color='r', linestyle='-', label="emd")
-    plt.xscale("log")
     plt.yscale("log")
+    plt.xscale("log")
     plt.xlabel("epsilon")
     plt.ylabel("time")
-    plt.title(f"Time of calculation of emd and sinkhorn \n N = {n}")
+    plt.title(f"Time of calculation of emd and sinkhorn \n N={n}")
     plt.legend()
     plt.show()
+    plt.savefig(f"../../figures/time_of_calculation_emd_sinkhorn_{n}.png")
+    plt.gcf().clear()
     
     
     
