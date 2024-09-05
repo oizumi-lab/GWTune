@@ -872,8 +872,10 @@ if __name__ == "__main__":
     M = np.random.rand(n, n)
     
     epsilons = np.logspace(-3.5, 0, 100)
-    devices = ["cpu", "cuda"]
-    types = ["float64"]
+    #epsilons = np.logspace(-1, 0, 10)
+    devices = ["cuda"]
+    types = ["float32", "float64"]
+    sinkhorn_log = True
     
     # count the time of calculation
     t_start = time.time()
@@ -892,7 +894,10 @@ if __name__ == "__main__":
             for eps in epsilons:
                 t_start = time.time()
                 #ot.bregman.sinkhorn(a, b, M, eps, numItermax=100000, log=False)
-                ot.bregman.sinkhorn(a, b, M, eps, numItermax=100000, log=False, device=device, dtype=dtype)
+                if sinkhorn_log:
+                    ot.bregman.sinkhorn_log(a, b, M, eps, numItermax=100000, log=False, device=device, dtype=dtype, stopThr=1e-5) #stopThr=1e-9
+                else:
+                    ot.bregman.sinkhorn(a, b, M, eps, numItermax=100000, log=False, device=device, dtype=dtype)
                 t_end = time.time()
 
                 t = t_end - t_start
@@ -964,7 +969,10 @@ if __name__ == "__main__":
     plt.xscale("log")
     plt.xlabel("epsilon")
     plt.ylabel("time")
-    plt.title(f"Time of calculation of emd and sinkhorn \n N={n}")
+    if sinkhorn_log:
+        plt.title(f"Time of calculation of sinkhorn_log \n N={n}")
+    else:
+        plt.title(f"Time of calculation of emd and sinkhorn \n N={n}")
     plt.legend()
     plt.savefig(f"../figures/time_of_calculation_emd_sinkhorn_log_{n}.png")
     plt.show()
