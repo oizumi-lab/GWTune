@@ -885,9 +885,7 @@ class PairwiseAnalysis:
 
         if fig_dir is None:
             fig_dir = self.figure_path
-
-            if not os.path.exists(fig_dir):
-                os.makedirs(fig_dir, exist_ok=True)
+            os.makedirs(fig_dir, exist_ok=True)
 
         OT = self.show_OT(
             ot_to_plot = None,
