@@ -155,6 +155,7 @@ class VisualizationConfig:
         zlabel: Optional[str] = None,
         zlabel_size: int = 15,
         color_labels: Optional[List[str]] = None,
+        color_label_width = None,
         color_hue: Optional[str] = None,
         colorbar_label: Optional[str] = None,
         colorbar_range: List[float] = [0., 1.],
@@ -222,6 +223,8 @@ class VisualizationConfig:
                 Size of the z-axis label. Defaults to 15.
             color_labels (List[str], optional):
                 Labels of the color. Defaults to None.
+            color_label_width (int, optional):
+                Width of the color label. Defaults to None.
             color_hue (str, optional):
                 Hue of the color. Defaults to None.
             colorbar_label (str, optional):
@@ -285,6 +288,7 @@ class VisualizationConfig:
             'zlabel': zlabel,
             'zlabel_size': zlabel_size,
             'color_labels': color_labels,
+            'color_label_width': color_label_width,
             'color_hue': color_hue,
             'colorbar_label': colorbar_label,
             'colorbar_range': colorbar_range,
@@ -569,7 +573,7 @@ class Representation:
         Args:
             dim (int, optional):
                 The dimension of the embedding space for visualization. If the original dimensions of the embeddings are
-                higher than "dim", the dimension reduction method(PCA) is applied. Defaults to 3.
+                higher than "dim", the dimension reduction method (PCA) is applied. Defaults to 3.
             visualization_config (VisualizationConfig, optional):
                 Configuration for visualization details. Defaults to VisualizationConfig().
             category_name_list (Optional[List[str]:, optional):
@@ -598,9 +602,18 @@ class Representation:
                 category_name_list = self.category_name_list
                 num_category_list = self.num_category_list
                 category_idx_list = self.category_idx_list
+            
+        if self.embedding.shape[1] > dim:
+            embedding_list, _ = utils_functions.obtain_embedding(
+                embedding_list=[self.embedding],
+                dim=dim,
+                emb_name="PCA",
+            )
+        else:
+            embedding_list = [self.embedding]
 
         visualize_functions.plot_embedding(
-            embedding_list=[self.embedding],
+            embedding_list=embedding_list,
             dim=dim,
             name_list=[self.name], 
             category_name_list=category_name_list,
