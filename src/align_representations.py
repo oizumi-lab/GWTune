@@ -592,11 +592,6 @@ class Representation:
                 The name of the figure. Defaults to "Aligned_embedding.png".
         """
 
-        if fig_dir is not None:
-            fig_path = os.path.join(fig_dir, fig_name)
-        else:
-            fig_path = None
-
         if category_idx_list is None:
             if self.category_idx_list is not None:
                 category_name_list = self.category_name_list
@@ -611,6 +606,10 @@ class Representation:
             )
         else:
             embedding_list = [self.embedding]
+            
+        
+        if fig_name is None:
+            fig_name = f"{self.name}_embedding"
 
         visualize_functions.plot_embedding(
             embedding_list=embedding_list,
@@ -622,7 +621,7 @@ class Representation:
             title=title, 
             has_legend=legend,
             fig_name=fig_name, 
-            fig_dir=fig_path, 
+            fig_dir=fig_dir, 
             **visualization_config()
         )
 
@@ -1105,7 +1104,6 @@ class PairwiseAnalysis:
 
         # figure plotting epsilon as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
-        plt.title(f"epsilon - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
         plt.scatter(df_trial["params_eps"], df_trial["value"], c = 100 * df_trial["user_attrs_best_acc"], s = marker_size, cmap=cmap)
 
         plt.xlabel("epsilon", fontsize=xlabel_size)
@@ -1119,6 +1117,13 @@ class PairwiseAnalysis:
 
         if plot_eps_log:
             plt.xscale('log')
+            
+            if lim_eps is None:
+                norm = LogNorm(vmin=self.config.eps_list[0], vmax=self.config.eps_list[1])
+            else:
+                norm = LogNorm(vmin=lim_eps[0], vmax=lim_eps[1])
+        else:
+            norm = None
 
         plt.tick_params(axis='x', which='both', labelsize=xticks_size, rotation=xticks_rotation)
         plt.tick_params(axis='y', which='major', labelsize=yticks_size)
@@ -1143,25 +1148,25 @@ class PairwiseAnalysis:
 
         # figure plotting accuracy as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
-        plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], s = marker_size, cmap=cmap)
-        plt.title(f"Matching Rate - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
+        plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap, norm=norm, s = marker_size)
+        #plt.title(f"Matching Rate - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
         plt.xlabel("Matching Rate (%)", fontsize=xlabel_size)
         plt.xticks(fontsize=xticks_size)
         plt.ylabel("GWD", fontsize=ylabel_size)
         plt.yticks(fontsize=yticks_size)
 
-        cbar =  plt.colorbar(format = cbar_format)
+        cbar = plt.colorbar(format = cbar_format)
         cbar.set_label(label='epsilon', size=cbar_label_size)
         cbar.ax.tick_params(labelsize=cbar_ticks_size)
 
         plt.grid(True)
 
+        ymin, ymax = plt.xlim(lim_acc)
+        if ymax > 100:
+            plt.xlim(lim_acc, 105)
+
         if lim_gwd is not None:
             plt.ylim(lim_gwd)
-
-        ymin, ymax = plt.xlim(lim_acc)
-        if ymax > 104:
-            plt.xlim(lim_acc, 100)
 
         plt.tight_layout()
 
@@ -1172,6 +1177,7 @@ class PairwiseAnalysis:
 
         plt.clf()
         plt.close()
+
 
     def show_OT(
         self,
@@ -2809,14 +2815,15 @@ class AlignRepresentations:
             name_list.append(self.representations_list[i].name)
             embedding_list.append(self.representations_list[i].embedding[sort_idx, :])
         
-        # obtain the reduced dimension embedding list
-        embedding_list, _ = utils_functions.obtain_embedding(
-            embedding_list,
-            dim=dim, 
-            emb_name=method, 
-            emb_transformer=emb_transformer,
-            **kwargs,
-        )
+        if embedding_list[0].shape[1] > dim:
+            # obtain the reduced dimension embedding list
+            embedding_list, _ = utils_functions.obtain_embedding(
+                embedding_list,
+                dim=dim, 
+                emb_name=method, 
+                emb_transformer=emb_transformer,
+                **kwargs,
+            )
         
         if category_idx_list is None:
             if self.representations_list[0].category_idx_list is not None:

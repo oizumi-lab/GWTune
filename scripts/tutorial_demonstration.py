@@ -206,6 +206,23 @@ alignment.show_optimization_log(
 # %%
 alignment.calc_accuracy(top_k_list=[1, 3, 5], eval_type="ot_plan")
 
+#%%
+study = alignment.pairwise_list[0]._run_optimization(compute_OT = False)
+df_trial = study.trials_dataframe()
+
+#%%
+plt.figure(figsize=(8,6))
+plt.scatter(df_trial["params_eps"], df_trial["value"], s = 60)
+plt.xlabel("epsilon", fontsize=20)
+plt.ylabel("GWD", fontsize=20)
+plt.xscale('log')
+
+plt.tick_params(axis='x', which='both', labelsize=20, rotation=0)
+plt.tick_params(axis='y', which='major', labelsize=20)
+plt.tight_layout()
+plt.savefig(f"../results/{dataset}/eps_gwd.svg")
+plt.show()
+
 # %%
 vis_emb3d = VisualizationConfig(
     figsize=(8, 8), 
