@@ -137,14 +137,14 @@ colors = plot(embedding_1)
 colors = plot(embedding_2)
 # %%
 Group1 = Representation(
-    name="Embedding X",
+    name="Embeddings X",
     metric="euclidean",
     embedding=embedding_1,
 )
 
 # %%
 Group2 = Representation(
-    name="Embedding Y",
+    name="Embeddings Y",
     metric="euclidean",
     embedding=embedding_2,
 )
@@ -179,8 +179,8 @@ vis_ot = VisualizationConfig(
     cmap = "rocket_r",
     cbar_ticks_size=30,
     font="Arial",
-    xlabel = "100 points of Embedding X",
-    ylabel = "100 points of Embedding Y",
+    xlabel = "100 points of Embeddings X",
+    ylabel = "100 points of Embeddings Y",
     xlabel_size=40,
     ylabel_size=40,
     cbar_label="Probability",
@@ -212,6 +212,7 @@ vis_emb_2 = VisualizationConfig(
 vis_log = VisualizationConfig(
     figsize=(8, 6), 
     title_size = 0, 
+    # cmap = "rocket_r",
     cmap = "viridis",
     cbar_ticks_size=23,
     font="Arial",
@@ -267,8 +268,8 @@ alignment.RSA_get_corr()
 
 #%%
 # show embeddings
-Group1.show_embedding(dim=3, fig_dir=f"../results/{dataset}", visualization_config=vis_emb, fig_name="Embedding X", legend=False)
-Group2.show_embedding(dim=3, fig_dir=f"../results/{dataset}", visualization_config=vis_emb_2, fig_name="Embedding Y", legend=False)
+Group1.show_embedding(dim=3, fig_dir=f"../results/{dataset}", visualization_config=vis_emb, fig_name="Embeddings X", legend=False)
+Group2.show_embedding(dim=3, fig_dir=f"../results/{dataset}", visualization_config=vis_emb_2, fig_name="Embeddings Y", legend=False)
 
 # %%
 # GW
@@ -307,7 +308,7 @@ plt.savefig(f"../results/{dataset}/eps_gwd.svg")
 plt.show()
 
 # %%
-_emb = alignment.visualize_embedding(dim=3, visualization_config=vis_emb3d, name_list=["Embedding X", "Embedding Y"])
+_emb = alignment.visualize_embedding(dim=3, visualization_config=vis_emb3d, name_list=["Embeddings X", "Embeddings Y"])
 
 # %%
 df = alignment.calc_accuracy(top_k_list=[1, 3, 5], eval_type="ot_plan", return_dataframe=True)
