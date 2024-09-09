@@ -920,7 +920,7 @@ if __name__ == "__main__":
     import numpy as np
     from tqdm.auto import tqdm
     
-    n = 100
+    n = 2000
     np.random.seed(0)
     
     epsilons = np.logspace(-3.5, 0, 100)
@@ -951,7 +951,7 @@ if __name__ == "__main__":
             t_sinkhorn_log = []
             for eps in tqdm(epsilons):
                 t_start = time.time()
-                ot.bregman.sinkhorn_log(torch_a, torch_b, torch_M, eps, numItermax=100000, log=True)
+                ot.bregman.sinkhorn_log(torch_a, torch_b, torch_M, eps, numItermax=100000, log=True, stopThr=1e-5) 
                 t_end = time.time()
                 
                 t = t_end - t_start
@@ -959,6 +959,16 @@ if __name__ == "__main__":
                 t_sinkhorn_log.append(t)
             
             t_sinkhorn_all[(device, dtype)] = t_sinkhorn_log
+    
+    # %%
+    import pickle
+    with open(f"../figures/sinkhorn_log, N={n}_loose.pkl","wb") as f:
+        pickle.dump(t_sinkhorn_all, f)
+    
+    # %%
+    import pickle
+    with open(f"../figures/sinkhorn_log, N={n}_loose.pkl","rb") as f:
+         t_sinkhorn_all = pickle.load(f)
     
     #%%
     plt.figure()
@@ -980,17 +990,20 @@ if __name__ == "__main__":
     
     
     #%%
-    double_results = t_sinkhorn_all[("cuda", "double")]
-    float_results = t_sinkhorn_all[("cuda", "float")]
+    double_results = t_sinkhorn_all[("cuda", torch.double)]
+    float_results = t_sinkhorn_all[("cuda", torch.float32)]
     
+    values = np.array(double_results) / np.array(float_results)
     plt.figure()    
-    plt.plot(epsilons, double_results / float_results, label="time ratio (double / float)")
+    plt.plot(epsilons, values, label="time ratio (double / float)")
     plt.xlabel("epsilon")
     plt.ylabel("double / float")
+    plt.xscale("log")
     plt.title(f"Time of calculation of sinkhorn_log \n N={n}")
     plt.savefig(f"../figures/time_of_calculation_emd_sinkhorn_log_{n}.png")
     plt.show()
     plt.gcf().clear()
+    
     
     
 # %%
