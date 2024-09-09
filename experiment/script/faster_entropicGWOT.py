@@ -920,6 +920,7 @@ if __name__ == "__main__":
     import numpy as np
     from tqdm.auto import tqdm
     
+    #%%
     n = 2000
     np.random.seed(0)
     
@@ -938,8 +939,10 @@ if __name__ == "__main__":
     t_emd = t_end - t_start
     print("emd time: ", t_emd)
     
-    t_sinkhorn_all = {}
     
+    sinkhorn_log = True
+    #%%
+    t_sinkhorn_all = {}
     for device in devices:
         for dtype in types:
             dtype = torch.float32 if dtype == "float" else torch.double
@@ -951,7 +954,7 @@ if __name__ == "__main__":
             t_sinkhorn_log = []
             for eps in tqdm(epsilons):
                 t_start = time.time()
-                ot.bregman.sinkhorn_log(torch_a, torch_b, torch_M, eps, numItermax=100000, log=True, stopThr=1e-5) 
+                ot.bregman.sinkhorn_log(torch_a, torch_b, torch_M, eps, numItermax=100000, log=True)#, stopThr=1e-5) 
                 t_end = time.time()
                 
                 t = t_end - t_start
@@ -962,12 +965,12 @@ if __name__ == "__main__":
     
     # %%
     import pickle
-    with open(f"../figures/sinkhorn_log, N={n}_loose.pkl","wb") as f:
+    with open(f"../figures/sinkhorn_log, N={n}_default.pkl","wb") as f:
         pickle.dump(t_sinkhorn_all, f)
     
     # %%
     import pickle
-    with open(f"../figures/sinkhorn_log, N={n}_loose.pkl","rb") as f:
+    with open(f"../figures/sinkhorn_log, N={n}_default.pkl","rb") as f:
          t_sinkhorn_all = pickle.load(f)
     
     #%%
@@ -999,7 +1002,7 @@ if __name__ == "__main__":
     plt.xlabel("epsilon")
     plt.ylabel("double / float")
     plt.xscale("log")
-    plt.title(f"Time of calculation of sinkhorn_log \n N={n}")
+    plt.title(f"time ratio (double / float) \n N={n}")
     plt.savefig(f"../figures/time_of_calculation_emd_sinkhorn_log_{n}.png")
     plt.show()
     plt.gcf().clear()
