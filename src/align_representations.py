@@ -145,6 +145,8 @@ class VisualizationConfig:
         yticks_size: int = 10,
         xticks_rotation: int = 0,
         yticks_rotation: int = 0,
+        elev:int = 30,
+        azim:int = 60,
         tick_format: str = '%.2f',
         title_size: int = 20,
         legend_size: int = 5,
@@ -175,6 +177,8 @@ class VisualizationConfig:
         lim_eps: Optional[float] = None,
         lim_gwd: Optional[float] = None,
         lim_acc: Optional[float] = None,
+        edgecolor:Optional[str] = None,
+        linewidth:Optional[int] = None,
     ) -> None:
         """Initializes the VisualizationConfig class with specified visualization parameters.
 
@@ -203,6 +207,10 @@ class VisualizationConfig:
                 Rotation angle of the xticks. Defaults to 0.
             yticks_rotation (int, optional):
                 Rotation angle of the yticks. Defaults to 0.
+            elev (int, optional):
+                Elevation angle of the 3D plot. Defaults to 30.
+            azim (int, optional):
+                Azimuthal angle of the 3D plot. Defaults to 60.
             tick_format (Optional[str]):
                 Format of the ticks. Defaults to '%.2f'.
             title_size (int, optional):
@@ -263,6 +271,10 @@ class VisualizationConfig:
                 Limits for GWD. Defaults to None.
             lim_acc (float, optional):
                 Limits for accuracy. Defaults to None.
+            edgecolor (Optional[str], optional):
+                Color of the edge. Defaults to None.
+            linewidth (Optional[int], optional):
+                Width of the line for the edge of plot. Defaults to None.
         """
 
         self.visualization_params = {
@@ -278,6 +290,8 @@ class VisualizationConfig:
             'yticks_size': yticks_size,
             'xticks_rotation': xticks_rotation,
             'yticks_rotation': yticks_rotation,
+            'elev': elev,
+            'azim': azim,
             'tick_format': tick_format,
             'title_size': title_size,
             'legend_size': legend_size,
@@ -308,6 +322,8 @@ class VisualizationConfig:
             'lim_eps':lim_eps,
             'lim_gwd':lim_gwd,
             'lim_acc':lim_acc,
+            'edgecolor':edgecolor,
+            'linewidth':linewidth,
         }
 
     def __call__(self) -> Dict[str, Any]:
@@ -606,10 +622,9 @@ class Representation:
             )
         else:
             embedding_list = [self.embedding]
-            
         
-        if fig_name is None:
-            fig_name = f"{self.name}_embedding"
+        if fig_dir is not None:
+            os.makedirs(fig_dir, exist_ok=True)
 
         visualize_functions.plot_embedding(
             embedding_list=embedding_list,
@@ -1094,6 +1109,9 @@ class PairwiseAnalysis:
 
         xlabel_size = kwargs.get("xlabel_size", 20)
         ylabel_size = kwargs.get("ylabel_size", 20)
+        
+        edgecolor = kwargs.get("edgecolor", None)
+        linewidth = kwargs.get("linewidth", None)
 
         lim_eps = kwargs.get("lim_eps", None)
         lim_gwd = kwargs.get("lim_gwd", None)
@@ -1104,7 +1122,7 @@ class PairwiseAnalysis:
 
         # figure plotting epsilon as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
-        plt.scatter(df_trial["params_eps"], df_trial["value"], c = 100 * df_trial["user_attrs_best_acc"], s = marker_size, cmap=cmap)
+        plt.scatter(df_trial["params_eps"], df_trial["value"], c = 100 * df_trial["user_attrs_best_acc"], s = marker_size, cmap=cmap, edgecolor=edgecolor, linewidth=linewidth)
 
         plt.xlabel("epsilon", fontsize=xlabel_size)
         plt.ylabel("GWD", fontsize=ylabel_size)
@@ -1148,7 +1166,7 @@ class PairwiseAnalysis:
 
         # figure plotting accuracy as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
-        plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap, norm=norm, s = marker_size)
+        plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap, norm=norm, s = marker_size, edgecolor=edgecolor, linewidth=linewidth)
         #plt.title(f"Matching Rate - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
         plt.xlabel("Matching Rate (%)", fontsize=xlabel_size)
         plt.xticks(fontsize=xticks_size)

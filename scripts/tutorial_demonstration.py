@@ -30,6 +30,8 @@ def tangled_rope(num_points=100, num_loops=3, radius=1, beta=0.3, pattern=1):
     elif pattern == 2:
         radius = radius + beta * t / (2 * np.pi) + np.sin(t / (2 * np.pi))
     
+    # radius = radius + beta * t / (2 * np.pi)
+    
     np.random.seed(pattern)
     noize = np.random.normal(0, 0.07, num_points)
     
@@ -44,6 +46,20 @@ def tangled_rope(num_points=100, num_loops=3, radius=1, beta=0.3, pattern=1):
         z = t / (2 * np.pi)
         
     embedding = np.column_stack((x, y, z))
+
+
+    if pattern == 2:
+        # embedding = np.rot90(embedding, 1, axes=(0, 1)).T
+        theta_y = np.radians(90)
+  
+        rot_y = np.array([
+            [ np.cos(theta_y), 0, np.sin(theta_y)],
+            [0,                1,               0],
+            [-np.sin(theta_y), 0, np.cos(theta_y)]
+        ])
+        
+        embedding = (rot_y @ embedding.T).T
+    
     return embedding
 
 #%%
@@ -53,7 +69,7 @@ embedding_2 = tangled_rope(beta=0.3, pattern=2)
 
 # %%
 # 3次元プロットの設定
-def plot(embedding):
+def plot(embedding, pattern=1):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
@@ -76,8 +92,8 @@ def plot(embedding):
     return colors
     
 
-colors = plot(embedding_1)
-colors = plot(embedding_2)
+colors1 = plot(embedding_1, pattern=1)
+colors2 = plot(embedding_2, pattern=2)
 
 # %%
 Group1 = Representation(name="Embeddings X", metric="euclidean", embedding=embedding_1)
@@ -88,7 +104,9 @@ vis_emb = VisualizationConfig(
     figsize=(8, 8), 
     legend_size=20,
     cbar_ticks_size=20,
-    color_labels=colors,
+    color_labels=colors1,
+    elev=30,
+    azim=60,
     fig_ext='svg',
 )
 
@@ -96,7 +114,9 @@ vis_emb_2 = VisualizationConfig(
     figsize=(8, 8), 
     legend_size=12,
     marker_size=60,
-    color_labels=colors,
+    color_labels=colors1,
+    elev=30,
+    azim=60,
     fig_ext='svg',
     markers_list=['X'],
 )
@@ -122,12 +142,12 @@ vis_sim_mat= VisualizationConfig(
     figsize=(12, 12), 
     title_size = 0, 
     cmap = "rocket_r",
-    cbar_ticks_size=30,
+    cbar_ticks_size=60,
     font="Arial",
     cbar_label="Dissimilarity",
-    cbar_label_size=40,
-    color_labels=colors,
-    color_label_width=3,
+    cbar_label_size=80,
+    color_labels=colors1,
+    color_label_width=5,
     fig_ext='svg',
 )
 
@@ -144,7 +164,7 @@ vis_ot = VisualizationConfig(
     ylabel_size=40,
     cbar_label="Probability",
     cbar_label_size=40,
-    color_labels=colors,
+    color_labels=colors1,
     color_label_width=3,
     fig_ext='svg',
 )
@@ -154,16 +174,20 @@ vis_log = VisualizationConfig(
     figsize=(8, 6), 
     title_size = 0, 
     cmap = "viridis",
-    cbar_ticks_size=23,
+    cbar_ticks_size=20,
     font="Arial",
-    xlabel_size=20,
+    xlabel_size=40,
     xticks_size=20,
-    ylabel_size=20,
+    ylabel_size=40,
     yticks_size=20,
-    cbar_label_size=20,
-    marker_size=60,
+    cbar_label_size=30,
+    marker_size=90,
     plot_eps_log=True,
     fig_ext='svg',
+    lim_gwd=[0.85, 1.0],
+    lim_eps=[5e-3, 1e-1],
+    edgecolor="black",
+    linewidth=1,
 )
 
 #%%
@@ -212,9 +236,9 @@ df_trial = study.trials_dataframe()
 
 #%%
 plt.figure(figsize=(8,6))
-plt.scatter(df_trial["params_eps"], df_trial["value"], s = 60)
-plt.xlabel("epsilon", fontsize=20)
-plt.ylabel("GWD", fontsize=20)
+plt.scatter(df_trial["params_eps"], df_trial["value"], s = 60, edgecolor="black", linewidth=1)
+plt.xlabel("epsilon", fontsize=40)
+plt.ylabel("GWD", fontsize=40)
 plt.xscale('log')
 
 plt.tick_params(axis='x', which='both', labelsize=20, rotation=0)
@@ -228,7 +252,7 @@ vis_emb3d = VisualizationConfig(
     figsize=(8, 8), 
     legend_size=20,
     marker_size=60,
-    color_labels=colors,
+    color_labels=colors1,
     fig_ext='svg',
     markers_list=['o', 'X'],
     # xlabel="PC1",
