@@ -920,7 +920,7 @@ if __name__ == "__main__":
     import numpy as np
     from tqdm.auto import tqdm
     
-    n = 2000
+    n = 100
     np.random.seed(0)
     
     epsilons = np.logspace(-3.5, 0, 100)
@@ -979,6 +979,18 @@ if __name__ == "__main__":
     plt.gcf().clear()
     
     
+    #%%
+    double_results = t_sinkhorn_all[("cuda", "double")]
+    float_results = t_sinkhorn_all[("cuda", "float")]
+    
+    plt.figure()    
+    plt.plot(epsilons, double_results / float_results, label="double / float")
+    plt.xlabel("epsilon")
+    plt.ylabel("double / float")
+    plt.title(f"Time of calculation of sinkhorn_log \n N={n}")
+    plt.savefig(f"../figures/time_of_calculation_emd_sinkhorn_log_{n}.png")
+    plt.show()
+    plt.gcf().clear()
     
     
 # %%
