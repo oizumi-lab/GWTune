@@ -984,7 +984,7 @@ if __name__ == "__main__":
     float_results = t_sinkhorn_all[("cuda", "float")]
     
     plt.figure()    
-    plt.plot(epsilons, double_results / float_results, label="double / float")
+    plt.plot(epsilons, double_results / float_results, label="time ratio (double / float)")
     plt.xlabel("epsilon")
     plt.ylabel("double / float")
     plt.title(f"Time of calculation of sinkhorn_log \n N={n}")
