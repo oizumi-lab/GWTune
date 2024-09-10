@@ -148,8 +148,8 @@ vis_sim_mat1= VisualizationConfig(
     cmap = "rocket_r",
     cbar_ticks_size=60,
     font="Arial",
-    xlabel = "100 points of Embeddings X",
-    ylabel = "100 points of Embeddings X",
+    xlabel = "100 points",
+    ylabel = "100 points",
     xlabel_size=60,
     ylabel_size=60,
     cbar_label="Dissimilarity",
@@ -166,8 +166,8 @@ vis_sim_mat2= VisualizationConfig(
     cmap = "rocket_r",
     cbar_ticks_size=60,
     font="Arial",
-    xlabel = "100 points of Embeddings Y",
-    ylabel = "100 points of Embeddings Y",
+    xlabel = "100 points",
+    ylabel = "100 points",
     xlabel_size=60,
     ylabel_size=60,
     cbar_label="Dissimilarity",
@@ -265,6 +265,9 @@ alignment.calc_accuracy(top_k_list=[1, 3, 5], eval_type="ot_plan")
 #%%
 study = alignment.pairwise_list[0]._run_optimization(compute_OT = False)
 df_trial = study.trials_dataframe()
+
+#%%
+print(df_trial.sort_values(by = "value"))
 
 #%%
 plt.figure(figsize=(8,6))
