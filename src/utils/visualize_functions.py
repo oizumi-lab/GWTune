@@ -156,6 +156,7 @@ def show_heatmap(
     cbar_format = kwargs.get('cbar_format', None)#"%.2e"
     cbar_label = kwargs.get('cbar_label', None)
     cbar_label_size = kwargs.get('cbar_label_size', 20)
+    cbar_range = kwargs.get('cbar_range', None)
     cmap = kwargs.get('cmap', 'cividis')
 
     ot_object_tick = kwargs.get("ot_object_tick", False)
@@ -166,11 +167,13 @@ def show_heatmap(
     category_line_style = kwargs.get('category_line_style', 'dashed')
     category_line_color = kwargs.get('category_line_color', 'C2')
 
-    font = kwargs.get('font', 'Noto Sans CJK JP')
+    font = kwargs.get('font', 'Arial')
     show_figure = kwargs.get('show_figure', True)
     
     color_labels = kwargs.get('color_labels', None)
     color_label_width = kwargs.get('color_label_width', None)
+    
+    dpi = kwargs.get('dpi', 300)
 
     plt.style.use("default")
     plt.rcParams["grid.color"] = "black"
@@ -241,12 +244,18 @@ def show_heatmap(
 
     cbar = fig.colorbar(aximg, cax=cax, format = cbar_format)
     cbar.set_label(cbar_label, size = cbar_label_size)
+    
+    if cbar_range is not None:
+        cmin, cmax = cbar_range
+        cbar.mappable.set_clim(cmin, cmax)
+    
+    
     cbar.ax.tick_params(axis='y', labelsize = cbar_ticks_size)
 
     plt.tight_layout()
 
     if save_file_name is not None:
-        plt.savefig(save_file_name)
+        plt.savefig(save_file_name, bbox_inches='tight', dpi=dpi)
 
     if show_figure:
         plt.show()
@@ -333,11 +342,12 @@ def plot_embedding(
     marker_size = kwargs.get('marker_size', 30)
     cmap = kwargs.get('cmap', "viridis")
     show_figure = kwargs.get('show_figure', True)
-    font = kwargs.get('font', 'Noto Sans CJK JP')
+    font = kwargs.get('font', 'Arial')
     elev = kwargs.get('elev', 30)
     azim = kwargs.get('azim' ,60)
     alpha = kwargs.get('alpha', 1)
     fig_ext = kwargs.get('fig_ext', "png")
+    dpi = kwargs.get('dpi', 300)
     
     if color_labels is None:
 
@@ -460,7 +470,8 @@ def plot_embedding(
         cbar.ax.tick_params(labelsize=xlabel_size)
         cbar.mappable.set_clim(colorbar_range[0], colorbar_range[1])
 
-    plt.tight_layout()
+    fig.tight_layout()
+    
     if fig_dir is not None:
         fig_path = os.path.join(fig_dir, f"{fig_name}.{fig_ext}")
         plt.savefig(fig_path, dpi=300, bbox_inches='tight')
