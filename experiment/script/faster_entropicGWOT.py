@@ -939,10 +939,10 @@ if __name__ == "__main__":
     t_emd = t_end - t_start
     print("emd time: ", t_emd)
     
-    
     sinkhorn_log = True
     #%%
     t_sinkhorn_all = {}
+    iter_list = {}
     for device in devices:
         for dtype in types:
             dtype = torch.float32 if dtype == "float" else torch.double
@@ -952,15 +952,18 @@ if __name__ == "__main__":
             torch_M = torch.tensor(M, device=device, dtype=dtype).clone().detach()
             
             t_sinkhorn_log = []
+            n_iter = []
             for eps in tqdm(epsilons):
                 t_start = time.time()
-                ot.bregman.sinkhorn_log(torch_a, torch_b, torch_M, eps, numItermax=100000, log=True)#, stopThr=1e-5) 
+                _, logv = ot.bregman.sinkhorn_log(torch_a, torch_b, torch_M, eps, numItermax=100000, log=True, stopThr=1e-5) 
                 t_end = time.time()
                 
                 t = t_end - t_start
                 # print(f"epsilon: {eps} \n sinkhorn time: ", t)
                 t_sinkhorn_log.append(t)
+                n_iter.append(logv['niter'])
             
+            iter_list[(device, dtype)] = n_iter
             t_sinkhorn_all[(device, dtype)] = t_sinkhorn_log
     
     # %%
@@ -1003,10 +1006,25 @@ if __name__ == "__main__":
     plt.ylabel("double / float")
     plt.xscale("log")
     plt.title(f"time ratio (double / float) \n N={n}")
-    plt.savefig(f"../figures/time_of_calculation_emd_sinkhorn_log_{n}.png")
+    plt.savefig(f"../figures/time_ratio_sinkhorn_log_{n}.png")
     plt.show()
     plt.gcf().clear()
     
+    #%%
+    double_results = iter_list[("cuda", torch.double)]
+    float_results = iter_list[("cuda", torch.float32)]
     
+    plt.figure()    
+    
+    plt.plot(epsilons, float_results, label="float")
+    plt.plot(epsilons, double_results, label="double")
+    
+    plt.xlabel("epsilon")
+    plt.ylabel("iteration number")
+    plt.xscale("log")
+    plt.title(f"iteration number for float and double \n N={n}")
+    plt.legend()
+    plt.savefig(f"../figures/iteration number for float and double N = {n}.png")
+    plt.show()
     
 # %%
