@@ -270,6 +270,15 @@ df_trial = study.trials_dataframe()
 print(df_trial.sort_values(by = "value"))
 
 #%%
+import matplotlib, re
+plt.style.use("default")
+plt.rcParams["grid.color"] = "black"
+plt.rcParams['font.family'] = "Arial"
+plt.rcParams.update(plt.rcParamsDefault)
+styles = matplotlib.style.available
+darkgrid_style = [s for s in styles if re.match(r"seaborn-.*-darkgrid", s)][0]
+plt.style.use(darkgrid_style)
+
 plt.figure(figsize=(8,6))
 plt.scatter(df_trial["params_eps"], df_trial["value"], s = 60, edgecolor="black", linewidth=1)
 plt.xlabel("epsilon", fontsize=40)
@@ -278,6 +287,7 @@ plt.xscale('log')
 
 plt.tick_params(axis='x', which='both', labelsize=20, rotation=0)
 plt.tick_params(axis='y', which='major', labelsize=20)
+plt.grid(True)
 plt.tight_layout()
 plt.savefig(f"../results/{dataset}/eps_gwd.svg")
 plt.show()
@@ -296,10 +306,9 @@ vis_emb3d = VisualizationConfig(
     font="Arial",
     cmap="cool",
     colorbar_shrink=0.8,
-    xlabel_size=20,
-    ylabel_size=20,
-    zlabel_size=20,
-    left_adjust=0.2,
+    xlabel_size=40,
+    ylabel_size=40,
+    zlabel_size=40,
 )
 
 # %%
