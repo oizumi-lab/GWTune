@@ -280,15 +280,17 @@ darkgrid_style = [s for s in styles if re.match(r"seaborn-.*-darkgrid", s)][0]
 plt.style.use(darkgrid_style)
 
 plt.figure(figsize=(8,6))
-plt.scatter(df_trial["params_eps"], df_trial["value"], s = 60, edgecolor="black", linewidth=1)
+plt.scatter(df_trial["params_eps"], df_trial["value"], s = 90, edgecolor="black", linewidth=1)
 plt.xlabel("epsilon", fontsize=40)
 plt.ylabel("GWD", fontsize=40)
 plt.xscale('log')
 
 plt.tick_params(axis='x', which='both', labelsize=20, rotation=0)
 plt.tick_params(axis='y', which='major', labelsize=20)
-plt.grid(True)
+plt.grid(True, which="both")
 plt.tight_layout()
+cbar = plt.colorbar(label="GWD")
+cbar.ax.tick_params(labelsize=20)
 plt.savefig(f"../results/{dataset}/eps_gwd.svg")
 plt.show()
 
