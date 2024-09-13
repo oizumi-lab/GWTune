@@ -1317,7 +1317,7 @@ class PairwiseAnalysis:
         metric: str = "cosine",
         barycenter: bool = False,
         supervised: bool = False,
-        category_mat: Optional[np.ndarray] = None
+        eval_mat: Optional[np.ndarray] = None
     ) -> pd.DataFrame:
         """Evaluation of the accuracy of the unsupervised alignment
 
@@ -1351,7 +1351,7 @@ class PairwiseAnalysis:
             supervised (bool, optional):
                 define the accuracy based on a diagnoal matrix. Defaults to False.
 
-            category_mat (Optional[np.ndarray], optional):
+            eval_mat (Optional[np.ndarray], optional):
                 This will be used for the category info. Defaults to None.
 
         Returns:
@@ -1388,8 +1388,8 @@ class PairwiseAnalysis:
                 acc = self._calc_accuracy_with_topk_diagonal(OT, k=k, order="maximum")
 
             elif eval_type == "category":
-                assert category_mat is not None
-                acc = self._calc_accuracy_with_topk_diagonal(OT, k=k, order="maximum", category_mat=category_mat)
+                assert eval_mat is not None, "Please provide the category matrix for the evaluation."
+                acc = self._calc_accuracy_with_topk_diagonal(OT, k=k, order="maximum", eval_mat=eval_mat)
 
             acc_list.append(acc)
 
@@ -1397,12 +1397,12 @@ class PairwiseAnalysis:
 
         return df
 
-    def _calc_accuracy_with_topk_diagonal(self, matrix, k, order="maximum", category_mat=None):
+    def _calc_accuracy_with_topk_diagonal(self, matrix, k, order="maximum", eval_mat=None):
         # Get the diagonal elements
-        if category_mat is None:
-            category_mat = np.eye(matrix.shape[0])
+        if eval_mat is None:
+            eval_mat = np.eye(matrix.shape[0])
         else:
-            assert matrix.shape == category_mat.shape
+            assert matrix.shape == eval_mat.shape, "The shape of the OT and eval_mat must be the same."
         
         # Get the top k values for each row
         if order == "maximum":
@@ -1414,7 +1414,7 @@ class PairwiseAnalysis:
         
         count = 0
         for i, row in enumerate(topk_values):
-            indices = np.argwhere(category_mat[i, :] == 1) # indices of grand truth
+            indices = np.argwhere(eval_mat[i, :] == 1) # indices of grand truth
             
             # Count the number of indices for each row where the indices of matching values are included in the top k values
             count += np.isin(indices, row).any()
@@ -1699,20 +1699,20 @@ class PairwiseAnalysis:
 
         self._plot_GWD_optimization(top_k_trials, GWD0_list, **visualization_config())
 
-    def _evaluate_accuracy_and_plot(self, ot_to_evaluate, eval_type, category_mat=None, **kwargs):
+    def _evaluate_accuracy_and_plot(self, ot_to_evaluate, eval_type, eval_mat=None, **kwargs):
         top_k_list = [1, 5, 10]
         df_before = self.eval_accuracy(
             top_k_list = top_k_list,
             ot_to_evaluate = None,
             eval_type=eval_type,
-            category_mat=category_mat,
+            eval_mat=eval_mat,
         )
 
         df_after = self.eval_accuracy(
             top_k_list = top_k_list,
             ot_to_evaluate=ot_to_evaluate,
             eval_type=eval_type,
-            category_mat=category_mat,
+            eval_mat=eval_mat,
         )
 
         df_before = df_before.set_index('top_n')
@@ -2579,7 +2579,7 @@ class AlignRepresentations:
         self,
         top_k_list: List[int],
         eval_type: str = "ot_plan",
-        category_mat: Optional[Any] = None,
+        eval_mat: Optional[Any] = None,
         barycenter: bool = False,
         return_dataframe: bool = False
     ) -> Optional[pd.DataFrame]:
@@ -2592,7 +2592,7 @@ class AlignRepresentations:
             eval_type (str, optional):
                 two ways to evaluate the accuracy as above. Defaults to "ot_plan".
 
-            category_mat (Optional[Any], optional):
+            eval_mat (Optional[Any], optional):
                 This will be used for the category info. Defaults to None.
 
             barycenter (bool, optional):
@@ -2611,7 +2611,7 @@ class AlignRepresentations:
         accuracy["top_n"] = top_k_list
 
         for pairwise in self.pairwise_list:
-            df = pairwise.eval_accuracy(top_k_list, eval_type=eval_type, metric=self.metric, barycenter=barycenter, category_mat=category_mat)
+            df = pairwise.eval_accuracy(top_k_list, eval_type=eval_type, metric=self.metric, barycenter=barycenter, eval_mat=eval_mat)
 
             accuracy = pd.merge(accuracy, df, on="top_n")
 
