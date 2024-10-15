@@ -26,26 +26,9 @@ def get_color_labels(
         color_labels (List): color labels for each objects
     """
 
-    # Set the saturation and lightness values to maximum
-    saturation = 1.0
-    lightness = 0.5
-
-    if hue == "warm":
-        hue_list = np.linspace(-0.2, 0.1, n)
-    elif hue == "cool":
-        hue_list = np.linspace(0.5, 0.8, n)
-    else:
-        hue_list = np.linspace(0, 1, n, endpoint = False)
-
-    # Create a list to store the color labels
-    color_labels = []
-
-    # Generate the color labels
-    for i in range(n):
-        hue = hue_list[i]
-        r, g, b = colorsys.hls_to_rgb(hue, lightness, saturation)
-        color_labels.append((r, g, b))
-
+    cm = plt.get_cmap(hue)
+    color_labels = [cm(v) for v in np.linspace(0, 1, n)]
+    
     if show_labels:
         # Show color labels
         plt.figure(figsize=(10, 5))
