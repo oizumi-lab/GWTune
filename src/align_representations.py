@@ -26,11 +26,11 @@ from sklearn import manifold
 from sqlalchemy import URL, create_engine
 from sqlalchemy_utils import create_database, database_exists, drop_database
 from tqdm.auto import tqdm
-
+from sklearn.base import TransformerMixin
 sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
 from .gw_alignment import GW_Alignment
 from .histogram_matching import SimpleHistogramMatching
-from .utils import backend, gw_optimizer, visualize_functions
+from .utils import backend, gw_optimizer, visualize_functions, utils_functions
 
 
 # %%
@@ -135,16 +135,20 @@ class VisualizationConfig:
         self,
         show_figure: bool = True,
         fig_ext:str='png',
+        dpi:int = 300,
         font:str='DejaVu Sans',#'Noto Sans CJK JP'
         figsize: Tuple[int, int] = (8, 6),
         cbar_label_size: int = 15,
         cbar_ticks_size: int = 10,
         cbar_format: Optional[str]=None,
         cbar_label: Optional[str]=None,
+        cbar_range: Optional[List[float]] = None,
         xticks_size: int = 10,
         yticks_size: int = 10,
         xticks_rotation: int = 0,
         yticks_rotation: int = 0,
+        elev:int = 30,
+        azim:int = 60,
         tick_format: str = '%.2f',
         title_size: int = 20,
         legend_size: int = 5,
@@ -155,6 +159,7 @@ class VisualizationConfig:
         zlabel: Optional[str] = None,
         zlabel_size: int = 15,
         color_labels: Optional[List[str]] = None,
+        color_label_width = None,
         color_hue: Optional[str] = None,
         colorbar_label: Optional[str] = None,
         colorbar_range: List[float] = [0., 1.],
@@ -174,6 +179,8 @@ class VisualizationConfig:
         lim_eps: Optional[float] = None,
         lim_gwd: Optional[float] = None,
         lim_acc: Optional[float] = None,
+        edgecolor:Optional[str] = None,
+        linewidth:Optional[int] = None,
     ) -> None:
         """Initializes the VisualizationConfig class with specified visualization parameters.
 
@@ -202,6 +209,10 @@ class VisualizationConfig:
                 Rotation angle of the xticks. Defaults to 0.
             yticks_rotation (int, optional):
                 Rotation angle of the yticks. Defaults to 0.
+            elev (int, optional):
+                Elevation angle of the 3D plot. Defaults to 30.
+            azim (int, optional):
+                Azimuthal angle of the 3D plot. Defaults to 60.
             tick_format (Optional[str]):
                 Format of the ticks. Defaults to '%.2f'.
             title_size (int, optional):
@@ -222,6 +233,8 @@ class VisualizationConfig:
                 Size of the z-axis label. Defaults to 15.
             color_labels (List[str], optional):
                 Labels of the color. Defaults to None.
+            color_label_width (int, optional):
+                Width of the color label. Defaults to None.
             color_hue (str, optional):
                 Hue of the color. Defaults to None.
             colorbar_label (str, optional):
@@ -260,21 +273,29 @@ class VisualizationConfig:
                 Limits for GWD. Defaults to None.
             lim_acc (float, optional):
                 Limits for accuracy. Defaults to None.
+            edgecolor (Optional[str], optional):
+                Color of the edge. Defaults to None.
+            linewidth (Optional[int], optional):
+                Width of the line for the edge of plot. Defaults to None.
         """
 
         self.visualization_params = {
             'show_figure':show_figure,
             'fig_ext':fig_ext,
+            'dpi':dpi,
             'font':font,
             'figsize': figsize,
             'cbar_label_size': cbar_label_size,
             'cbar_ticks_size': cbar_ticks_size,
             'cbar_format':cbar_format,
             'cbar_label':cbar_label,
+            'cbar_range': cbar_range,
             'xticks_size': xticks_size,
             'yticks_size': yticks_size,
             'xticks_rotation': xticks_rotation,
             'yticks_rotation': yticks_rotation,
+            'elev': elev,
+            'azim': azim,
             'tick_format': tick_format,
             'title_size': title_size,
             'legend_size': legend_size,
@@ -285,6 +306,7 @@ class VisualizationConfig:
             'zlabel': zlabel,
             'zlabel_size': zlabel_size,
             'color_labels': color_labels,
+            'color_label_width': color_label_width,
             'color_hue': color_hue,
             'colorbar_label': colorbar_label,
             'colorbar_range': colorbar_range,
@@ -304,6 +326,8 @@ class VisualizationConfig:
             'lim_eps':lim_eps,
             'lim_gwd':lim_gwd,
             'lim_acc':lim_acc,
+            'edgecolor':edgecolor,
+            'linewidth':linewidth,
         }
 
     def __call__(self) -> Dict[str, Any]:
@@ -569,7 +593,7 @@ class Representation:
         Args:
             dim (int, optional):
                 The dimension of the embedding space for visualization. If the original dimensions of the embeddings are
-                higher than "dim", the dimension reduction method(PCA) is applied. Defaults to 3.
+                higher than "dim", the dimension reduction method (PCA) is applied. Defaults to 3.
             visualization_config (VisualizationConfig, optional):
                 Configuration for visualization details. Defaults to VisualizationConfig().
             category_name_list (Optional[List[str]:, optional):
@@ -588,27 +612,36 @@ class Representation:
                 The name of the figure. Defaults to "Aligned_embedding.png".
         """
 
-        if fig_dir is not None:
-            fig_path = os.path.join(fig_dir, fig_name)
-        else:
-            fig_path = None
-
         if category_idx_list is None:
             if self.category_idx_list is not None:
                 category_name_list = self.category_name_list
                 num_category_list = self.num_category_list
                 category_idx_list = self.category_idx_list
+            
+        if self.embedding.shape[1] > dim:
+            embedding_list, _ = utils_functions.obtain_embedding(
+                embedding_list=[self.embedding],
+                dim=dim,
+                emb_name="PCA",
+            )
+        else:
+            embedding_list = [self.embedding]
+        
+        if fig_dir is not None:
+            os.makedirs(fig_dir, exist_ok=True)
 
-        visualize_embedding = visualize_functions.VisualizeEmbedding(
-            embedding_list=[self.embedding],
+        visualize_functions.plot_embedding(
+            embedding_list=embedding_list,
             dim=dim,
+            name_list=[self.name], 
             category_name_list=category_name_list,
             num_category_list=num_category_list,
             category_idx_list=category_idx_list,
-        )
-
-        visualize_embedding.plot_embedding(
-            name_list=[self.name], title=title, legend=legend, save_dir=fig_path, **visualization_config()
+            title=title, 
+            has_legend=legend,
+            fig_name=fig_name, 
+            fig_dir=fig_dir, 
+            **visualization_config()
         )
 
 
@@ -870,9 +903,7 @@ class PairwiseAnalysis:
 
         if fig_dir is None:
             fig_dir = self.figure_path
-
-            if not os.path.exists(fig_dir):
-                os.makedirs(fig_dir, exist_ok=True)
+            os.makedirs(fig_dir, exist_ok=True)
 
         OT = self.show_OT(
             ot_to_plot = None,
@@ -1082,6 +1113,9 @@ class PairwiseAnalysis:
 
         xlabel_size = kwargs.get("xlabel_size", 20)
         ylabel_size = kwargs.get("ylabel_size", 20)
+        
+        edgecolor = kwargs.get("edgecolor", None)
+        linewidth = kwargs.get("linewidth", None)
 
         lim_eps = kwargs.get("lim_eps", None)
         lim_gwd = kwargs.get("lim_gwd", None)
@@ -1092,8 +1126,7 @@ class PairwiseAnalysis:
 
         # figure plotting epsilon as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
-        plt.title(f"epsilon - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
-        plt.scatter(df_trial["params_eps"], df_trial["value"], c = 100 * df_trial["user_attrs_best_acc"], s = marker_size, cmap=cmap)
+        plt.scatter(df_trial["params_eps"], df_trial["value"], c = 100 * df_trial["user_attrs_best_acc"], s = marker_size, cmap=cmap, edgecolor=edgecolor, linewidth=linewidth)
 
         plt.xlabel("epsilon", fontsize=xlabel_size)
         plt.ylabel("GWD", fontsize=ylabel_size)
@@ -1106,6 +1139,13 @@ class PairwiseAnalysis:
 
         if plot_eps_log:
             plt.xscale('log')
+            
+            if lim_eps is None:
+                norm = LogNorm(vmin=self.config.eps_list[0], vmax=self.config.eps_list[1])
+            else:
+                norm = LogNorm(vmin=lim_eps[0], vmax=lim_eps[1])
+        else:
+            norm = None
 
         plt.tick_params(axis='x', which='both', labelsize=xticks_size, rotation=xticks_rotation)
         plt.tick_params(axis='y', which='major', labelsize=yticks_size)
@@ -1130,14 +1170,14 @@ class PairwiseAnalysis:
 
         # figure plotting accuracy as x-axis and GWD as y-axis
         plt.figure(figsize=figsize)
-        plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap)
-        plt.title(f"Matching Rate - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
+        plt.scatter(100 * df_trial["user_attrs_best_acc"], df_trial["value"].values, c = df_trial["params_eps"], cmap=cmap, norm=norm, s = marker_size, edgecolor=edgecolor, linewidth=linewidth)
+        #plt.title(f"Matching Rate - GWD ({self.pair_name.replace('_', ' ')})", fontsize=title_size)
         plt.xlabel("Matching Rate (%)", fontsize=xlabel_size)
         plt.xticks(fontsize=xticks_size)
         plt.ylabel("GWD", fontsize=ylabel_size)
         plt.yticks(fontsize=yticks_size)
 
-        cbar =  plt.colorbar(format = cbar_format)
+        cbar = plt.colorbar(format = cbar_format)
         cbar.set_label(label='epsilon', size=cbar_label_size)
         cbar.ax.tick_params(labelsize=cbar_ticks_size)
 
@@ -1145,7 +1185,7 @@ class PairwiseAnalysis:
 
         ymin, ymax = plt.xlim(lim_acc)
         if ymax > 100:
-            plt.xlim(lim_acc, 100)
+            plt.xlim(lim_acc, 105)
 
         if lim_gwd is not None:
             plt.ylim(lim_gwd)
@@ -1159,6 +1199,7 @@ class PairwiseAnalysis:
 
         plt.clf()
         plt.close()
+
 
     def show_OT(
         self,
@@ -1276,7 +1317,7 @@ class PairwiseAnalysis:
         metric: str = "cosine",
         barycenter: bool = False,
         supervised: bool = False,
-        category_mat: Optional[np.ndarray] = None
+        eval_mat: Optional[np.ndarray] = None
     ) -> pd.DataFrame:
         """Evaluation of the accuracy of the unsupervised alignment
 
@@ -1310,7 +1351,7 @@ class PairwiseAnalysis:
             supervised (bool, optional):
                 define the accuracy based on a diagnoal matrix. Defaults to False.
 
-            category_mat (Optional[np.ndarray], optional):
+            eval_mat (Optional[np.ndarray], optional):
                 This will be used for the category info. Defaults to None.
 
         Returns:
@@ -1347,8 +1388,8 @@ class PairwiseAnalysis:
                 acc = self._calc_accuracy_with_topk_diagonal(OT, k=k, order="maximum")
 
             elif eval_type == "category":
-                assert category_mat is not None
-                acc = self._calc_accuracy_with_topk_diagonal(OT, k=k, order="maximum", category_mat=category_mat)
+                assert eval_mat is not None, "Please provide the category matrix for the evaluation."
+                acc = self._calc_accuracy_with_topk_diagonal(OT, k=k, order="maximum", eval_mat=eval_mat)
 
             acc_list.append(acc)
 
@@ -1356,39 +1397,33 @@ class PairwiseAnalysis:
 
         return df
 
-    def _calc_accuracy_with_topk_diagonal(self, matrix, k, order="maximum", category_mat=None):
+    def _calc_accuracy_with_topk_diagonal(self, matrix, k, order="maximum", eval_mat=None):
         # Get the diagonal elements
-        if category_mat is None:
-            diagonal = np.diag(matrix)
+        if eval_mat is None:
+            eval_mat = np.eye(matrix.shape[0])
         else:
-            category_mat = category_mat.values
-
-            diagonal = []
-            for i in range(matrix.shape[0]):
-                category = category_mat[i]
-
-                matching_rows = np.where(np.all(category_mat == category, axis=1))[0]
-                matching_elements = matrix[i, matching_rows] # get the columns of which category are the same as i-th row
-
-                diagonal.append(np.max(matching_elements))
-
+            assert matrix.shape == eval_mat.shape, "The shape of the OT and eval_mat must be the same."
+        
         # Get the top k values for each row
         if order == "maximum":
-            topk_values = np.partition(matrix, -k)[:, -k:]
+            topk_values = np.argpartition(matrix, -k)[:, -k:]
         elif order == "minimum":
-            topk_values = np.partition(matrix, k - 1)[:, :k]
+            topk_values = np.argpartition(matrix, k - 1)[:, :k]
         else:
             raise ValueError("Invalid order parameter. Must be 'maximum' or 'minimum'.")
-
-        # Count the number of rows where the diagonal is in the top k values
-        count = np.sum([diagonal[i] in topk_values[i] for i in range(matrix.shape[0])])
-
+        
+        count = 0
+        for i, row in enumerate(topk_values):
+            indices = np.argwhere(eval_mat[i, :] == 1) # indices of grand truth
+            
+            # Count the number of indices for each row where the indices of matching values are included in the top k values
+            count += np.isin(indices, row).any()
 
         # Calculate the accuracy as the proportion of counts to the total number of rows
-        accuracy = count / matrix.shape[0]
-        accuracy *= 100
-
-        return accuracy
+        matching_rate = count / matrix.shape[0]
+        matching_rate *= 100
+        
+        return matching_rate
 
     def procrustes(
         self,
@@ -1664,20 +1699,20 @@ class PairwiseAnalysis:
 
         self._plot_GWD_optimization(top_k_trials, GWD0_list, **visualization_config())
 
-    def _evaluate_accuracy_and_plot(self, ot_to_evaluate, eval_type, category_mat=None, **kwargs):
+    def _evaluate_accuracy_and_plot(self, ot_to_evaluate, eval_type, eval_mat=None, **kwargs):
         top_k_list = [1, 5, 10]
         df_before = self.eval_accuracy(
             top_k_list = top_k_list,
             ot_to_evaluate = None,
             eval_type=eval_type,
-            category_mat=category_mat,
+            eval_mat=eval_mat,
         )
 
         df_after = self.eval_accuracy(
             top_k_list = top_k_list,
             ot_to_evaluate=ot_to_evaluate,
             eval_type=eval_type,
-            category_mat=category_mat,
+            eval_mat=eval_mat,
         )
 
         df_before = df_before.set_index('top_n')
@@ -2544,7 +2579,7 @@ class AlignRepresentations:
         self,
         top_k_list: List[int],
         eval_type: str = "ot_plan",
-        category_mat: Optional[Any] = None,
+        eval_mat: Optional[Any] = None,
         barycenter: bool = False,
         return_dataframe: bool = False
     ) -> Optional[pd.DataFrame]:
@@ -2557,7 +2592,7 @@ class AlignRepresentations:
             eval_type (str, optional):
                 two ways to evaluate the accuracy as above. Defaults to "ot_plan".
 
-            category_mat (Optional[Any], optional):
+            eval_mat (Optional[Any], optional):
                 This will be used for the category info. Defaults to None.
 
             barycenter (bool, optional):
@@ -2576,7 +2611,7 @@ class AlignRepresentations:
         accuracy["top_n"] = top_k_list
 
         for pairwise in self.pairwise_list:
-            df = pairwise.eval_accuracy(top_k_list, eval_type=eval_type, metric=self.metric, barycenter=barycenter, category_mat=category_mat)
+            df = pairwise.eval_accuracy(top_k_list, eval_type=eval_type, metric=self.metric, barycenter=barycenter, eval_mat=eval_mat)
 
             accuracy = pd.merge(accuracy, df, on="top_n")
 
@@ -2677,7 +2712,7 @@ class AlignRepresentations:
         the_others, pivot_idx_list = self._check_pairs(pivot)
 
         # check whether 'pair_list' includes all pairs between the pivot and the other Representations
-        assert len(the_others) == len(self.representations_list)-1, "'pair_list' must include all pairs between the pivot and the other Representations."
+        assert len(the_others) == len(self.representations_list) - 1, "'pair_list' must include all pairs between the pivot and the other Representations."
 
         for pair_idx, pivot_idx in pivot_idx_list:
             pairwise = self.pairwise_list[pair_idx]
@@ -2710,10 +2745,9 @@ class AlignRepresentations:
     def visualize_embedding(
         self,
         dim: int,
-        method: str = "PCA",
-        method_params: Optional[Dict[str, Any]] = None,
-        pivot: Union[int, str] = 0,
-        returned: str = "figure",
+        method: Optional[str] = "PCA",
+        emb_transformer: Optional[TransformerMixin] = None,
+        pivot: Union[None, int, str] = 0,
         visualization_config: VisualizationConfig = VisualizationConfig(),
         category_name_list: Optional[List[str]] = None,
         num_category_list: Optional[List[int]] = None,
@@ -2722,21 +2756,23 @@ class AlignRepresentations:
         legend: bool = True,
         fig_dir: Optional[str] = None,
         fig_name: str = "Aligned_embedding",
+        **kwargs,
     ) -> Optional[Union[plt.Figure, List[np.ndarray]]]:
-        """Visualizes the aligned embedding in the specified number of dimensions.
+        """
+        2024.6.19 re-wrote
+        Visualizes the aligned embedding in the specified number of dimensions.
 
         Args:
             dim (int):
                 The number of dimensions in which the points are embedded.
             method (str, optional):
                 The method used to reduce the dimensionality of the embedding. Options include "PCA", "TSNE", "Isomap" and "MDS".
-            method_params (Optional[Dict[str, Any]], optional):
+            emb_transformer (Optional[TransformerMixin], optional):
                 Parameters used for the dimensionality reduction method.
                 See sklearn documentation for details. Defaults to None.
-            pivot (Union[int, str], optional):
-                The index of the pivot Representation or the name of the pivot Representation. Defaults to 0.
-            returned (str, optional):
-                "figure" or "row_data. Defaults to "figure".
+            pivot (Union[None, int, str], optional):
+                The index of the pivot Representation or the name of the pivot Representation for Procrustes.
+                If None, no Procrustes analysis was done, and PCA will be done on just concatenated (in axis=0) data. Defaults to 0.
             visualization_config (VisualizationConfig, optional):
                 Container of parameters used for figure. Defaults to VisualizationConfig().
             category_name_list (Optional[List[str]], optional):
@@ -2753,6 +2789,8 @@ class AlignRepresentations:
                 Directory path where the generated figure will be saved. If None, the figure will not be saved. Defaults to None.
             fig_name (str, optional):
                 Name of the saved figure if `fig_dir` is specified. Defaults to "Aligned_embedding.png".
+            **kwargs:
+                Additional arguments for the dimensionality reduction method.
 
         Returns:
             Optional[Union[plt.Figure, List[np.ndarray]]]:
@@ -2763,44 +2801,66 @@ class AlignRepresentations:
         if fig_dir is None:
             fig_dir = os.path.join(self.main_results_dir, "visualize_embedding", self.config.init_mat_plan)
             os.makedirs(fig_dir, exist_ok=True)
-
-        fig_path = os.path.join(fig_dir, f"{fig_name}.{visualization_config.visualization_params['fig_ext']}")
-
-        if pivot != "barycenter":
-            self._procrustes_to_pivot(pivot)
-            #for i in range(len(self.pairwise_list) // 2):
-            #    pair = self.pairwise_list[i]
-            #    pair.source.embedding = pair.get_new_source_embedding()
-
-        else:
-            assert self.barycenter is not None
-
+        
         name_list = []
         embedding_list = []
+        
+        # chooose pivot.  
+        if pivot == None:
+            pass
+        
+        elif isinstance(pivot, int):
+            self._procrustes_to_pivot(pivot)
+            fig_name = "procrustes"
+        
+        elif pivot == "barycenter":
+            assert self.barycenter is not None
+            self._procrustes_to_pivot(pivot)
+            fig_name = "barycenter"
+        
+        else:
+            raise ValueError("pivot must be None, int or 'barycenter'.")
+            
+        # get sort idx
+        if category_idx_list is not None:
+            print("New category information is given.")
+            sort_idx = np.concatenate(category_idx_list)  
+        elif self.representations_list[0].category_idx_list is not None:
+            print("Category information was already given.")
+            sort_idx = np.concatenate(self.representations_list[0].category_idx_list)        
+        else:
+            print("No category information is given.")
+            sort_idx = np.arange(self.representations_list[0].embedding.shape[0]) # This means that the order of data is not changed
+        
+        # sort the embedding after pivot.
         for i in range(len(self.representations_list)):
-            embedding_list.append(self.representations_list[i].embedding)
             name_list.append(self.representations_list[i].name)
-
-        if returned == "figure":
-            if category_idx_list is None:
-                if self.representations_list[0].category_idx_list is not None:
-                    category_name_list = self.representations_list[0].category_name_list
-                    num_category_list = self.representations_list[0].num_category_list
-                    category_idx_list = self.representations_list[0].category_idx_list
-
-            visualize_embedding = visualize_functions.VisualizeEmbedding(
-                embedding_list=embedding_list,
-                dim=dim,
-                method=method,
-                method_params=method_params,
-                category_name_list=category_name_list,
-                num_category_list=num_category_list,
-                category_idx_list=category_idx_list,
+            embedding_list.append(self.representations_list[i].embedding[sort_idx, :])
+        
+        if embedding_list[0].shape[1] > dim:
+            # obtain the reduced dimension embedding list
+            embedding_list, _ = utils_functions.obtain_embedding(
+                embedding_list,
+                dim=dim, 
+                emb_name=method, 
+                emb_transformer=emb_transformer,
+                **kwargs,
             )
-
-            visualize_embedding.plot_embedding(
-                name_list=name_list, title=title, legend=legend, save_dir=fig_path, **visualization_config()
-            )
-
-        elif returned == "row_data":
-            return embedding_list
+        
+        if category_idx_list is None:
+            if self.representations_list[0].category_idx_list is not None:
+                category_name_list = self.representations_list[0].category_name_list
+                num_category_list = self.representations_list[0].num_category_list
+        
+        visualize_functions.plot_embedding(
+            embedding_list=embedding_list,
+            dim=dim,
+            name_list=name_list,
+            category_name_list=category_name_list,
+            num_category_list=num_category_list,
+            title=title, 
+            has_legend=legend,
+            fig_name=fig_name,
+            fig_dir=fig_dir, 
+            **visualization_config(),
+        )
