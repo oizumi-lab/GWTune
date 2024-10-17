@@ -40,7 +40,6 @@ def get_color_labels(
 
     return color_labels
 
-
 def get_color_labels_for_category(
     n_category_list: List[int],
     min_saturation: int,
@@ -96,7 +95,6 @@ def show_heatmap(
     matrix: Any,
     title: Optional[str],
     save_file_name: Optional[str] = None,
-    ticks: Optional[str] = None,
     category_name_list: Optional[List[str]] = None,
     num_category_list: Optional[List[int]] = None,
     x_object_labels: Optional[List[str]] = None,
@@ -137,12 +135,13 @@ def show_heatmap(
     cbar_ticks_size = kwargs.get("cbar_ticks_size", 20)
     xticks_size = kwargs.get('xticks_size', 20)
     yticks_size = kwargs.get('yticks_size', 20)
-    cbar_format = kwargs.get('cbar_format', None)#"%.2e"
+    cbar_format = kwargs.get('cbar_format', None)
     cbar_label = kwargs.get('cbar_label', None)
     cbar_label_size = kwargs.get('cbar_label_size', 20)
     cbar_range = kwargs.get('cbar_range', None)
     cmap = kwargs.get('cmap', 'cividis')
 
+    ticks = kwargs.get('ticks', None)
     ot_object_tick = kwargs.get("ot_object_tick", False)
     ot_category_tick = kwargs.get("ot_category_tick", False)
 
@@ -174,7 +173,7 @@ def show_heatmap(
         raise(ValueError, "please turn off either 'ot_category_tick' or 'ot_object_tick'.")
 
     if not ot_object_tick and ot_category_tick:
-        assert category_name_list is not None
+        assert category_name_list is not None, "please provide 'category_name_list' or set `OT_format` or `sim_mat_format` to `sorted`."
         assert num_category_list is not None
 
         if ticks == "objects":
@@ -183,8 +182,8 @@ def show_heatmap(
 
         elif ticks == "category":
             label_pos = [sum(num_category_list[:i + 1]) for i in range(len(category_name_list))]
-            plt.xticks(label_pos, labels = category_name_list, rotation = xticks_rotation, size = xticks_size, fontweight = "bold")
-            plt.yticks(label_pos, labels = category_name_list, rotation = yticks_rotation, size = yticks_size, fontweight = "bold")
+            plt.xticks(label_pos, labels = category_name_list, rotation = xticks_rotation, size = xticks_size)
+            plt.yticks(label_pos, labels = category_name_list, rotation = yticks_rotation, size = yticks_size)
 
             if draw_category_line:
                 for pos in label_pos:
@@ -193,9 +192,7 @@ def show_heatmap(
 
 
     if ot_object_tick and not ot_category_tick:
-        if ticks == "numbers":
-            # plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = xticks_size, rotation = xticks_rotation)
-            # plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = yticks_size, rotation = yticks_rotation)
+        if ticks is None:
             pass
         elif ticks == "objects":
             # assert object_labels is not None

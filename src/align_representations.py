@@ -172,6 +172,7 @@ class VisualizationConfig:
         self,
         show_figure: bool = True,
         fig_ext:str='png',
+        bins: int = 100,
         dpi:int = 300,
         font:str='DejaVu Sans',#'Noto Sans CJK JP'
         figsize: Tuple[int, int] = (8, 6),
@@ -206,6 +207,7 @@ class VisualizationConfig:
         alpha: int = 1,
         color: str = 'C0',
         cmap: str = 'cividis',
+        ticks: Optional[str] = None,
         ot_object_tick: bool = False,
         ot_category_tick: bool = False,
         draw_category_line: bool = False,
@@ -319,6 +321,7 @@ class VisualizationConfig:
         self.visualization_params = {
             'show_figure':show_figure,
             'fig_ext':fig_ext,
+            'bins':bins,
             'dpi':dpi,
             'font':font,
             'figsize': figsize,
@@ -353,6 +356,7 @@ class VisualizationConfig:
             'marker_size': marker_size,
             'color':color,
             'cmap':cmap,
+            'ticks':ticks,
             'ot_object_tick': ot_object_tick,
             'ot_category_tick': ot_category_tick,
             'draw_category_line': draw_category_line,
@@ -617,21 +621,15 @@ class Representation:
         self,
         fig_dir:Optional[str]=None,
         return_sorted:bool=False,
-        arbitrary_title:Optional[str]=None,
         visualization_config: VisualizationConfig = VisualizationConfig(),
     ):
         if fig_dir is not None:
             os.makedirs(fig_dir, exist_ok=True)
-        
-        if arbitrary_title is None:
-            title = self.name
-        else:
-            title = arbitrary_title
 
         if not return_sorted:
             visualize_functions.show_heatmap(
                 self.sim_mat,
-                title=title,
+                title=self.name,
                 category_name_list=None,
                 num_category_list=None,
                 object_labels=self.object_labels,
@@ -644,7 +642,7 @@ class Representation:
             assert self.category_idx_list is not None, "No label info to sort the 'sim_mat'."
             visualize_functions.show_heatmap(
                 self.sorted_sim_mat,
-                title=title,
+                title=self.name,
                 category_name_list=self.category_name_list,
                 num_category_list=self.num_category_list,
                 object_labels=self.object_labels,
@@ -655,8 +653,8 @@ class Representation:
 
     def show_sim_mat_distribution(
         self,
-        bins = 100,
         visualization_config: VisualizationConfig = VisualizationConfig(),
+        **kwargs,
     ) -> None:
         """
         Show the distribution of the values of elements of the dissimilarity matrix.
@@ -665,7 +663,9 @@ class Representation:
         figsize = params.get('figsize', (4, 3))
         title_size = params.get("title_size", 20)
         color = params.get("color", "C0")
-
+        bins = params.get("bins", 100)
+        show_figure = params.get("show_figure", True)
+        
         lower_triangular = np.tril(self.sim_mat)
         lower_triangular = lower_triangular.flatten()
 
@@ -675,7 +675,10 @@ class Representation:
         plt.xlabel("RDM value")
         plt.ylabel("Count")
         plt.grid(True)
-        plt.show()
+        
+        if show_figure:
+            plt.show()
+        
         plt.clf()
         plt.close()
 
@@ -1503,7 +1506,6 @@ class PairwiseAnalysis:
     def plot_OT(
         self,
         return_sorted:bool = False,
-        title: Optional[str] = None,
         fig_dir: Optional[str] = None,
         visualization_config: VisualizationConfig = VisualizationConfig(),
     ) -> matplotlib.axes.Axes:
@@ -1513,11 +1515,6 @@ class PairwiseAnalysis:
         Args:
             return_sorted (bool, optional):
                 format of sim_mat to visualize. Defaults to False.
-            title (Optional[str], optional):
-                The title of the heatmap. Defaults to None.
-            ticks (Optional[str], optional):
-                Determines how ticks should be displayed. 
-                Options are "objects", "category", or None. Defaults to None.
             fig_dir (Optional[str], optional):
                 Directory to save the heatmap. If None, the heatmap won't be saved.
             visualization_config (VisualizationConfig, optional):
@@ -1527,10 +1524,7 @@ class PairwiseAnalysis:
         if fig_dir is not None:
             os.makedirs(fig_dir, exist_ok=True)
         
-        if title is None:
-            title = f"$\Gamma$ ({self.pair_name.replace('_', ' ')})"
-        else:
-            title = f"$\Gamma$ ({title})"
+        title = f"$\Gamma$ ({self.pair_name.replace('_', ' ')})"
 
         if not return_sorted:
             visualize_functions.show_heatmap(
@@ -1762,7 +1756,8 @@ class AlignRepresentations:
         main_results_dir: Optional[str] = None,
         data_name: str = "NoDefined",
         metric: str = "cosine",
-        
+        pairs_computed: Optional[List[str]] = None,
+        specific_eps_list: Optional[dict] = None,
     ) -> None:
         self.config = config
         self.data_name = data_name
@@ -1797,22 +1792,192 @@ class AlignRepresentations:
         
         else:
             raise ValueError("pairwise_method must be 'combination' or 'permutation'.")
+    
+        self.set_specific_eps_list(specific_eps_list)
+        self.set_pairs_computed(pairs_computed)
+    
+    # data for gwot
+    def _make_pairwise(
+        self,
+        source: Representation,
+        target: Representation,
+    ) -> PairwiseAnalysis:
+        """Create a PairwiseAnalysis object from two representations.
 
-    def RSA_get_corr(self, metric: str = "pearson", return_data = False) -> None:
-        """Conventional representation similarity analysis (RSA).
+        pair_name will be automatically generated as "source_name_vs_target_name".
+        pairwise_name will be automatically generated as "data_name_pair_name".
+        directory of PairwiseAnalysis will be automatically generated as "main_results_dir/pairwise_name".
 
         Args:
-            metric (str, optional):
-                spearman or pearson. Defaults to "pearson".
-        """
-        for pairwise in self.pairwise_list:
-            corr = pairwise.RSA(metric=metric)
-            self.RSA_corr[pairwise.pair_name] = corr
-            print(f"Correlation {pairwise.pair_name.replace('_', ' ')} : {corr}")
-        
-        if return_data:
-            return self.RSA_corr
+            source (Representation): source representation
+            target (Representation): target representation
 
+        Returns:
+            pairwise (PairwiseAnalysis): PairwiseAnalysis object.
+        """
+
+        # set information for the pairwise
+        assert source.name != target.name, "source and target must be different."
+        
+        pair_name = f"{source.name}_vs_{target.name}"
+        pairwise_name = self.data_name + "_" + pair_name
+        pair_results_dir = self.main_results_dir + "/" + pairwise_name
+
+        config_copy = copy.deepcopy(self.config)
+        
+        if self.specific_eps_list is not None:
+            if source.name in self.specific_eps_list.keys():
+                config_copy.eps_list = self.specific_eps_list[source.name]
+            
+            if target.name in self.specific_eps_list.keys():
+                config_copy.eps_list = self.specific_eps_list[target.name]
+
+            elif pair_name in self.specific_eps_list.keys():
+                config_copy.eps_list = self.specific_eps_list[pair_name]
+
+        # create PairwiseAnalysis object
+        pairwise = PairwiseAnalysis(
+            results_dir=pair_results_dir,
+            config=config_copy,
+            source=source,
+            target=target,
+            data_name=self.data_name,
+            pair_name=pair_name,
+            instance_name=pairwise_name,
+        )
+        
+        print("pair:", pairwise.pair_name, "eps_list:", pairwise.config.eps_list)
+        
+        if self.histogram_matching:
+            pairwise.match_sim_mat_distribution(return_data=False)
+                    
+        return pairwise
+    
+    def _get_pairwise_list(self, pair_list):
+        pairwise_list = []
+        
+        if self.pairwise_method == "combination":
+            for pair in pair_list:
+                source = self.representations_list[pair[0]]
+                target = self.representations_list[pair[1]]
+                pairwise = self._make_pairwise(source, target)
+                pairwise_list.append(pairwise)
+        
+        elif self.pairwise_method == "permutation":
+            for source_idx, target_idx in pair_list:
+                source = self.source_list[source_idx]
+                target = self.target_list[target_idx]
+                pairwise = self._make_pairwise(source, target)
+                pairwise_list.append(pairwise)
+            
+        return pairwise_list    
+
+    def set_pairs_computed(self, pairs_computed: Optional[List[str]]) -> None:
+        """User can only re-run the optimization for specific pairs by using `set_pair_computed`.
+
+        Args:
+            pairs_computed (Optional[List[str]]):
+                List of specific representation pairs to compute.  If not provided, optimization will be
+                run for all pairs. Example values in the list might be: ["Group1", "Group2_vs_Group4"]
+
+        Examples:
+            >>> pairs_computed = ["Group1", "Group2_vs_Group4"]
+            >>> align_representation.set_pair_computed(pairs_computed)
+        """
+        self.pairs_computed = pairs_computed
+        if self.pairs_computed is not None:
+            print("The pairs to compute was selected by pairs_computed...")
+            self.specific_pair_list = self._specific_pair_list(pairs_computed)
+            self.pairwise_list = self._get_pairwise_list(self.specific_pair_list)
+
+        else:
+            print("All the pairs in the list below will be computed. ")
+            self.pairwise_list = self._get_pairwise_list(self.pairs_index_list)
+
+    def set_specific_eps_list(
+        self,
+        specific_eps_list: Optional[Dict[str, List[float]]],
+        specific_only: bool = False,
+    ) -> None:
+        """
+        Also, user can re-define the epsilon range for some pairs by using `set_specific_eps_list`.
+
+        The rest of them will be computed with `config.eps_list`.
+        If `specific_only` is True (default is False), only these pairs will be computed and the rest of them were skipped.
+
+        Args:
+            specific_eps_list (Optional[Dict[str, List[float]]]):
+                A dictionary specifying custom epsilon values for particular representation pairs.
+                Key is the representation pair name and value is a list of epsilon values.
+            specific_only (bool):
+                If True, only pairs specified in `specific_eps_list` will be computed. Defaults to False.
+
+        Examples:
+            >>> specific_eps_list = {'Group1': [0.02, 0.1], "Group2_vs_Group4":[0.1, 0.2]}
+            >>> align_representation.set_specific_eps_list(specific_eps_list, specific_only=False)
+        """
+
+        self.specific_eps_list = specific_eps_list
+
+        if specific_eps_list is not None:
+            assert isinstance(self.specific_eps_list, dict), "specific_eps_list needs to be dict."
+            
+            print("The range of epsilon for some pairs in the list below was changed ...")
+
+            self.specific_pair_list = self._specific_pair_list(specific_eps_list)
+
+            if specific_only:
+                self.pairwise_list = self._get_pairwise_list(self.specific_pair_list)
+            else:
+                self.pairwise_list = self._get_pairwise_list(self.pairs_index_list)
+
+    def _specific_pair_list(self, pair_list):
+        if isinstance(pair_list, dict):
+            key_loop = pair_list.keys()
+        elif isinstance(pair_list, list):
+            key_loop = pair_list
+        
+        if self.pairwise_method == "permutation":
+            source_name_list = [source.name for source in self.source_list]
+            target_name_list = [target.name for target in self.target_list]
+            
+        specific_pair_list = []
+        for key in key_loop:
+            if "_vs_" in key:
+                source_name, target_name = key.split("_vs_")
+
+                if self.pairwise_method == "combination":
+                    source_idx = self.name_list.index(source_name)
+                    target_idx = self.name_list.index(target_name)
+                
+                elif self.pairwise_method == "permutation":
+                    source_idx = source_name_list.index(source_name)
+                    target_idx = target_name_list.index(target_name)
+
+                rep_list = [(source_idx, target_idx)]
+
+            else:
+                
+                if self.pairwise_method == "combination":
+                    rep_idx = self.name_list.index(key)
+                    rep_list = [nn for nn in self.pairs_index_list if rep_idx in nn]
+                
+                elif self.pairwise_method == "permutation":
+                    if key in source_name_list:
+                        source_idx = source_name_list.index(key)
+                        rep_list = [(source_idx, idx) for idx in range(len(target_name_list))]
+                    
+                    elif key in target_name_list:
+                        target_idx = target_name_list.index(key)
+                        rep_list = [(idx, target_idx) for idx in range(len(source_name_list))]
+                    
+                    else:
+                        raise ValueError("the specific group must be in source_name_list or target_name_list.")
+
+            specific_pair_list.extend(rep_list)
+
+        return specific_pair_list
+    
     def show_sim_mat(
         self,
         sim_mat_format: str = "default",
@@ -1820,13 +1985,12 @@ class AlignRepresentations:
         visualization_config_hist: VisualizationConfig = VisualizationConfig(),
         fig_dir: Optional[str] = None,
         show_distribution: bool = False,
-        ticks: Optional[str] = None,
     ) -> None:
         """Show the dissimilarity matrix of the representation.
 
         Args:
             sim_mat_format (str, optional):
-                "default", "sorted", or "both". If "sorted" is selected, the rearranged matrix is shown. Defaults to "default".
+                "default" or "sorted". If "sorted" is selected, the rearranged matrix is shown. Defaults to "default".
             visualization_config (VisualizationConfig, optional):
                 container of parameters used for figure. Defaults to VisualizationConfig().
             visualization_config_hist (VisualizationConfig, optional):
@@ -1835,48 +1999,70 @@ class AlignRepresentations:
                 The directory for saving the figure. Defaults to None.
             show_distribution (bool, optional):
                 show the histogram figures. Defaults to False.
-            ticks (Optional[str], optional):
-                "numbers", "objects", or "category". Defaults to None.
         """
 
+        if self.pairwise_method == "combination":
+            rep_list = self.representations_list
+        elif self.pairwise_method == "permutation":
+            rep_list = self.source_list + self.target_list
+        
         if fig_dir is None:
-            fig_dir = os.path.join(
-                self.main_results_dir, 
-                "individual_sim_mat", 
-                self.config.init_mat_plan,
-            )
+            fig_dir = os.path.join(self.main_figure_dir, "individual_sim_mat")
             os.makedirs(fig_dir, exist_ok=True)
+        
+        if sim_mat_format == "default":
+            return_sorted = False
+        elif sim_mat_format == "sorted":
+            return_sorted = True
+        else:
+            raise ValueError("sim_mat_format must be 'default' or 'sorted'.")
 
-        for representation in self.representations_list:
-            representation.show_sim_mat(
-                sim_mat_format=sim_mat_format,
-                visualization_config=visualization_config,
+        for rep in rep_list:
+            rep.plot_sim_mat(
                 fig_dir=fig_dir,
-                ticks=ticks,
+                return_sorted=return_sorted,
+                visualization_config=visualization_config,
             )
-
+            
             if show_distribution:
-                representation.show_sim_mat_distribution(**visualization_config_hist())
+                rep.show_sim_mat_distribution(visualization_config = visualization_config_hist)
+    
+    # RSA methods
+    def RSA_get_corr(self, metric: str = "pearson", return_data = False) -> None:
+        """Conventional representation similarity analysis (RSA).
 
+        Args:
+            metric (str, optional):
+                spearman or pearson. Defaults to "pearson".
+        """
+        for pairwise in self.pairwise_list:
+            corr = pairwise.rsa(metric=metric)
+            self.RSA_corr[pairwise.pair_name] = corr
+            print(f"Correlation {pairwise.pair_name.replace('_', ' ')} : {corr}")
+        
+        if return_data:
+            return self.RSA_corr
+    
+    # entropic GWOT
     def gw_alignment(
         self,
         compute_OT: bool = False,
         delete_results: bool = False,
         return_data: bool = False,
-        return_figure: bool = True,
+        return_figure: bool = False,
         OT_format: str = "default",
         visualization_config: VisualizationConfig = VisualizationConfig(),
         show_log: bool = False,
         fig_dir: Optional[str] = None,
-        ticks: Optional[str] = None,
         save_dataframe: bool = False,
         change_sampler_seed: bool = False,
-        fix_sampler_seed: int = 42,
+        sampler_seed: int = 42,
         fix_random_init_seed: bool = False,
         first_random_init_seed: Optional[int] = None,
-        parallel_method :str= "multiprocess",
+        parallel_method :str = "multiprocess",
     ) -> Optional[List[np.ndarray]]:
-        """compute GWOT for each pair.
+        """
+        compute GWOT for each pair.
 
         Args:
             compute_OT (bool, optional):
@@ -1907,9 +2093,6 @@ class AlignRepresentations:
                 If None, the figures will be saved in the same subfolder in "results_dir".
                 Defaults to None.
 
-            ticks (Optional[str], optional):
-                you can use "objects" or "category (if existed)" or "None". Defaults to None.
-
             save_dataframe (bool, optional):
                 If True, you can save all the computed data stored in SQlite or PyMySQL in csv
                 format (pandas.DataFrame) in the result folder.  Defaults to False.
@@ -1929,20 +2112,55 @@ class AlignRepresentations:
                 Returns a list of computed Optimal Transport matrices if `return_data` is True. Otherwise, returns None.
         """
 
-        # check the n_jobs
-        if self.data.config.n_jobs < 1:
-            raise ValueError("n_jobs > 0 is required in this toolbox.")
+        # check the n_jobs and sampler_seed
+        utils_functions.check_parameters(self.config.n_jobs, sampler_seed)
+        
+        if delete_results:
+            self.drop_gw_alignment_files(drop_all=True, delete_database=True, delete_directory=True)
 
-        if isinstance(sampler_seed, int) and sampler_seed > -1:
-            pass
-        else:
-            raise ValueError("please 'sampler_seed' = True or False or int > 0.")
-
+        # compute the entropic GWOT in parallel.
+        if compute_OT:
+            self._entropic_gwot(
+                parallel_method,
+                sampler_seed,
+                change_sampler_seed,
+                save_dataframe,
+                fix_random_init_seed,
+                first_random_init_seed,
+            )
+            
+        if return_figure:
+            for pairwise in self.pairwise_list:
+                pairwise.plot_OT(
+                    return_sorted=False if OT_format == "default" else True,
+                    fig_dir=fig_dir,
+                    visualization_config=visualization_config,
+                )
+        
+        if show_log:
+            self.show_optimization_log(fig_dir, visualization_config)
+        
+        if return_data:
+            OT_list = [pairwise.OT for pairwise in self.pairwise_list]
+            return OT_list
+   
+    def _entropic_gwot(
+        self,
+        parallel_method: str,
+        sampler_seed: int,
+        change_sampler_seed: bool,
+        save_dataframe :bool,
+        fix_random_init_seed :int,
+        first_random_init_seed :int,
+    ):
+        """
+        compute the entropic GWOT in parallel.
+        """
         if parallel_method == "multiprocess":
-            pool = ProcessPoolExecutor(self.data.config.n_jobs)
+            pool = ProcessPoolExecutor(self.config.n_jobs)
         
         elif parallel_method == "multithread":
-            pool = ThreadPoolExecutor(self.data.config.n_jobs)
+            pool = ThreadPoolExecutor(self.config.n_jobs)
         
         else:
             raise ValueError("parallel_method must be 'multiprocess' or 'multithread'.")
@@ -1960,8 +2178,8 @@ class AlignRepresentations:
                         sampler_seed = sampler_seed
 
                     future = pool.submit(
-                        pairwise.run_gwot,
-                        compute_OT=compute_OT,
+                        pairwise.run_entropic_gwot,
+                        compute_OT=True,
                         save_dataframe=save_dataframe,
                         target_device=self.config.device,
                         sampler_seed=sampler_seed,
@@ -1976,150 +2194,78 @@ class AlignRepresentations:
                 for future in as_completed(processes):
                     future.result()
 
-    def gwot_after_entropic(
-        self,
-        top_k: Optional[int] = None,
-        parallel_method: Optional[str] = None,
-        OT_format: str = "default",
-        ticks: Optional[str] = None,
-        category_mat: Optional[Any] = None,
-        visualization_config: VisualizationConfig = VisualizationConfig(),
-    ) -> None:
-        """Run GWOT without entropy by setting the optimized entropic GWOT as the initial plan.
-
-        This method computes the GWOT for each pair of representations without entropy regularization
-        by initializing the transport plan with the result obtained from entropic GWOT.
-
-        Args:
-            top_k (int, optional):
-                this will be used for loading the optimized OT from the bottom k of lowest GWD (= top_k) value.
-                Defaults to None. If None, all the computed OT will be used for GWOT without entropy.
-
-            parallel_method (Optional[str], optional):
-                parallel method to compute GWOT. Defaults to "multithread".
-
-            OT_format (str, optional):
-                format of sim_mat to visualize.
-                Options are "default", "sorted", and "both". Defaults to "default".
-
-            ticks (Optional[str], optional):
-                you can use "objects" or "category (if existed)" or "None". Defaults to None.
-
-            category_mat (Optional[Any], optional):
-                This will be used for the category info. Defaults to None.
-
-            visualization_config (VisualizationConfig, optional):
-                container of parameters used for figure. Defaults to VisualizationConfig().
-        """
-
-        if parallel_method == "multiprocess":
-            pool = ProcessPoolExecutor(self.config.n_jobs)
-
-        elif parallel_method == "multithread":
-            pool = ThreadPoolExecutor(self.config.n_jobs)
-
-        elif parallel_method is None:
-            for idx, pair in enumerate(self.pairwise_list):
-                pair.run_test_after_entropic_gwot(
-                    top_k=top_k,
-                    OT_format=OT_format,
-                    device=None,
-                    to_types=None,
-                    data_type=None,
-                    ticks=ticks,
-                    category_mat=category_mat,
-                    visualization_config = visualization_config,
-                )
-
-            return None
-
-        with pool:
-            if self.config.to_types == "numpy":
-                if self.config.multi_gpu != False:
-                    warnings.warn("numpy doesn't use GPU. Please 'multi_GPU = False'.", UserWarning)
-                target_device = self.config.device
-
-            processes = []
-            for idx, pair in enumerate(self.pairwise_list):
-                if self.config.multi_gpu:
-                    target_device = "cuda:" + str(idx % torch.cuda.device_count())
-                else:
-                    target_device = self.config.device
-
-                if isinstance(self.config.multi_gpu, list):
-                    gpu_idx = idx % len(self.config.multi_gpu)
-                    target_device = "cuda:" + str(self.config.multi_gpu[gpu_idx])
-
-                future = pool.submit(
-                    pair.run_test_after_entropic_gwot,
-                    top_k=top_k,
-                    OT_format=OT_format,
-                    device=target_device,
-                    to_types=self.config.to_types,
-                    data_type=self.config.data_type,
-                    ticks=ticks,
-                    category_mat=category_mat,
-                    visualization_config = visualization_config,
-                )
-                processes.append(future)
-
-            for future in as_completed(processes):
-                future.result()
-
     def drop_gw_alignment_files(
         self,
-        drop_filenames: Optional[List[str]] = None,
-        drop_all: bool = False
+        rep_or_pair_name_list: Optional[List[str]] = None,
+        drop_all: bool = False,
+        delete_database: bool = False,
+        delete_directory: bool = False,
     ) -> None:
-        """Delete the specified database and directory with the given filename
+        """Delete the specified database and directory with the given filename and sampler name.
 
         Args:
-            drop_filenames (Optional[List[str]], optional):
-                A list of filenames corresponding to the results that are to be deleted.
+            rep_or_pair_name_list (Optional[List[str]], optional):
+                List of representation or pairwise names to delete. (e.g. rep_or_pair_name_list = ["Group1", "Group2_vs_Group4"])
                 If `drop_all` is set to True, this parameter is ignored. Defaults to None.
             drop_all (bool, optional):
                 If set to True, all results will be deleted regardless of the `drop_filenames` parameter.
                 Defaults to False.
+            delete_database (bool, optional):
+                If set to True, the database will be deleted. Defaults to False.
+            delete_directory (bool, optional):
+                If set to True, the directory will be deleted. Defaults to False.
 
         Raises:
             ValueError: If neither `drop_filenames` is specified nor `drop_all` is set to True.
         """
+        
+        all_drop_list = [pairwise.study_name for pairwise in self.pairwise_list]
+        
         if drop_all:
-            drop_filenames = [pairwise.filename for pairwise in self.pairwise_list]
+            drop_list = all_drop_list
+        
+        else:
+            assert rep_or_pair_name_list is not None, "Specify the results name in drop_filenames or set drop_all=True"
+            
+            drop_idx_list = []
+            for name in rep_or_pair_name_list:
+                drop_idx = [idx for idx, pairname in enumerate(all_drop_list) if name in pairname]
+                drop_idx_list.extend(drop_idx)
+            
+            drop_list = [all_drop_list[n] for n in set(drop_idx_list)]    
 
-        if drop_filenames is None:
-            raise ValueError("Specify the results name in drop_filenames or set drop_all=True")
-
+        # delete files for each pairwise
         for pairwise in self.pairwise_list:
-            if (pairwise.filename not in drop_filenames) or (not database_exists(pairwise.storage)):
+            if pairwise.study_name not in drop_list:
+                continue        
+            if not sqlalchemy_utils.database_exists(pairwise.storage):
                 continue
-            pairwise.delete_prev_results()
-
+            
+            self._delete_figure(pairwise)
+            pairwise.delete_previous_results(
+                delete_database=delete_database, 
+                delete_directory=delete_directory
+            )
+    
+    def _delete_figure(self, pairwise:PairwiseAnalysis):        
+        for root, _, files in os.walk(self.main_figure_dir, topdown=False):
+            for file in files:
+                if pairwise.pair_name in file:
+                    os.remove(os.path.join(root, file))
+    
     def show_optimization_log(
         self,
         fig_dir: Optional[str] = None,
         visualization_config: VisualizationConfig = VisualizationConfig()
     ) -> None:
-        """Show both the relationships between epsilons and GWD, and between accuracy and GWD
-
-        Args:
-            fig_dir (Optional[str], optional):
-                you can define the path to which you save the figures (.png).
-                If None, the figures will be saved in the same subfolder in "results_dir". Defaults to None.
-            visualization_config (VisualizationConfig, optional):
-                Container of parameters used for figure. Defaults to VisualizationConfig().
+        """
+        Show both the relationships between epsilons and GWD, and between accuracy and GWD
         """
 
-        # default setting
-        plt.rcParams.update(plt.rcParamsDefault)
-        styles = matplotlib.style.available
-        darkgrid_style = [s for s in styles if re.match(r"seaborn-.*-darkgrid", s)][0]
-        plt.style.use(darkgrid_style)
-
         for pairwise in self.pairwise_list:
-            pairwise.get_optimization_log(
+            pairwise.plot_optimization_log(
                 fig_dir=fig_dir,
-                **visualization_config(),
+                visualization_config=visualization_config,
             )
 
     def calc_accuracy(
@@ -2158,7 +2304,13 @@ class AlignRepresentations:
         accuracy["top_n"] = top_k_list
 
         for pairwise in self.pairwise_list:
-            df = pairwise.eval_accuracy(top_k_list, eval_type=eval_type, metric=self.metric, barycenter=barycenter, eval_mat=eval_mat)
+            df = pairwise.eval_accuracy(
+                top_k_list, 
+                eval_type=eval_type, 
+                metric=self.metric, 
+                barycenter=barycenter, 
+                eval_mat=eval_mat,
+            )
 
             accuracy = pd.merge(accuracy, df, on="top_n")
 
@@ -2204,7 +2356,8 @@ class AlignRepresentations:
         fig_name: str = "Accuracy_ot_plan.png",
         scatter: bool = True
     ) -> None:
-        """Plot the accuracy of the unsupervised alignment for each top_k
+        """
+        Plot the accuracy of the unsupervised alignment for each top_k
 
         Args:
             eval_type (str, optional):
@@ -2222,6 +2375,7 @@ class AlignRepresentations:
                 If True, the accuracy will be visualized as a swarm plot. Otherwise, a line plot will be used.
                 Defaults to True.
         """
+        
         # default setting
         plt.rcParams.update(plt.rcParamsDefault)
         styles = matplotlib.style.available
@@ -2245,7 +2399,7 @@ class AlignRepresentations:
         plt.title(eval_type)
         plt.xlabel("top k")
         plt.ylabel("Matching rate (%)")
-        # plt.legend(loc = "best")
+
         plt.tick_params(axis="both", which="major")
         plt.subplots_adjust(left=0.2, right=0.9, bottom=0.2)
         if fig_dir is not None:
@@ -2258,7 +2412,7 @@ class AlignRepresentations:
     def _procrustes_to_pivot(self, pivot):
         the_others = set()
         pivot_idx_list = [] # [pair_idx, paivot_idx]
-        for i, pair in enumerate(self.all_pair_list):
+        for i, pair in enumerate(self.pairs_index_list):
             if pivot in pair:
                 the_others.add(filter(lambda x: x != pivot, pair))
 
@@ -2341,7 +2495,11 @@ class AlignRepresentations:
         """
 
         if fig_dir is None:
-            fig_dir = os.path.join(self.main_results_dir, "visualize_embedding", self.config.init_mat_plan)
+            fig_dir = os.path.join(
+                self.main_results_dir, 
+                "visualize_embedding", 
+                self.config.init_mat_plan,
+            )
             os.makedirs(fig_dir, exist_ok=True)
         
         name_list = []
@@ -2471,8 +2629,8 @@ class AlignRepresentations:
                 If return_data is True, returns the computed OT.
         """
 
-        #assert self.all_pair_list == range(len(self.pairwise_list))
-
+        assert self.pairwise_method == "combination", "pairwise_method must be 'combination'."
+        
         # Select the pivot
         pivot_representation = self.representations_list[pivot]
         others_representaions = self.representations_list[:pivot] + self.representations_list[pivot + 1 :]
