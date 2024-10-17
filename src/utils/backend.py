@@ -4,6 +4,7 @@ from typing import Any, List, Union
 import numpy as np
 import ot
 import torch
+from scipy.spatial import distance
 
 
 #%%
@@ -205,7 +206,7 @@ class Backend():
 
         # save data
         if self.to_types == 'torch':
-            torch.save(gw, file_path + f'/gw_{number}.pt')
+            torch.save(gw.to('cpu'), file_path + f'/gw_{number}.pt')
         elif self.to_types == 'numpy':
             np.save(file_path + f'/gw_{number}', gw)
 
@@ -231,6 +232,24 @@ class Backend():
 
         return flag
 
+    def distance(self, x1, x2, metric):
+        """Compute distance between two embeddings."""
+        
+        if self.to_types == 'numpy':
+            dist = distance.cdist(x1, x2, metric=metric)
+        
+        elif self.to_types == 'torch':
+            import torchmetrics
+            if metric == 'cosine':
+                dist = 1 - torchmetrics.functional.pairwise_cosine_similarity(x1, x2)
+            
+            elif metric == 'euclidean':
+                dist = torchmetrics.functional.pairwise_euclidean_distance(x1, x2)
+            
+            else:
+                raise NotImplementedError()
+            
+        return dist
 
 # %%
 if __name__ == '__main__':
