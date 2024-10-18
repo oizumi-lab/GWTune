@@ -26,7 +26,7 @@ config = OptimizationConfig(
     to_types = 'torch',
     device = 'cpu', 
     data_type = 'double', 
-    n_jobs = 3,
+    n_jobs = 1,
     multi_gpu = True,
     storage = None,
     db_params = {"drivername": "sqlite"},
@@ -76,19 +76,19 @@ vis = VisualizationConfig(
 
 # %%
 ar.gw_alignment(
-    compute_OT=False,
+    compute_OT=True,
     delete_results=False,
     return_data=False,
-    return_figure=True,
+    return_figure=False,
     # OT_format="default",
     OT_format="sorted",
     visualization_config=vis,
     # show_log=True,
     fig_dir=None,
-    save_dataframe=False,
+    save_dataframe=True,
     change_sampler_seed=False,
     sampler_seed=42,
-    fix_random_init_seed=False,
+    fix_random_init_seed=True,
     first_random_init_seed=None,
     parallel_method="multiprocess",
 )

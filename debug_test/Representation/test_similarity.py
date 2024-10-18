@@ -28,15 +28,10 @@ from src.utils.utils_functions import get_category_data, sort_matrix_with_catego
 object_labels, category_idx_list, num_category_list, category_name_list = get_category_data(category_mat, sort_by="default")
 
 i = 0 
-metric = "L2_normalized_euclidean" 
+metric = "euclidean" 
 name = f"Group{i+1}" # the name of the representation
 embedding = np.load(f"../../data/THINGS/THINGS_embedding_Group{i+1}.npy")[0]
 
-#%%
-new_embedding = embedding / np.linalg.norm(embedding, axis=1, keepdims=True)
-
-#%%
-sp.spatial.distance.cdist(new_embedding, new_embedding, metric="euclidean")
 
 #%%
 rep = Representation(
@@ -55,8 +50,6 @@ rep = Representation(
 rep.plot_sim_mat(return_sorted=False)
 # %%
 rep.plot_sim_mat(return_sorted=True)
-# %%
-rep.plot_distribution(font='sans-serif')
 
 # %%
 metric = "cosine"
@@ -76,6 +69,5 @@ rep = Representation(
 rep.plot_sim_mat(return_sorted=False)
 # %%
 rep.plot_sim_mat(return_sorted=True)
-# %%
-rep.plot_distribution(font='sans-serif')
+
 # %%

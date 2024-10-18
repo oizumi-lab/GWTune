@@ -95,7 +95,7 @@ pair.match_sim_mat_distribution(return_data=False, method="target", plot=True)
 
 # %%
 ot = pair.run_entropic_gwot(
-    compute_OT=False, 
+    compute_OT=True, 
     save_dataframe=True, 
     fix_random_init_seed=False,
 )

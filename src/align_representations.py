@@ -20,7 +20,7 @@ import ot
 import pandas as pd
 import seaborn as sns
 import torch
-import torch.multiprocessing as mp
+import multiprocessing as mp
 import scipy as sp
 
 import sqlalchemy_utils
@@ -205,6 +205,7 @@ class VisualizationConfig:
         markers_list: Optional[List[str]] = None,
         marker_size: int = 30,
         alpha: int = 1,
+        grid_alpha :float = 1.0,
         color: str = 'C0',
         cmap: str = 'cividis',
         ticks: Optional[str] = None,
@@ -288,6 +289,8 @@ class VisualizationConfig:
                 Size of the marker. Defaults to 30.
             alpha (int, optional):
                 Alpha of the marker. Defaults to 1.
+            grid_alpha (float, optional):
+                Alpha of the grid. Defaults to 1.0.
             color (str, optional):
                 Color for plots. Defaults to 'C0'.
             cmap (str, optional):
@@ -352,6 +355,7 @@ class VisualizationConfig:
             'colorbar_range': colorbar_range,
             'colorbar_shrink': colorbar_shrink,
             'alpha': alpha,
+            'grid_alpha': grid_alpha,
             'markers_list': markers_list,
             'marker_size': marker_size,
             'color':color,
@@ -1097,7 +1101,7 @@ class PairwiseAnalysis:
             os.makedirs(p, exist_ok=True)
 
         # device setting
-        if self.config.multi_gpu != False and self.config.to_types == "torch":
+        if self.config.multi_gpu != False and self.config.to_types == "torch" and self.config.device == "cuda":
             if not queue.empty():
                 device_idx = queue.get()
                 new_device = "cuda:" + str(device_idx)

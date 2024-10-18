@@ -21,19 +21,18 @@ class Backend():
         nx (backend module): The backend module from POT (Python Optimal Transport) corresponding to the data type.
     """
 
-    def __init__(self, device: str = 'cpu', to_types: str = 'torch', data_type: str = 'double') -> None:
+    def __init__(self, device: str = 'cpu', to_types: str = 'numpy', data_type: str = 'double') -> None:
         """Initializes the Backend class.
 
         Args:
             device (str, optional): The device to be used for computation, either "cpu" or "cuda". Defaults to 'cpu'.
-            to_types (str, optional): Specifies the data structure to be used, either 'torch' or 'numpy'. Defaults to 'torch'.
+            to_types (str, optional): Specifies the data structure to be used, either 'torch' or 'numpy'. Defaults to 'numpy'.
             data_type (str, optional): Specifies the type of data to be used in computation. Defaults to 'double'.
         """
 
         self.device = device
         self.to_types = to_types
         self.data_type = data_type
-        pass
 
     def __call__(self, *args) -> Union[List[Any], Any]:
         """Convert the provided data to the specified data type and device.
