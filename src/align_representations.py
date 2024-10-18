@@ -1064,7 +1064,7 @@ class PairwiseAnalysis:
 
         # delete directosry
         if delete_directory:
-            shutil.rmtree(self.save_path)
+            shutil.rmtree(self.results_dir)
         else:
             if os.path.exists(self.data_path):
                 for root, _, files in os.walk(self.data_path, topdown=False):
@@ -1101,7 +1101,7 @@ class PairwiseAnalysis:
             os.makedirs(p, exist_ok=True)
 
         # device setting
-        if self.config.multi_gpu != False and self.config.to_types == "torch" and self.config.device == "cuda":
+        if self.config.multi_gpu == True and self.config.device == "cuda":
             if not queue.empty():
                 device_idx = queue.get()
                 new_device = "cuda:" + str(device_idx)
@@ -2220,6 +2220,12 @@ class AlignRepresentations:
         
         if drop_all:
             drop_list = all_drop_list
+            confirm = input(f"Are you sure you want to delete all the results of following list in {self.main_results_dir}?:\n{all_drop_list}\n(yes/no) : ")
+            
+            if confirm == "yes":
+                pass
+            else:
+                return None
         
         else:
             assert rep_or_pair_name_list is not None, "Specify the results name in drop_filenames or set drop_all=True"
