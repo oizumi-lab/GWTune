@@ -17,6 +17,6 @@ dependencies:
   - umap-learn
   - pip:
       - sqlalchemy-utils==0.41.1
-      - torch==2.0.1
-      - torchaudio==2.0.2
-      - torchvision==0.15.2
+      - torch==2.4.1
+      - torchvision==0.19.1
+      - torchaudio==2.4.1
