@@ -1298,7 +1298,7 @@ class PairwiseAnalysis:
         self,
         top_k_list: List[int],
         eval_type: str = "ot_plan",
-        eval_mat: Optional[np.ndarray] = None,
+        category_mat: Optional[np.ndarray] = None,
         metric: str = "cosine",
         barycenter: bool = False,
         supervised: bool = False,
@@ -1321,7 +1321,7 @@ class PairwiseAnalysis:
             eval_type (str, optional):
                 two ways to evaluate the accuracy as above. Defaults to "ot_plan".
 
-            eval_mat (Optional[np.ndarray], optional):
+            category_mat (Optional[np.ndarray], optional):
                 This will be used for the category info. Defaults to None.
                 
             metric (str, optional):
@@ -1333,9 +1333,6 @@ class PairwiseAnalysis:
 
             supervised (bool, optional):
                 define the accuracy based on a diagnoal matrix. Defaults to False.
-
-            category_mat (Optional[np.ndarray], optional):
-                This will be used for the category info. Defaults to None.
 
         Returns:
             df : dataframe which has accuracies for top_k.
@@ -1367,6 +1364,7 @@ class PairwiseAnalysis:
                 acc = self._calc_matching_rate_with_eval_mat(OT, k=k, eval_mat=None, order="maximum")
             
             elif eval_type == "category":
+                eval_mat = np.dot(category_mat.values, category_mat.values.T)
                 acc = self._calc_matching_rate_with_eval_mat(OT, k=k, eval_mat=eval_mat, order="maximum")
 
             acc_list.append(acc)
@@ -2130,12 +2128,7 @@ class AlignRepresentations:
             )
             
         if return_figure:
-            for pairwise in self.pairwise_list:
-                pairwise.plot_OT(
-                    return_sorted=False if OT_format == "default" else True,
-                    fig_dir=fig_dir,
-                    visualization_config=visualization_config,
-                )
+            self.show_OT(OT_format, fig_dir, visualization_config)
         
         if show_log:
             self.show_optimization_log(fig_dir, visualization_config)
@@ -2253,6 +2246,20 @@ class AlignRepresentations:
                 if pairwise.pair_name in file:
                     os.remove(os.path.join(root, file))
     
+    def show_OT(
+        self, 
+        OT_format: str = "default", 
+        fig_dir: Optional[str] = None, 
+        visualization_config: VisualizationConfig = VisualizationConfig()
+    ) -> None:
+        
+        for pairwise in self.pairwise_list:
+                pairwise.plot_OT(
+                    return_sorted=False if OT_format == "default" else True,
+                    fig_dir=fig_dir,
+                    visualization_config=visualization_config,
+                )
+
     def show_optimization_log(
         self,
         fig_dir: Optional[str] = None,
@@ -2272,7 +2279,7 @@ class AlignRepresentations:
         self,
         top_k_list: List[int],
         eval_type: str = "ot_plan",
-        eval_mat: Optional[Any] = None,
+        category_mat: Optional[Any] = None,
         barycenter: bool = False,
         return_dataframe: bool = False
     ) -> Optional[pd.DataFrame]:
@@ -2304,12 +2311,12 @@ class AlignRepresentations:
         accuracy["top_n"] = top_k_list
 
         for pairwise in self.pairwise_list:
-            df = pairwise.eval_accuracy(
+            df = pairwise.calc_matching_rate(
                 top_k_list, 
-                eval_type=eval_type, 
+                eval_type=eval_type,
+                category_mat=category_mat, 
                 metric=self.metric, 
                 barycenter=barycenter, 
-                eval_mat=eval_mat,
             )
 
             accuracy = pd.merge(accuracy, df, on="top_n")
@@ -2328,7 +2335,7 @@ class AlignRepresentations:
             self.category_level_accuracy = accuracy
             print("category level accuracy : \n", accuracy)
 
-        print("Mean : \n", accuracy.iloc[:, 1:].mean(axis="columns"))
+        print("\nMean : \n", accuracy.iloc[:, 1:].mean(axis="columns"))
 
         if return_dataframe:
             return accuracy
@@ -2409,6 +2416,20 @@ class AlignRepresentations:
         plt.clf()
         plt.close()
 
+    def get_highest_top1_matching_rate(self):
+        highest_top1_list = []
+        for pairwise in self.pairwise_list:
+            df = pairwise.study.trials_dataframe()
+            top1 = df["user_attrs_best_acc"].max() * 100
+            highest_top1_list.append(top1)
+        
+        highest_top1 = pd.DataFrame(
+            index = [pairwise.pair_name for pairwise in self.pairwise_list], 
+            data={"top1": highest_top1_list},
+        )
+        
+        return highest_top1
+    
     def _procrustes_to_pivot(self, pivot):
         the_others = set()
         pivot_idx_list = [] # [pair_idx, paivot_idx]

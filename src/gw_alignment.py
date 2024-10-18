@@ -229,23 +229,6 @@ class MainGromovWasserstainComputation:
     initializing the computations, performing the entropic Gromov-Wasserstein optimization, and saving
     the results of the optimization. The class provides a comprehensive suite of methods to manage and
     manipulate the optimization process.
-
-    Attributes:
-        to_types (str): Specifies the type of data structure to be used, either "torch" or "numpy".
-        data_type (str): Specifies the type of data to be used in computation.
-        source_dist (Any): Array-like, shape (n_source, n_source). Dissimilarity matrix of the source data.
-        target_dist (Any): Array-like, shape (n_target, n_target). Dissimilarity matrix of the target data.
-        p (array-like): Distribution over the source data.
-        q (array-like): Distribution over the target data.
-        source_size (int): Number of elements in the source distribution.
-        target_size (int): Number of elements in the target distribution.
-        init_mat_builder (InitMatrix): Builder object for creating initial transportation plans.
-        max_iter (int): Maximum number of iterations for entropic Gromov-Wasserstein alignment by POT.
-        numItermax (int): Maximum number of iterations for the Sinkhorn algorithm.
-        n_iter (int): Number of initial plans evaluated in single optimization.
-        back_end (Backend): Backend object responsible for handling device-specific operations.
-        best_gw_loss (float, optional): Best Gromov-Wasserstein loss achieved during optimization.
-                                        Only used for certain initialization methods.
     """
 
     def __init__(
@@ -296,6 +279,7 @@ class MainGromovWasserstainComputation:
             sinkhorn_method (str, optional): The method used for Sinkhorn algorithm.
                                         Options are "sinkhorn", "sinkhorn_stabilized", or "sinkhorn_epsilon_scaling".
                                         Defaults to "sinkhorn".
+            first_random_init_seed (int, optional): The first seed for generating the random initial matrix.
             tol (float, optional):      Stop threshold on error. Defaults to 1e-9.
             verbose (bool, optional):   Print information along iterations. Defaults to False.
             m (Optional[float], optional): The number of points to be used in partial Gromov-Wasserstein alignment.

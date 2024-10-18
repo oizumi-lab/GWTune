@@ -455,7 +455,7 @@ def plot_embedding(
     
     if fig_dir is not None:
         fig_path = os.path.join(fig_dir, f"{fig_name}.{fig_ext}")
-        plt.savefig(fig_path, dpi=300, bbox_inches='tight')
+        plt.savefig(fig_path, dpi=dpi, bbox_inches='tight')
 
     if show_figure:
         plt.show()
@@ -476,12 +476,13 @@ def plot_optimization_log(
     xlabel_size: int = 20,
     ylabel_size: int = 20,
     xticks_rotation: int = 0,
-    cbar_ticks_size: int = 20,
     xticks_size: int = 10,
     yticks_size: int = 10,
     cbar_format: Optional[str] = None,
     cbar_label_size: int = 20,
+    cbar_ticks_size: int = 20,
     cmap: str = "viridis",
+    grid_alpha : float = 1.0,
     marker_size: int = 20,
     plot_eps_log: bool = False,
     lim_eps: Optional[Tuple[float, float]] = None,
@@ -529,6 +530,7 @@ def plot_optimization_log(
     """
     plt.style.use("default")
     plt.rcParams["grid.color"] = "black"
+    plt.rcParams["grid.alpha"] = str(grid_alpha)
     plt.rcParams['font.family'] = font
     
     # figure plotting epsilon as x-axis and GWD as y-axis
@@ -594,6 +596,7 @@ def plot_optimization_log(
     
     plt.style.use("default")
     plt.rcParams["grid.color"] = "black"
+    plt.rcParams["grid.alpha"] = str(grid_alpha)
     plt.rcParams['font.family'] = font
 
     # figure plotting accuracy as x-axis and GWD as y-axis
