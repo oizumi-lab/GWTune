@@ -4,6 +4,7 @@ from typing import Any, List, Union
 import numpy as np
 import ot
 import torch
+from scipy.spatial import distance
 
 
 #%%
@@ -20,19 +21,18 @@ class Backend():
         nx (backend module): The backend module from POT (Python Optimal Transport) corresponding to the data type.
     """
 
-    def __init__(self, device: str = 'cpu', to_types: str = 'torch', data_type: str = 'double') -> None:
+    def __init__(self, device: str = 'cpu', to_types: str = 'numpy', data_type: str = 'double') -> None:
         """Initializes the Backend class.
 
         Args:
             device (str, optional): The device to be used for computation, either "cpu" or "cuda". Defaults to 'cpu'.
-            to_types (str, optional): Specifies the data structure to be used, either 'torch' or 'numpy'. Defaults to 'torch'.
+            to_types (str, optional): Specifies the data structure to be used, either 'torch' or 'numpy'. Defaults to 'numpy'.
             data_type (str, optional): Specifies the type of data to be used in computation. Defaults to 'double'.
         """
 
         self.device = device
         self.to_types = to_types
         self.data_type = data_type
-        pass
 
     def __call__(self, *args) -> Union[List[Any], Any]:
         """Convert the provided data to the specified data type and device.
@@ -205,7 +205,7 @@ class Backend():
 
         # save data
         if self.to_types == 'torch':
-            torch.save(gw, file_path + f'/gw_{number}.pt')
+            torch.save(gw.to('cpu'), file_path + f'/gw_{number}.pt')
         elif self.to_types == 'numpy':
             np.save(file_path + f'/gw_{number}', gw)
 
@@ -231,6 +231,24 @@ class Backend():
 
         return flag
 
+    def distance(self, x1, x2, metric):
+        """Compute distance between two embeddings."""
+        
+        if self.to_types == 'numpy':
+            dist = distance.cdist(x1, x2, metric=metric)
+        
+        elif self.to_types == 'torch':
+            import torchmetrics
+            if metric == 'cosine':
+                dist = 1 - torchmetrics.functional.pairwise_cosine_similarity(x1, x2)
+            
+            elif metric == 'euclidean':
+                dist = torchmetrics.functional.pairwise_euclidean_distance(x1, x2)
+            
+            else:
+                raise NotImplementedError()
+            
+        return dist
 
 # %%
 if __name__ == '__main__':
