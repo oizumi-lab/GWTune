@@ -398,3 +398,637 @@ alignment.calc_accuracy(top_k_list=[1, 3, 5], eval_type="ot_plan")
 alignment.calc_accuracy(top_k_list=[1, 3, 5], eval_type="k_nearest")
 
 # %%
+
+
+
+### Pattern 4
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.colors import Normalize
+from matplotlib.cm import ScalarMappable
+
+# 絡まった紐の座標を生成する関数
+def tangled_rope(num_points=100, num_loops=3, radius=1, beta=0.3, pattern=1):
+    t = np.linspace(0, 2 * np.pi * num_loops, num_points)
+    
+    # set radius as a function of t
+    if pattern == 1:
+        radius = radius + beta * t / (2 * np.pi)
+    elif pattern == 2:
+        radius = radius + beta * t / (2 * np.pi) + np.sin(t / (2 * np.pi))
+    
+    x = np.sin(t) * radius
+    y = np.cos(t) * radius
+    z = t / (2 * np.pi)
+    
+    embedding = np.column_stack((x, y, z))
+    return embedding
+
+# 絡まった紐の座標を生成
+embedding_1 = tangled_rope(beta=0.3, pattern=1)
+embedding_2 = tangled_rope(beta=0.3, pattern=2)
+
+# 3次元プロットの設定
+
+def plot(embedding):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # 色を連続的に変化させる
+    norm = Normalize(vmin=min(embedding[:, 2]), vmax=max(embedding[:, 2]))
+    cmap = plt.get_cmap('cool')
+    scalar_map = ScalarMappable(norm=norm, cmap=cmap)
+    colors = scalar_map.to_rgba(embedding[:, 2])
+
+    # 絡まった紐をプロット
+    ax.scatter(embedding[:, 0], embedding[:, 1], embedding[:, 2], c=colors)
+
+    # 軸ラベルの設定
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    # 表示
+    plt.show()
+    return colors
+    
+
+colors = plot(embedding_1)
+colors = plot(embedding_2)
+# %%
+Group1 = Representation(
+    name="1",
+    metric="euclidean",
+    embedding=embedding_1,
+    )
+
+Group2 = Representation(
+    name="2",
+    metric="euclidean",
+    embedding=embedding_2,
+    
+)
+
+config = OptimizationConfig(
+    eps_list=[0.1, 1],
+    num_trial=50,
+    db_params={"drivername": "sqlite"},
+    n_iter=1,
+)
+
+vis_config = VisualizationConfig(
+    figsize=(8, 6), 
+    title_size = 0, 
+    cmap = "rocket_r",
+    cbar_ticks_size=10,
+    font="Arial",
+    color_labels=colors,
+    color_label_width=3
+)
+
+vis_emb = VisualizationConfig(
+    figsize=(8, 8), 
+    legend_size=12,
+    marker_size=60,
+    color_labels=colors,
+    fig_ext='svg',
+    markers_list=['o', 'X']
+)
+vis_emb_2 = VisualizationConfig(
+    figsize=(8, 8), 
+    legend_size=12,
+    marker_size=60,
+    color_labels=colors,
+    fig_ext='svg',
+    markers_list=['X']
+)
+
+vis_log = VisualizationConfig(
+    figsize=(8, 6), 
+    title_size = 0, 
+    cmap = "viridis",
+    cbar_ticks_size=15,
+    font="Arial",
+    xlabel_size=20,
+    xticks_size=15,
+    ylabel_size=20,
+    yticks_size=15,
+    cbar_label_size=15,
+    plot_eps_log=True,
+    fig_ext='svg'
+)
+
+alignment = AlignRepresentations(
+    config=config,
+    representations_list=[Group1, Group2],
+    main_results_dir="../results/",
+    data_name="Simulation_4"
+)
+
+#%%
+# RSA
+alignment.show_sim_mat(
+    visualization_config=vis_config, 
+    show_distribution=False,
+    fig_dir="../results/Simulation_4"
+    )
+alignment.RSA_get_corr()
+
+# show embeddings
+Group1.show_embedding(dim=3, visualization_config=vis_emb, fig_dir="../results/Simulation_4", fig_name="Group1", legend=False)
+Group2.show_embedding(dim=3, visualization_config=vis_emb_2, fig_dir="../results/Simulation_4", fig_name="Group2", legend=False)
+# %%
+# GW
+alignment.gw_alignment(
+    compute_OT=False,
+    delete_results=False,
+    visualization_config=vis_config
+    )
+
+alignment.show_optimization_log(
+    fig_dir="../results/Simulation_4",
+    visualization_config=vis_log
+    )
+alignment.visualize_embedding(dim=3, visualization_config=vis_emb, fig_dir="../results/Simulation_4")
+
+alignment.calc_accuracy(top_k_list=[1, 3, 5], eval_type="ot_plan")
+# %%
+
+
+### Simulation for the colors data
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+# load colors
+colors = np.load("../../data/color/new_color_order.npy")
+
+#%%
+
+def plot_circles_and_points(radius1, num_points1, radius2, num_points2, distance):
+    fig, ax = plt.subplots()
+    ax.set_aspect('equal')
+
+    
+    # Circle 1
+    theta1 = np.linspace(0, 2 * np.pi, num_points1, endpoint=False)
+    x1 = radius1 * np.cos(theta1) - distance / 2
+    y1 = radius1 * np.sin(theta1)
+    #circle1 = plt.Circle((-distance / 2, 0), radius1, edgecolor='b', facecolor='none')
+    circle_1 = np.column_stack((x1, y1))
+    
+    # Circle 2
+    theta2 = np.linspace(0, 2 * np.pi, num_points2, endpoint=False)
+    x2 = radius2 * np.cos(theta2) + distance / 2
+    y2 = radius2 * np.sin(theta2)
+    #circle2 = plt.Circle((distance / 2, 0), radius2, edgecolor='r', facecolor='none')
+    circle_2 = np.column_stack((x2, y2))
+
+    #ax.add_patch(circle1)
+    #ax.add_patch(circle2)
+    ax.plot(x1, y1, 'bo')  # Points for circle 1
+    ax.plot(x2, y2, 'ro')  # Points for circle 2
+
+    ax.set_xlim(-radius1 - distance, radius2 + distance)
+    ax.set_ylim(-max(radius1, radius2) - 1, max(radius1, radius2) + 1)
+
+    plt.grid(True)
+    plt.show()
+    
+    return circle_1, circle_2
+
+# Parameters
+radius1 = 4
+num_points1 = 60
+radius2 = 3
+num_points2 = 33
+distance = 3.5
+
+circle1, circle2 = plot_circles_and_points(radius1, num_points1, radius2, num_points2, distance)
+
+# %%
+# concatenate circles
+embedding_1 = np.concatenate((circle1, circle2), axis=0)
+# add noise
+np.random.seed(0)
+noise = np.random.normal(0, 0.3, embedding_1.shape)
+embedding_1 = embedding_1 + noise
+
+# shuffle the order of the points of the second circle and save the new embedding
+np.random.seed(0)
+np.random.shuffle(circle2)
+embedding_2 = np.concatenate((circle1, circle2), axis=0)
+# add the same noise
+embedding_2 = embedding_2 + noise
+
+# %%
+Group1 = Representation(
+    name="1",
+    metric="euclidean",
+    embedding=embedding_1,
+    )
+
+Group2 = Representation(
+    name="2",
+    metric="euclidean",
+    embedding=embedding_2,
+    
+)
+
+config = OptimizationConfig(
+    eps_list=[0.1, 1],
+    num_trial=10, #50
+    db_params={"drivername": "sqlite"},
+    n_iter=1,
+)
+
+vis_config = VisualizationConfig(
+    figsize=(8, 6), 
+    title_size = 0, 
+    cmap = "rocket_r",
+    cbar_ticks_size=10,
+    font="Arial",
+    color_labels=colors,
+    color_label_width=3
+)
+
+vis_emb = VisualizationConfig(
+    figsize=(8, 8), 
+    legend_size=12,
+    marker_size=60,
+    color_labels=colors,
+    fig_ext='svg',
+    markers_list=['o', 'X']
+)
+vis_emb_2 = VisualizationConfig(
+    figsize=(8, 8), 
+    legend_size=12,
+    marker_size=60,
+    color_labels=colors,
+    fig_ext='svg',
+    markers_list=['X']
+)
+
+vis_log = VisualizationConfig(
+    figsize=(8, 6), 
+    title_size = 0, 
+    cmap = "viridis",
+    cbar_ticks_size=15,
+    font="Arial",
+    xlabel_size=20,
+    xticks_size=15,
+    ylabel_size=20,
+    yticks_size=15,
+    cbar_label_size=15,
+    plot_eps_log=True,
+    fig_ext='svg'
+)
+
+alignment = AlignRepresentations(
+    config=config,
+    representations_list=[Group1, Group2],
+    main_results_dir="../results/",
+    data_name="Simulation_colors"
+)
+
+#%%
+# RSA
+alignment.show_sim_mat(
+    visualization_config=vis_config, 
+    show_distribution=False,
+    fig_dir="../results/Simulation_colors"
+    )
+alignment.RSA_get_corr()
+
+# show embeddings
+Group1.show_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_colors", fig_name="Group1", legend=False)
+Group2.show_embedding(dim=2, visualization_config=vis_emb_2, fig_dir="../results/Simulation_colors", fig_name="Group2", legend=False)
+# %%
+# GW
+alignment.gw_alignment(
+    compute_OT=True,
+    delete_results=False,
+    visualization_config=vis_config
+    )
+
+alignment.show_optimization_log(
+    fig_dir="../results/Simulation_colors",
+    visualization_config=vis_log
+    )
+alignment.visualize_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_colors")
+
+alignment.calc_accuracy(top_k_list=[1, 3, 5], eval_type="ot_plan")
+# %%
+
+
+
+### Simulation for the colors data number 2
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# load colors
+colors = np.load("../../data/color/new_color_order.npy")
+
+def plot_circle(radius, num_points):
+    fig, ax = plt.subplots()
+    ax.set_aspect('equal')
+
+    theta = np.linspace(0, 2 * np.pi, num_points, endpoint=False)
+    x = radius * np.cos(theta)
+    y = radius * np.sin(theta)
+    circle = np.column_stack((x, y))
+
+    ax.plot(x, y, 'bo')  # Points for circle
+
+    ax.set_xlim(-radius - 1, radius + 1)
+    ax.set_ylim(-radius - 1, radius + 1)
+
+    plt.grid(True)
+    plt.show()
+    
+    return circle
+
+# Parameters
+radius = 4
+num_points = 93
+
+circle1 = plot_circle(radius, num_points)
+circle2 = plot_circle(radius, num_points)
+
+# add correlated noise
+np.random.seed(0)
+noise = np.random.normal(0, 0.4, circle1.shape)
+circle1 = circle1 + noise*1
+circle2 = circle2 + noise*1
+
+# shuffle the order of the points of the second circle and save the new embedding
+np.random.seed(0)
+np.random.shuffle(circle2[-38:])
+
+embedding_1 = circle1
+embedding_2 = circle2
+# %%
+# %%
+Group1 = Representation(
+    name="1",
+    metric="euclidean",
+    embedding=embedding_1,
+    )
+
+Group2 = Representation(
+    name="2",
+    metric="euclidean",
+    embedding=embedding_2,
+    
+)
+
+config = OptimizationConfig(
+    eps_list=[0.01, 0.1],
+    num_trial=10, #50
+    db_params={"drivername": "sqlite"},
+    n_iter=1,
+)
+
+vis_config = VisualizationConfig(
+    figsize=(8, 6), 
+    title_size = 0, 
+    cmap = "rocket_r",
+    cbar_ticks_size=10,
+    font="Arial",
+    color_labels=colors,
+    color_label_width=3
+)
+
+vis_emb = VisualizationConfig(
+    figsize=(8, 8), 
+    legend_size=12,
+    marker_size=60,
+    color_labels=colors,
+    fig_ext='svg',
+    markers_list=['o', 'X']
+)
+vis_emb_2 = VisualizationConfig(
+    figsize=(8, 8), 
+    legend_size=12,
+    marker_size=60,
+    color_labels=colors,
+    fig_ext='svg',
+    markers_list=['X']
+)
+
+vis_log = VisualizationConfig(
+    figsize=(8, 6), 
+    title_size = 0, 
+    cmap = "viridis",
+    cbar_ticks_size=15,
+    font="Arial",
+    xlabel_size=20,
+    xticks_size=15,
+    ylabel_size=20,
+    yticks_size=15,
+    cbar_label_size=15,
+    plot_eps_log=True,
+    fig_ext='svg'
+)
+
+alignment = AlignRepresentations(
+    config=config,
+    representations_list=[Group1, Group2],
+    main_results_dir="../results/",
+    data_name="Simulation_colors"
+)
+
+#%%
+# RSA
+alignment.show_sim_mat(
+    visualization_config=vis_config, 
+    show_distribution=False,
+    fig_dir="../results/Simulation_colors"
+    )
+alignment.RSA_get_corr()
+
+# show embeddings
+Group1.show_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_colors", fig_name="Group1", legend=False)
+Group2.show_embedding(dim=2, visualization_config=vis_emb_2, fig_dir="../results/Simulation_colors", fig_name="Group2", legend=False)
+# %%
+# GW
+alignment.gw_alignment(
+    compute_OT=True,
+    delete_results=True,
+    visualization_config=vis_config
+    )
+
+alignment.show_optimization_log(
+    fig_dir="../results/Simulation_colors",
+    visualization_config=vis_log
+    )
+alignment.visualize_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_colors")
+
+alignment.calc_accuracy(top_k_list=[1, 3, 5], eval_type="ot_plan")
+# %%
+
+### Simulation for the colors data number 3
+import numpy as np
+import matplotlib.pyplot as plt
+
+def generate_cluster_centers(n_clusters, size=1.0, seed=42):
+    np.random.seed(seed)  # 乱数シードの設定（再現性のため）
+    
+    centers = []
+    for _ in range(n_clusters):
+        # クラスターの中心をランダムに決定
+        center_x, center_y = np.random.normal((0, 0), size, 3)
+        centers.append((center_x, center_y))
+    
+    return centers
+
+def generate_clusters(n_points_per_cluster, centers, spread=1.0, seed=42):
+    np.random.seed(seed)  # 乱数シードの設定（再現性のため）
+
+    # set the emnpty 2d array
+    clusters = np.empty((0, 3))
+    for center in centers:
+        # クラスターの中心からの距離が spread 以内の範囲にランダムに点を生成
+        points_x = np.random.normal(center[0], spread, n_points_per_cluster)
+        points_y = np.random.normal(center[1], spread, n_points_per_cluster)
+        points_z = np.random.normal(center[2], spread, n_points_per_cluster)
+        points = np.column_stack((points_x, points_y, points_z))
+        # stack the points
+        clusters = np.vstack((clusters, points))
+    return clusters
+
+def plot_clusters(clusters):
+    plt.figure(figsize=(8, 6))
+    for points_x, points_y in clusters:
+        plt.scatter(points_x, points_y, alpha=0.6)
+    plt.title("Randomly Generated Clusters")
+    plt.xlabel("X-axis")
+    plt.ylabel("Y-axis")
+    plt.grid(True)
+    plt.show()
+
+# クラスターを生成しプロットする例
+n_points_per_cluster = 5
+n_clusters = 18
+interpolation_points = 3
+size = 20
+spread = 10
+centers = generate_cluster_centers(n_clusters, size=size, seed=2)
+clusters1 = generate_clusters(n_points_per_cluster, centers, spread=spread, seed=42)
+clusters2 = generate_clusters(n_points_per_cluster, centers, spread=spread, seed=43)
+plot_clusters(clusters1)
+plot_clusters(clusters2)
+
+# convert to numpy array
+# reshape (31, 2, 3) -> (93, 2)
+embedding_1 = clusters1
+embedding_2 = clusters2
+
+if interpolation_points > 0:
+    interp = np.random.uniform(-size, size, (interpolation_points, 2))
+    embedding_1 = np.vstack((embedding_1, interp))
+    embedding_2 = np.vstack((embedding_2, interp))
+# %%
+# load colors
+colors = np.load("../../data/color/new_color_order.npy")
+
+Group1 = Representation(
+    name="1",
+    metric="euclidean",
+    embedding=embedding_1,
+    )
+
+Group2 = Representation(
+    name="2",
+    metric="euclidean",
+    embedding=embedding_2,
+    
+)
+
+config = OptimizationConfig(
+    eps_list=[0.1, 10],
+    num_trial=30, #50
+    db_params={"drivername": "sqlite"},
+    n_iter=1,
+)
+
+vis_config = VisualizationConfig(
+    figsize=(8, 6), 
+    title_size = 0, 
+    cmap = "rocket_r",
+    cbar_ticks_size=10,
+    font="Arial",
+    color_labels=colors,
+    color_label_width=3
+)
+
+vis_emb = VisualizationConfig(
+    figsize=(8, 8), 
+    legend_size=12,
+    marker_size=60,
+    color_labels=colors,
+    fig_ext='svg',
+    markers_list=['o', 'X']
+)
+vis_emb_2 = VisualizationConfig(
+    figsize=(8, 8), 
+    legend_size=12,
+    marker_size=60,
+    color_labels=colors,
+    fig_ext='svg',
+    markers_list=['X']
+)
+
+vis_log = VisualizationConfig(
+    figsize=(8, 6), 
+    title_size = 0, 
+    cmap = "viridis",
+    cbar_ticks_size=15,
+    font="Arial",
+    xlabel_size=20,
+    xticks_size=15,
+    ylabel_size=20,
+    yticks_size=15,
+    cbar_label_size=15,
+    plot_eps_log=True,
+    fig_ext='svg'
+)
+
+alignment = AlignRepresentations(
+    config=config,
+    representations_list=[Group1, Group2],
+    main_results_dir="../results/",
+    data_name="Simulation_colors_cluster"
+)
+
+#%%
+# RSA
+alignment.show_sim_mat(
+    visualization_config=vis_config, 
+    show_distribution=False,
+    fig_dir="../results/Simulation_colors_cluster"
+    )
+alignment.RSA_get_corr()
+
+# show embeddings
+Group1.show_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_colors_cluster", fig_name="Group1", legend=False)
+Group2.show_embedding(dim=2, visualization_config=vis_emb_2, fig_dir="../results/Simulation_colors_cluster", fig_name="Group2", legend=False)
+# %%
+# GW
+alignment.gw_alignment(
+    compute_OT=True,
+    delete_results=False,
+    visualization_config=vis_config
+    )
+
+alignment.show_optimization_log(
+    fig_dir="../results/Simulation_colors_cluster",
+    visualization_config=vis_log
+    )
+alignment.visualize_embedding(dim=2, visualization_config=vis_emb, fig_dir="../results/Simulation_colors_cluster")
+
+alignment.calc_accuracy(top_k_list=[1, 3, 5], eval_type="ot_plan")
+# %%
