@@ -4,6 +4,11 @@ import numpy as np
 import pickle as pkl
 import pandas as pd
 
+# set_cpu = 4
+# os.environ["OPENBLAS_NUM_THREADS"] = str(set_cpu)
+# os.environ["MKL_NUM_THREADS"] = str(set_cpu)
+# os.environ["OMP_NUM_THREADS"] = str(set_cpu)
+
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.join(os.getcwd(), '../../'))
 from src.align_representations import Representation, PairwiseAnalysis, OptimizationConfig, VisualizationConfig
