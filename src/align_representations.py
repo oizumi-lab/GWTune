@@ -350,6 +350,7 @@ class VisualizationConfig:
             'zlabel_size': zlabel_size,
             'color_labels': color_labels,
             'color_label_width': color_label_width,
+            'color_label_width': color_label_width,
             'color_hue': color_hue,
             'colorbar_label': colorbar_label,
             'colorbar_range': colorbar_range,
