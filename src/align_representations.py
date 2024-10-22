@@ -1088,10 +1088,22 @@ class PairwiseAnalysis:
         Run the entropic GWOT.
         
         Args:
-            compute_OT (bool, optional): _description_. Defaults to False.
-            save_dataframe (bool, optional): _description_. Defaults to False.
-            target_device (Optional[str], optional): _description_. Defaults to None.
-            sampler_seed (int, optional): _description_. Defaults to 42.
+            compute_OT (bool, optional):
+                If True, GWOT will be computed. Defaults to False.
+            save_dataframe (bool, optional):
+                If True, the dataframe will be saved. Defaults to False.
+            target_device (Optional[str], optional):
+                The device to be used for computation. Defaults to None.
+            sampler_seed (int, optional):
+                Seed for the sampler. Defaults to 42.
+            fix_random_init_seed (bool, optional):
+                If True, the random seed will be fixed. Defaults to False.
+            first_random_init_seed (Optional[int], optional):
+                The first random seed for the initialization. Defaults to None.
+            iter_from_ComputeGWOT (Optional[int], optional):
+                The iteration number of the PairwiseAnalysis instance. Defaults to None.
+            queue (Optional[mp.Queue], optional):
+                The queue for multiprocessing with multi GPU. Defaults to None.
 
         Returns:
             ot (Union[np.ndarray, torch.Tensor]): GWOT.
@@ -1101,8 +1113,14 @@ class PairwiseAnalysis:
             os.makedirs(p, exist_ok=True)
 
         # device setting
-        if self.config.multi_gpu == True and self.config.device == "cuda":
-            if not queue.empty():
+        if self.config.to_types == "torch" and self.config.device == "cuda":
+            if queue is None:
+                if target_device is None:
+                    new_device = self.config.device
+                else:
+                    new_device = target_device
+            
+            elif not queue.empty():
                 device_idx = queue.get()
                 new_device = "cuda:" + str(device_idx)
                 print(f"cuda:{device_idx} is computing another pair, {self.instance_name}...")
@@ -1157,6 +1175,12 @@ class PairwiseAnalysis:
                 The device to be used for computation. Defaults to None.
             sampler_seed (int, optional):
                 Seed for the sampler. Defaults to 42.
+            save_dataframe (bool, optional):
+                If True, the dataframe will be saved. Defaults to False.
+            fix_random_init_seed (bool, optional):
+                If True, the random seed will be fixed. Defaults to False.
+            first_random_init_seed (Optional[int], optional):
+                The first random seed for the initialization. Defaults to None.
 
         Returns:
             OT (Union[np.ndarray, torch.Tensor]): GWOT.
@@ -1206,7 +1230,8 @@ class PairwiseAnalysis:
             sampler_seed (int, optional):
                 Seed for the sampler. Defaults to 42.
             n_jobs_for_pairwise_analysis (int, optional):
-                Number of jobs to run implemented by Optuna. Defaults to 1.
+                Number of jobs to run originally implemented by Optuna. Defaults to 1.
+                Changing this value may cause unexpected behavior with TPE sampler.
 
         Returns:
             study (optuna.study.Study):
@@ -1378,6 +1403,23 @@ class PairwiseAnalysis:
         return df
 
     def _calc_matching_rate_with_eval_mat(self, matrix, k, eval_mat=None, order="maximum"):
+        """
+        Calculate the matching rate based on the k-nearest neighbors of the embeddings.
+        
+        Args:
+            matrix (np.ndarray):
+                The matrix to be evaluated.
+            k (int):
+                The number of nearest neighbors to consider.
+            eval_mat (Optional[np.ndarray], optional):
+                The evaluation matrix. Defaults to None.
+            order (str, optional):
+                The order to consider. Defaults to "maximum".
+        
+        return:
+            matching_rate (float): The matching rate.
+        
+        """
         if eval_mat is None:
             eval_mat = np.eye(matrix.shape[0])
         else:
@@ -1409,6 +1451,19 @@ class PairwiseAnalysis:
         category_mat: Optional[pd.DataFrame] = None,
         eval_type: str = "category",
     ):    
+        """
+        Compare the accuracy for each category.
+
+        Args:
+            category_mat (Optional[pd.DataFrame], optional):
+                The category matrix. Defaults to None.
+            eval_type (str, optional):
+                The type of evaluation. Defaults to "category
+
+        Returns:
+            count_df (pd.DataFrame):
+                The dataframe containing the accuracy for each category.
+        """
         
         assert self.source.category_idx_list is not None, "No label info to sort the 'category_idx_list'."
         assert self.source.category_name_list is not None, "No label info to sort the 'category_name_list'."
@@ -2147,11 +2202,28 @@ class AlignRepresentations:
         sampler_seed: int,
         change_sampler_seed: bool,
         save_dataframe :bool,
-        fix_random_init_seed :int,
+        fix_random_init_seed :bool,
         first_random_init_seed :int,
     ):
         """
         compute the entropic GWOT in parallel.
+        
+        Args:
+            parallel_method (str):
+                parallel method to compute GWOT.
+                perhaps, multiprocess may be better to compute fast, because of Optuna's regulations.
+            sampler_seed (int):
+                the random seed value for optuna sampler.
+            change_sampler_seed (bool):
+                If True, the random seed will be different for each pair.
+            save_dataframe (bool):
+                If True, you can save all the computed data stored in SQlite or PyMySQL in csv
+                format (pandas.DataFrame) in the result folder.
+            fix_random_init_seed (bool):
+                If True, the random seed will be fixed for each pair.
+            first_random_init_seed (int):
+                the random seed value for the first initial matrix.
+            
         """
         if parallel_method == "multiprocess":
             pool = ProcessPoolExecutor(self.config.n_jobs)
@@ -2262,6 +2334,17 @@ class AlignRepresentations:
         fig_dir: Optional[str] = None, 
         visualization_config: VisualizationConfig = VisualizationConfig()
     ) -> None:
+        """
+        Show the OT for each pair.
+
+        Args:
+            OT_format (str, optional): 
+                format of sim_mat to visualize. Options are "default" or "sorted". Defaults to "default".
+            fig_dir (Optional[str], optional): 
+                The directory for saving the figure. Defaults to None.
+            visualization_config (VisualizationConfig, optional):
+                container of parameters used for figure. Defaults to VisualizationConfig().
+        """
         
         for pairwise in self.pairwise_list:
                 pairwise.plot_OT(
@@ -2277,6 +2360,12 @@ class AlignRepresentations:
     ) -> None:
         """
         Show both the relationships between epsilons and GWD, and between accuracy and GWD
+        
+        Args:
+            fig_dir (Optional[str], optional):
+                The directory for saving the figure. Defaults to None.
+            visualization_config (VisualizationConfig, optional):
+                container of parameters used for figure. Defaults to VisualizationConfig().
         """
 
         for pairwise in self.pairwise_list:
