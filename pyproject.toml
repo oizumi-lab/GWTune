@@ -7,20 +7,24 @@ readme = "README.md"
 packages = [{include = "src"}]
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.11"
-jupyter = "^1.0.0"
-matplotlib = "^3.6.1"
-pandas = "^1.5.0"
-scipy = "*"
-seaborn = "^0.12.0"
-optuna = "^3.2.0"
+python = ">=3.9"
+
+matplotlib = "*"
+numpy = "*"
+optuna = ">=3.2.0"
+pandas = "*"
+pot = "==0.9.4"
+pymysql = "*" 
 scikit-learn = "*"
-sqlalchemy = "^2.0.9"
-sqlalchemy-utils = "*"
-torch = "2.0.1"
-pytest = "^7.4.2"
-unbalancedgw = "^0.2.0"
-pot = "^0.9.4"
+scipy = "*"
+seaborn = "*"
+sqlalchemy = "*"
+tqdm = "*"
+umap-learn = "*"
+sqlalchemy-utils = "==0.41.1"
+torch = "==2.4.1"
+torchvision = "==0.19.1"
+torchaudio = "==2.4.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

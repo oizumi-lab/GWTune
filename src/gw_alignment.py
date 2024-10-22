@@ -1,23 +1,16 @@
 #%%
-import gc
-import math
-import os
+import math, os, gc, warnings
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
-import matplotlib.pyplot as plt
-import matplotlib.style as mplstyle
 import numpy as np
 import optuna
 import ot
-import seaborn as sns
 import torch
 from tqdm.auto import tqdm
 
 # warnings.simplefilter("ignore")
 from .utils.backend import Backend
 from .utils.init_matrix import InitMatrix
-
-# nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
 
 
 # %%
@@ -46,60 +39,98 @@ class GW_Alignment:
         source_dist: Any,
         target_dist: Any,
         data_path: str,
+        storage: str,
+        study_name: str,
         max_iter: int = 1000,
         numItermax: int = 1000,
         n_iter: int = 20,
-        to_types: str = "torch",
+        fix_random_init_seed : Optional[int] = None,
+        device: str = "cpu",
+        gw_type: str = "entropic_gromov_wasserstein",
+        to_types: str = "numpy",
         data_type: str = "double",
         sinkhorn_method: str = "sinkhorn",
-        fix_random_init_seed: Optional[int] = None,
+        instance_name: Optional[str]= None,
+        **kwargs,
     ) -> None:
         """Initialize the Gromov-Wasserstein alignment object.
 
         Args:
-            source_dist (Any):  Array-like, shape (n_source, n_source).
-                                Dissimilarity matrix of the source data.
-            target_dist (Any):  Array-like, shape (n_target, n_target).
-                                Dissimilarity matrix of the target data.
-            data_path (str):    Directory to save the computation results.
-            max_iter (int, optional):   Maximum number of iterations for entropic
-                                        Gromov-Wasserstein alignment by POT.
-                                        Defaults to 1000.
-            numItermax (int, optional): Maximum number of iterations for the
-                                        Sinkhorn algorithm. Defaults to 1000.
-            n_iter (int, optional): Number of initial plans evaluated in optimization. Defaults to 20.
-            to_types (str, optional):   Specifies the type of data structure to be used,
-                                        either "torch" or "numpy". Defaults to "torch".
-            data_type (str, optional):  Specifies the type of data to be used
-                                        in computation. Defaults to "double".
-            sinkhorn_method (str, optional):    Method used for the solver. Options are
-                                                "sinkhorn", "sinkhorn_log", "greenkhorn",
-                                                "sinkhorn_stabilized", or "sinkhorn_epsilon_scaling".
-                                                Defaults to "sinkhorn".
+            source_dist (Any):
+                Array-like, shape (n_source, n_source). Dissimilarity matrix of the source data.
+            target_dist (Any):
+                Array-like, shape (n_target, n_target).Dissimilarity matrix of the target data.
+            data_path (str):
+                Directory to save the computation results.
+            max_iter (int, optional):
+                Maximum number of iterations for entropic Gromov-Wasserstein alignment by POT.
+                Defaults to 1000.
+            numItermax (int, optional):
+                Maximum number of iterations for the Sinkhorn algorithm. Defaults to 1000.
+            n_iter (int, optional):
+                Number of initial plans evaluated in optimization. Defaults to 20.
+            gw_type (str, optional):
+                Type of Gromov-Wasserstein alignment to be used. Options are "entropic_gromov_wasserstein",
+                "entropic_semirelaxed_gromov_wasserstein", or "entropic_partial_gromov_wasserstein".
+                Defaults to "entropic_gromov_wasserstein".
+            to_types (str, optional):
+                Specifies the type of data structure to be used, either "torch" or "numpy".
+                Defaults to "torch".
+            data_type (str, optional):
+                Specifies the type of data to be used in computation. Defaults to "double".
+            sinkhorn_method (str, optional):
+                Method used for the solver. Options are "sinkhorn", "sinkhorn_log", "greenkhorn",
+                "sinkhorn_stabilized", or "sinkhorn_epsilon_scaling". Defaults to "sinkhorn".
         """
         self.to_types = to_types
         self.data_type = data_type
         self.sinkhorn_method = sinkhorn_method
+        self.instance_name = instance_name
+        self.gw_type = gw_type
+        self.device = device
+        
+        if self.to_types == "numpy":
+            assert device == "cpu", "numpy does not run in CUDA."
 
         # distribution in the source space, and target space
         self.source_size = len(source_dist)
         self.target_size = len(target_dist)
 
         self.data_path = data_path
-        if not os.path.exists(self.data_path):
-            os.makedirs(self.data_path, exist_ok=True)
+        os.makedirs(self.data_path, exist_ok=True)
 
         self.n_iter = n_iter
+        
+        # check a existed database to get the best gw_loss
+        try:
+            study = optuna.load_study(study_name=study_name, storage=storage)
+            df = study.trials_dataframe()
+            min_loss = df["value"].min()
+            
+            if math.isnan(min_loss):
+                self.best_gw_loss = float("inf")
+            else: 
+                self.best_gw_loss = min_loss
+
+            # print("existed best_loss :", self.best_gw_loss)
+        except KeyError:
+            self.best_gw_loss = float("inf")
+            # print("best_loss :", self.best_gw_loss)
 
         self.main_compute = MainGromovWasserstainComputation(
-            source_dist,
-            target_dist,
-            self.to_types,
-            data_type=self.data_type,
+            source_dist=source_dist,
+            target_dist=target_dist,
+            device=device,
+            to_types=to_types,
+            data_type=data_type,
             max_iter=max_iter,
             numItermax=numItermax,
             n_iter=n_iter,
             fix_random_init_seed=fix_random_init_seed,
+            gw_type=gw_type,
+            sinkhorn_method=sinkhorn_method,
+            instance_name=instance_name,
+            **kwargs
         )
 
     def define_eps_range(
@@ -137,7 +168,6 @@ class GW_Alignment:
     def __call__(
         self,
         trial: optuna.trial.Trial,
-        device: str,
         init_mat_plan: str,
         eps_list: List[float],
         eps_log: bool = True
@@ -148,14 +178,11 @@ class GW_Alignment:
 
         Args:
             trial (optuna.trial.Trial): The trial object from the Optuna for hyperparameter optimization.
-            device (str): The device to be used for computation, either "cpu" or "cuda".
             init_mat_plan (str): The method to be used for the initial plan. Options are "uniform",
                                  "diag", "random", "permutation" or "user_define".
             eps_list (List[float]): A list containing the lower and upper bounds for epsilon.
             eps_log (bool, optional): A flag to determine if the epsilon search is in logarithmic scale.
         """
-        if self.to_types == "numpy":
-            assert device == "cpu", "numpy does not run in CUDA."
 
         """
         1.  define hyperparameter (eps, T)
@@ -168,13 +195,7 @@ class GW_Alignment:
         """
         2.  Compute GW alignment with hyperparameters defined above.
         """
-        logv, trial = self.main_compute.compute_GW_with_init_plans(
-            trial,
-            eps,
-            init_mat_plan,
-            device,
-            sinkhorn_method = self.sinkhorn_method
-        )
+        logv, trial = self.main_compute.compute_GW_with_init_plans(trial, eps, init_mat_plan)
 
         """
         3.  count the accuracy of alignment and save the results if computation was finished in the right way.
@@ -182,6 +203,13 @@ class GW_Alignment:
         """
         gw = logv["ot"]
         gw_loss = logv["gw_dist"]
+        iteration = logv["cpt"]
+        
+        trial.set_user_attr("iteration", iteration)
+
+        if gw_loss < self.best_gw_loss:
+            self.best_gw_loss = gw_loss
+        
         self.main_compute.back_end.save_computed_results(gw, self.data_path, trial.number)
 
         """
@@ -194,7 +222,6 @@ class GW_Alignment:
 
         return gw_loss
 
-
 class MainGromovWasserstainComputation:
     """A class responsible for the specific computations of the entropic Gromov-Wasserstein alignment.
 
@@ -202,35 +229,29 @@ class MainGromovWasserstainComputation:
     initializing the computations, performing the entropic Gromov-Wasserstein optimization, and saving
     the results of the optimization. The class provides a comprehensive suite of methods to manage and
     manipulate the optimization process.
-
-    Attributes:
-        to_types (str): Specifies the type of data structure to be used, either "torch" or "numpy".
-        data_type (str): Specifies the type of data to be used in computation.
-        source_dist (Any): Array-like, shape (n_source, n_source). Dissimilarity matrix of the source data.
-        target_dist (Any): Array-like, shape (n_target, n_target). Dissimilarity matrix of the target data.
-        p (array-like): Distribution over the source data.
-        q (array-like): Distribution over the target data.
-        source_size (int): Number of elements in the source distribution.
-        target_size (int): Number of elements in the target distribution.
-        init_mat_builder (InitMatrix): Builder object for creating initial transportation plans.
-        max_iter (int): Maximum number of iterations for entropic Gromov-Wasserstein alignment by POT.
-        numItermax (int): Maximum number of iterations for the Sinkhorn algorithm.
-        n_iter (int): Number of initial plans evaluated in single optimization.
-        back_end (Backend): Backend object responsible for handling device-specific operations.
-        best_gw_loss (float, optional): Best Gromov-Wasserstein loss achieved during optimization.
-                                        Only used for certain initialization methods.
     """
 
     def __init__(
         self,
         source_dist: Any,
         target_dist: Any,
-        to_types: str,
+        p: Optional[Any] = None,
+        q: Optional[Any] = None,
+        device: str = "cpu",
+        to_types: str = "numpy",
         data_type: str = 'double',
         max_iter: int = 1000,
         numItermax: int = 1000,
         n_iter: int = 20,
-        fix_random_init_seed:Optional[int] = None,
+        fix_random_init_seed: Optional[int] = None,
+        gw_type:str = "entropic_gromov_wasserstein",
+        sinkhorn_method: str = "sinkhorn",
+        instance_name: Optional[str]= None,
+        *,
+        first_random_init_seed: Optional[int] = None,
+        tol: float = 1e-9,
+        verbose: bool = False,
+        m: Optional[float]=None,
     ) -> None:
         """Initialize the Gromov-Wasserstein alignment computation object.
 
@@ -239,6 +260,7 @@ class MainGromovWasserstainComputation:
                                         Dissimilarity matrix of the source data.
             target_dist (Any):          Array-like, shape (n_target, n_target).
                                         Dissimilarity matrix of the target data.
+            device (str):                 The device to be used for computation, either "cpu" or "cuda".
             to_types (str, optional):   Specifies the type of data structure to be used,
                                         either "torch" or "numpy". Defaults to "torch".
             data_type (str, optional):  Specifies the type of data to be used
@@ -250,20 +272,42 @@ class MainGromovWasserstainComputation:
                                         Sinkhorn algorithm. Defaults to 1000.
             n_iter (int, optional):     Number of initial plans evaluated in single optimization.
                                         Defaults to 20.
+            fix_random_init_seed (int, optional): Seed for generating the random initial matrix.
+            gw_type (str, optional):    The type of Gromov-Wasserstein alignment.
+                                        Options are "entropic_gromov_wasserstein",  "entropic_semirelaxed_gromov_wasserstein",  or "entropic_partial_gromov_wasserstein".
+                                        Defaults to "entropic_gromov_wasserstein".
+            sinkhorn_method (str, optional): The method used for Sinkhorn algorithm.
+                                        Options are "sinkhorn", "sinkhorn_stabilized", or "sinkhorn_epsilon_scaling".
+                                        Defaults to "sinkhorn".
+            first_random_init_seed (int, optional): The first seed for generating the random initial matrix.
+            tol (float, optional):      Stop threshold on error. Defaults to 1e-9.
+            verbose (bool, optional):   Print information along iterations. Defaults to False.
+            m (Optional[float], optional): The number of points to be used in partial Gromov-Wasserstein alignment.
+                                        Defaults to None.
         """
+
         self.to_types = to_types
         self.data_type = data_type
+        self.device = device
+        self.instance_name = instance_name
 
-        p = ot.unif(len(source_dist))
-        q = ot.unif(len(target_dist))
+        if p is None:
+            p = ot.unif(len(source_dist))
+        if q is None:
+            q = ot.unif(len(target_dist))
+
+        assert np.isclose(p.sum(), 1.0, atol=1e-8), "p must be a distribution."
+        assert np.isclose(q.sum(), 1.0, atol=1e-8), "q must be a distribution."
+        
+        # init matrix
+        self.init_mat_builder = InitMatrix(len(source_dist), len(target_dist), p, q)
 
         self.source_dist, self.target_dist, self.p, self.q = source_dist, target_dist, p, q
-
-        self.source_size = len(source_dist)
-        self.target_size = len(target_dist)
-
-        # init matrix
-        self.init_mat_builder = InitMatrix(self.source_size, self.target_size)
+        
+        self.back_end = Backend(device, to_types, data_type)
+        
+        self.ot_row_check = np.array([1.0/len(target_dist)] * len(target_dist))
+        self.ot_col_check = np.array([1.0/len(source_dist)] * len(source_dist))
 
         # parameter for entropic gw alignment by POT
         self.max_iter = max_iter
@@ -273,115 +317,161 @@ class MainGromovWasserstainComputation:
 
         # the number of iteration mainly used for random init matrix.
         self.n_iter = n_iter
-
-        self.back_end = Backend("cpu", self.to_types, self.data_type)
         
+        # fix the seed for random init matrix.
         self.fix_random_init_seed = fix_random_init_seed
         
         if self.fix_random_init_seed is not None:
-            self.fix_seed = [i for i in range(fix_random_init_seed)]
+            if first_random_init_seed is not None:
+                self.fix_seed = [i for i in range(first_random_init_seed, first_random_init_seed + fix_random_init_seed)]
+            else:
+                self.fix_seed = [i for i in range(fix_random_init_seed)]
+
+        # sinkhorn method
+        self.sinkhorn_method = sinkhorn_method
         
-    def entropic_gw(
-        self,
-        device: str,
-        eps: float,
-        T: Any,
-        tol: float = 1e-9,
-        sinkhorn_method: str = "sinkhorn",
-        verbose: bool = False
-    ) -> Dict[str, Any]:
-        """Performs the entropic Gromov-Wasserstein alignment.
+        # gw method
+        self.gw_type = gw_type
 
-        This function utilizes Sinkhorn's algorithm to iteratively solve the entropic Gromov-Wasserstein problem.
-        The algorithm terminates when the error between iterations is less than the provided tolerance or
-        when the maximum number of iterations is reached.
+        # parameters for gw alignment
+        self.verbose = verbose        
+        self.tol = tol
+        
+        if self.gw_type == "entropic_partial_gromov_wasserstein":
+            self.tol = 1e-7
+            self.m = m
+
+    # main function
+    def compute_GW_with_init_plans(
+        self,
+        trial: optuna.trial.Trial,
+        eps: float,
+        init_mat_plan: str,
+    ) -> Tuple[dict, optuna.trial.Trial]:
+        """Calculate Gromov-Wasserstein alignment with user-specified parameters.
 
         Args:
-            device (str):   The device to be used for computation, either "cpu" or "cuda".
-            epsilon (float):    Regularization term for Gromov-Wasserstein alignment.
-            T (Any):    Initial plan for Gromov-Wasserstein alignment.
-            tol (float, optional):  Stop threshold on error. Defaults to 1e-9.
-            sinkhorn_method (str, optional):    Method used for the solver. Options are "sinkhorn",
-                                                "sinkhorn_log", "greenkhorn", "sinkhorn_stabilized",
-                                                or "sinkhorn_epsilon_scaling". Defaults to "sinkhorn".
-            verbose (bool, optional): Print information along iterations. Defaults to False.
+            trial (optuna.trial.Trial): 
+                The trial object from the Optuna.
+            eps (float): 
+                Regularization term.
+            init_mat_plan (str): 
+                The initialization method of transportation plan for Gromov-Wasserstein alignment.
+                Options are "random", "permutation", "user_define", "uniform", or "diag".
+
+        Raises:
+            optuna.TrialPruned: If all iterations failed with the given parameters.
+            ValueError: If the initialization matrix method is not defined.
 
         Returns:
-            log (Dict[str, Any]):  A dictionary containing the optimization results.
+            best_logv (dict): The dictionary containing the Gromov-Wasserstein loss(distance) and accuracy.
+            trial (optuna.trial.Trial): The trial object from the Optuna.
         """
 
-        # all the variable are placed on "device" here.
-        self.back_end.device = device
-        C1, C2, p, q, T = self.back_end(self.source_dist, self.target_dist, self.p, self.q, T)
-        constC, hC1, hC2 = ot.gromov.init_matrix(C1, C2, p, q, loss_fun="square_loss")
+        # define init matrices and seeds
+        if init_mat_plan in ["uniform", "diag"]:
+            seeds = None
+            init_mat_list = [self.init_mat_builder.make_initial_T(init_mat_plan)]  # 1 initial matrix
 
-        cpt = 0
-        err = 1
-        log = {"err": []}
+        elif init_mat_plan in ["random", "permutation"]:
+            if self.fix_random_init_seed is None:
+                seeds = np.random.randint(0, 100000, self.n_iter)
+            else:
+                seeds = [self.fix_seed.pop(i) for i in range(self.n_iter)]
+                
+            init_mat_list = [self.init_mat_builder.make_initial_T(init_mat_plan, seed) for seed in seeds]  # n_iter initial matrices
 
-        while err > tol and cpt < self.max_iter:
-            Tprev = T
-            tens = ot.gromov.gwggrad(constC, hC1, hC2, T)
-            T = ot.bregman.sinkhorn(p, q, tens, eps, method=sinkhorn_method, numItermax=self.numItermax)
-
-            if cpt % 10 == 0:
-                err = self.back_end.nx.norm(T - Tprev)
-                if log:
-                    log["err"].append(err)
-                if verbose:
-                    if cpt % 200 == 0:
-                        print("{:5s}|{:12s}".format("It.", "Err") + "\n" + "-" * 19)
-                    print("{:5d}|{:8e}|".format(cpt, err))
-            cpt += 1
-
-        log["gw_dist"] = ot.gromov.gwloss(constC, hC1, hC2, T)
-        log["ot"] = T
-
-        return log
-
-    def gw_alignment_computation(
-        self,
-        init_mat: Any,
-        eps: float,
-        device: str,
-        sinkhorn_method: str = "sinkhorn",
-    ) -> Dict[str, Any]:
-        """Modify the result of Gromov-Wasserstein alignment to make it easier to optimize.
-
-        Args:
-            init_mat (Any): The initial value of transportation plan for Gromov-Wasserstein alignment.
-            eps (float):    Regularization term for Gromov-Wasserstein alignment.
-            device (str):   The device to be used for computation, either "cpu" or "cuda".
-            sinkhorn_method (str, optional):    Method used for the solver. Options are "sinkhorn", "sinkhorn_log",
-                                                "greenkhorn", "sinkhorn_stabilized", or "sinkhorn_epsilon_scaling".
-                                                Defaults to "sinkhorn".
-
-        Returns:
-            log:    A dictionary containing the optimization results.
-        """
-
-        logv = self.entropic_gw(
-            device,
-            eps,
-            init_mat,
-            sinkhorn_method=sinkhorn_method,
-        )
-
-        if self.back_end.check_zeros(logv["ot"]):
-            logv["gw_dist"] = float("nan")
-            logv["acc"] = float("nan")
+        elif init_mat_plan == "user_define":
+            seeds = None
+            init_mat_list = self.init_mat_builder.user_define_init_mat_list
 
         else:
-            pred = self.back_end.nx.argmax(logv["ot"], 1)
-            correct = (pred == self.back_end.nx.arange(len(logv["ot"]), type_as=logv["ot"])).sum()
-            logv["acc"] = correct / len(logv["ot"])
+            raise ValueError("Not defined initialize matrix.")
 
-        return logv
+        best_logv, trial = self._compute_GW_with_init_plans(
+            trial,
+            eps,
+            init_mat_plan,
+            init_mat_list,
+            seeds=seeds
+        )
+
+        return best_logv, trial
+
+    def _compute_GW_with_init_plans(
+        self,
+        trial: optuna.trial.Trial,
+        eps: float,
+        init_mat_plan: str,
+        init_mat_list: List[Any],
+        seeds: Optional[Iterable[int]] = None,
+    ) -> Tuple[dict, optuna.trial.Trial, Optional[bool]]:
+        """Computes the Gromov-Wasserstein alignment with the provided initial transportation plan.
+
+        Args:
+            trial (optuna.trial.Trial): The trial object from the Optuna.
+            init_mat_plan (str): The initialization method of transportation plan for Gromov-Wasserstein alignment.
+                                 Options are "random", "permutation", "user_define", "uniform", or "diag".
+            eps (float): Regularization term.
+            init_mat_list (List[Any]): The list of initial transportation plans.
+            seed (Any, optional): Seed for generating the initial matrix. Defaults to None.
+
+        Returns:
+            logv (dict): The dictionary containing the Gromov-Wasserstein loss(distance) and accuracy.
+            trial (optuna.trial.Trial): The trial object from the Optuna.
+            best_flag (Optional[bool]): The flag indicating whether the current trial is the best trial.
+        """
+
+        # set pseudo seeds
+        if seeds is None:
+            seeds = np.zeros(len(init_mat_list))
+
+        best_gw_loss = float("inf")
+
+        pbar = tqdm(zip(init_mat_list, seeds), total=len(init_mat_list))
+        pbar.set_description(f"{self.instance_name} No.{trial.number}, eps:{eps:.3e}")
+
+        for i, (init_mat, seed) in enumerate(pbar):
+            logv = self.gw_computation(eps, init_mat)
+
+            if logv["gw_dist"] < best_gw_loss:
+                best_gw_loss = logv["gw_dist"]
+                best_logv = logv
+
+                trial = self._save_results(
+                    logv["gw_dist"],
+                    logv["acc"],
+                    logv["err"][-1],
+                    trial,
+                    init_mat_plan,
+                    num_iter=i,
+                    seed=seed,
+                )
+                
+                elapsed_time = pbar.format_dict["elapsed"]
+                trial.set_user_attr("elapsed_time", elapsed_time)
+
+            self._check_pruner_should_work(
+                logv["gw_dist"],
+                trial,
+                init_mat_plan,
+                eps,
+                num_iter=i,
+            )
+            
+
+        if math.isinf(best_gw_loss) or best_gw_loss <= 0.0 or math.isnan(best_gw_loss):
+            raise optuna.TrialPruned(
+                f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}"
+            )
+
+        return best_logv, trial
 
     def _save_results(
         self,
         gw_loss: float,
         acc: float,
+        err: float, 
         trial: optuna.trial.Trial,
         init_mat_plan: str,
         num_iter: Optional[int] = None,
@@ -395,6 +485,7 @@ class MainGromovWasserstainComputation:
         Args:
             gw_loss (float): The Gromov-Wasserstein loss(distance).
             acc (float): The accuracy of the optimal transportation plan.
+            err (float): The error after the while loop in main computation.
             trial (optuna.trial.Trial): The trial object from the Optuna.
             init_mat_plan (str):    The initialization method of transportation plan for Gromov-Wasserstein alignment.
                                     Options are "random", "permutation", "user_define", "uniform", or "diag".
@@ -405,14 +496,18 @@ class MainGromovWasserstainComputation:
             trial (optuna.trial.Trial): The trial object from the Optuna.
         """
 
-        gw_loss, acc = self.back_end.get_item_from_torch_or_jax(gw_loss, acc)
+        gw_loss, acc, err = self.back_end.get_item_from_torch_or_jax(gw_loss, acc, err)
 
         trial.set_user_attr("best_acc", acc)
-        if init_mat_plan in ["random", "permutation"]:
-            assert num_iter is not None, "num_iter must be provided for random and permutation initialization."
-            assert seed is not None, "seed must be provided for random and permutation initialization."
+        trial.set_user_attr("error", err)
+        
+        if init_mat_plan in ["random", "permutation", "user_define"]:
+            assert num_iter is not None, "num_iter must be provided for random, permutation and user_define initialization."
             trial.set_user_attr("best_iter", num_iter)
-            trial.set_user_attr("best_seed", int(seed))
+
+            if init_mat_plan in ["random", "permutation"]:
+                assert seed is not None, "seed must be provided for random and permutation initialization."
+                trial.set_user_attr("best_seed", int(seed))
 
         return trial
 
@@ -467,158 +562,238 @@ class MainGromovWasserstainComputation:
                     f"Trial for '{init_mat_plan}' was pruned at iteration {num_iter} with parameters: {{'eps': {eps:.5e}, 'gw_loss': '{gw_loss:.5e}'}}"
                 )
 
-    def _compute_GW_with_init_plans(
-        self,
-        trial: optuna.trial.Trial,
-        init_mat_plan: str,
-        eps: float,
-        device: str,
-        sinkhorn_method: str,
-        num_iter: Optional[int] = None,
-        seed: Optional[Any] = None
-    ) -> Tuple[dict, optuna.trial.Trial, Optional[bool]]:
-        """Computes the Gromov-Wasserstein alignment with the provided initial transportation plan.
+    def gw_computation(self, eps: float, T: Any) -> Dict[str, Any]:
+        """Performs the entropic Gromov-Wasserstein alignment.
+
+        This function utilizes Sinkhorn's algorithm to iteratively solve the entropic Gromov-Wasserstein problem.
+        The algorithm terminates when the error between iterations is less than the provided tolerance or
+        when the maximum number of iterations is reached.
 
         Args:
-            trial (optuna.trial.Trial): The trial object from the Optuna.
-            init_mat_plan (str): The initialization method of transportation plan for Gromov-Wasserstein alignment.
-                                 Options are "random", "permutation", "user_define", "uniform", or "diag".
-            eps (float): Regularization term.
-            device (str): The device to be used for computation, either "cpu" or "cuda".
-            sinkhorn_method (str): Method used for the solver. Options are "sinkhorn", "sinkhorn_log", "greenkhorn",
-                                   "sinkhorn_stabilized", or "sinkhorn_epsilon_scaling".
-            num_iter (int, optional): The number of optimizations within a single trial. Defaults to None.
-            seed (Any, optional): Seed for generating the initial matrix. Defaults to None.
+            epsilon (float):    Regularization term for Gromov-Wasserstein alignment.
+            T (Any):    Initial plan for Gromov-Wasserstein alignment.
+            tol (float, optional):  Stop threshold on error. Defaults to 1e-9.
 
         Returns:
-            logv (dict): The dictionary containing the Gromov-Wasserstein loss(distance) and accuracy.
-            trial (optuna.trial.Trial): The trial object from the Optuna.
-            best_flag (Optional[bool]): The flag indicating whether the current trial is the best trial.
+            log (Dict[str, Any]):  A dictionary containing the optimization results.
         """
+        if self.gw_type == "entropic_gromov_wasserstein":
+            logv = self.entropic_gw_computation(eps, T)
 
-        if init_mat_plan == "user_define":
-            init_mat = seed
+        elif self.gw_type == "entropic_semirelaxed_gromov_wasserstein":
+            logv = self.entropic_semirelaxed_gw_computation(eps, T)
+
+        elif self.gw_type == "entropic_partial_gromov_wasserstein":
+            logv = self.entropic_partial_gw_computation(eps, T)
+
         else:
-            init_mat = self.init_mat_builder.make_initial_T(init_mat_plan, seed)
+            raise ValueError(f"gw type {self.gw_type} is not defined.")
 
-        logv = self.gw_alignment_computation(
-            init_mat,
-            eps,
-            device,
-            sinkhorn_method=sinkhorn_method,
-        )
+        return logv
 
-        if init_mat_plan in ["uniform", "diag"]:
-            best_flag = None
-            trial = self._save_results(
-                logv["gw_dist"],
-                logv["acc"],
-                trial,
-                init_mat_plan,
-            )
+    def entropic_gw_computation(self, eps: float, T: Any) -> Dict[str, Any]:
+        """Performs the entropic Gromov-Wasserstein alignment.
 
-        elif init_mat_plan in ["random", "permutation", "user_define"]:
-            if logv["gw_dist"] < self.best_gw_loss:
-                best_flag = True
-                self.best_gw_loss = logv["gw_dist"]
-
-                trial = self._save_results(
-                    logv["gw_dist"],
-                    logv["acc"],
-                    trial,
-                    init_mat_plan,
-                    num_iter=num_iter,
-                    seed=seed,
-                )
-
-            else:
-                best_flag = False
-
-        self._check_pruner_should_work(
-            logv["gw_dist"],
-            trial,
-            init_mat_plan,
-            eps,
-            num_iter=num_iter,
-        )
-
-        return logv, trial, best_flag
-
-    def compute_GW_with_init_plans(
-        self,
-        trial: optuna.trial.Trial,
-        eps: float,
-        init_mat_plan: str,
-        device: str,
-        sinkhorn_method = "sinkhorn"
-    ) -> Tuple[dict, optuna.trial.Trial]:
-        """Calculate Gromov-Wasserstein alignment with user-specified parameters.
+        This function utilizes Sinkhorn's algorithm to iteratively solve the entropic Gromov-Wasserstein problem.
+        The algorithm terminates when the error between iterations is less than the provided tolerance or
+        when the maximum number of iterations is reached.
 
         Args:
-            trial (optuna.trial.Trial): The trial object from the Optuna.
-            eps (float): Regularization term.
-            init_mat_plan (str): The initialization method of transportation plan for Gromov-Wasserstein alignment.
-                                    Options are "random", "permutation", "user_define", "uniform", or "diag".
-            device (str): The device to be used for computation, either "cpu" or "cuda".
-            sinkhorn_method (str, optional): Method used for the solver. Options are "sinkhorn", "sinkhorn_log", "greenkhorn",
-                                                "sinkhorn_stabilized", or "sinkhorn_epsilon_scaling". Defaults to "sinkhorn".
-
-        Raises:
-            optuna.TrialPruned: If all iterations failed with the given parameters.
-            ValueError: If the initialization matrix method is not defined.
+            epsilon (float):    Regularization term for Gromov-Wasserstein alignment.
+            T (Any):    Initial plan for Gromov-Wasserstein alignment.
 
         Returns:
-            logv (dict): The dictionary containing the Gromov-Wasserstein loss(distance) and accuracy.
-            trial (optuna.trial.Trial): The trial object from the Optuna.
+            log (Dict[str, Any]):  A dictionary containing the optimization results.
         """
+        
+        # all the variable are placed on "device" here.
+        C1, C2, p, q, T = self.back_end(
+            self.source_dist, 
+            self.target_dist, 
+            self.p, 
+            self.q, 
+            T
+        )
+    
+        constC, hC1, hC2 = ot.gromov.init_matrix(C1, C2, p, q, loss_fun="square_loss")
 
-        if init_mat_plan in ["uniform", "diag"]:
-            logv, trial, _ = self._compute_GW_with_init_plans(
-                trial,
-                init_mat_plan,
-                eps,
-                device,
-                sinkhorn_method,
-            )
-            return logv, trial
+        cpt = 0
+        err = 1
+        logv = {"err": []}
 
-        elif init_mat_plan in ["random", "permutation", "user_define"]:
-            self.best_gw_loss = float("inf")
+        while (err > self.tol and cpt < self.max_iter):
+            Tprev = T
+            tens = ot.gromov.gwggrad(constC, hC1, hC2, T)
+            T = ot.bregman.sinkhorn(p, q, tens, eps, method=self.sinkhorn_method, numItermax=self.numItermax)
 
-            if init_mat_plan in ["random", "permutation"]:
-                if self.fix_random_init_seed is None:
-                    pbar = tqdm(np.random.randint(0, 100000, self.n_iter))
-                else:
-                    pbar = tqdm([self.fix_seed.pop(i) for i in range(self.n_iter)])
+            if cpt % 10 == 0:
+                err = self.back_end.nx.norm(T - Tprev)
 
-            if init_mat_plan == "user_define":
-                pbar = tqdm(self.init_mat_builder.user_define_init_mat_list)
+                logv["err"].append(err)
+
+                if self.verbose:
+                    if cpt % 200 == 0:
+                        print("{:5s}|{:12s}".format("It.", "Err") + "\n" + "-" * 19)
+                    print("{:5d}|{:8e}|".format(cpt, err))
             
-            pbar.set_description(f"Trial No.{trial.number}, eps:{eps:.3e}")
-
-            for i, seed in enumerate(pbar):
-                logv, trial, best_flag = self._compute_GW_with_init_plans(
-                    trial,
-                    init_mat_plan,
-                    eps,
-                    device,
-                    sinkhorn_method,
-                    num_iter=i,
-                    seed=seed,
-                )
-
-                if best_flag:
-                    best_logv = logv
-
-            if math.isinf(self.best_gw_loss) or self.best_gw_loss <= 0.0 or math.isnan(self.best_gw_loss):
-                raise optuna.TrialPruned(
-                    f"All iteration was failed with parameters: {{'eps': {eps}, 'initialize': '{init_mat_plan}'}}"
-                )
-
-            else:
-                return best_logv, trial
+            cpt += 1
 
         else:
-            raise ValueError("Not defined initialize matrix.")
+            # if the while loop is not broken
+            logv["gw_dist"] = ot.gromov.gwloss(constC, hC1, hC2, T)
+            logv["ot"] = T
+            logv["cpt"] = cpt
+                        
+            # original POT function
+            if abs(self.back_end.nx.sum(T) - 1) > 1e-5:
+                warnings.warn("Solver failed to produce a transport plan (checked by original POT). ")
+                logv["gw_dist"] = float("nan")
+                logv["acc"] = float("nan")
+                return logv
+
+            # additonal part   
+            if self.back_end.check_zeros(logv["ot"]):
+                logv["gw_dist"] = float("nan")
+                logv["acc"] = float("nan")
+                return logv
+
+            else:
+                pred = self.back_end.nx.argmax(logv["ot"], 1)
+                correct = (pred == self.back_end.nx.arange(len(logv["ot"]), type_as=logv["ot"])).sum()
+                logv["acc"] = correct / len(logv["ot"])
+                return logv            
+        
+
+    def entropic_semirelaxed_gw_computation(self, eps: float, T: Any) -> Dict[str, Any]:
+        """Performs the entropic Gromov-Wasserstein alignment.
+
+        This function utilizes Sinkhorn's algorithm to iteratively solve the entropic Gromov-Wasserstein problem.
+        The algorithm terminates when the error between iterations is less than the provided tolerance or
+        when the maximum number of iterations is reached.
+
+        Args:
+            epsilon (float):    Regularization term for Gromov-Wasserstein alignment.
+            T (Any):    Initial plan for Gromov-Wasserstein alignment.
+
+        Returns:
+            log (Dict[str, Any]):  A dictionary containing the optimization results.
+        """
+
+        # all the variable are placed on "device" here.
+        C1, C2, p, q, T = self.back_end(self.source_dist, self.target_dist, self.p, self.q, T)
+        constC, hC1, hC2, fC2t = ot.gromov.init_matrix_semirelaxed(C1, C2, p, loss_fun="square_loss")
+        ones_p = self.back_end.nx.ones(p.shape, type_as=p)
+
+        def df(G):
+            qG = self.back_end.nx.sum(G, 0)
+            marginal_product = self.back_end.nx.outer(ones_p, self.back_end.nx.dot(qG, fC2t))
+            return ot.gromov.gwggrad(constC + marginal_product, hC1, hC2, G, self.back_end.nx)
+
+        cpt = 0
+        err = 1e15
+
+        logv = {"err": []}
+
+        while (err > self.tol and cpt < self.max_iter):
+            Tprev = T
+            # compute the kernel
+            K = T * self.back_end.nx.exp(- df(T) / eps)
+            scaling = p / self.back_end.nx.sum(K, 1)
+            T = self.back_end.nx.reshape(scaling, (-1, 1)) * K
+            if cpt % 10 == 0:
+                err = self.back_end.nx.norm(T - Tprev)
+                logv["err"].append(err)
+
+                if self.verbose:
+                    if cpt % 200 == 0:
+                        print("{:5s}|{:12s}".format("It.", "Err") + "\n" + "-" * 19)
+                    print("{:5d}|{:8e}|".format(cpt, err))
+            cpt += 1
+
+        qT = self.back_end.nx.sum(T, 0)
+        marginal_product = self.back_end.nx.outer(ones_p, self.back_end.nx.dot(qT, fC2t))
+
+        logv['gw_dist'] = ot.gromov.gwloss(constC + marginal_product, hC1, hC2, T, self.back_end.nx)
+        logv["ot"] = T
+        logv["cpt"] = cpt
+
+        # original part
+        if self.back_end.check_zeros(logv["ot"]):
+            logv["gw_dist"] = float("nan")
+            logv["acc"] = float("nan")
+
+        else:
+            pred = self.back_end.nx.argmax(logv["ot"], 1)
+            correct = (pred == self.back_end.nx.arange(len(logv["ot"]), type_as=logv["ot"])).sum()
+            logv["acc"] = correct / len(logv["ot"])
+
+        return logv
+
+    def entropic_partial_gw_computation(self, eps: float, T: Any) -> Dict[str, Any]:
+        """Performs the entropic partial Gromov-Wasserstein alignment.
+
+        This function utilizes Sinkhorn's algorithm to iteratively solve the entropic Gromov-Wasserstein problem.
+        The algorithm terminates when the error between iterations is less than the provided tolerance or
+        when the maximum number of iterations is reached.
+
+        Args:
+            epsilon (float):    Regularization term for Gromov-Wasserstein alignment.
+            T (Any):    Initial plan for Gromov-Wasserstein alignment.
+
+        Returns:
+            log (Dict[str, Any]):  A dictionary containing the optimization results.
+        """
+
+        # all the variable are placed on "device" here.
+        C1, C2, p, q, T = self.back_end(self.source_dist, self.target_dist, self.p, self.q, T)
+
+        if self.m is None:
+            self.m = np.min((np.sum(p), np.sum(q)))
+
+        elif self.m < 0:
+            raise ValueError("Problem infeasible. Parameter m should be greater than 0.")
+        
+        elif self.m > np.min((np.sum(p), np.sum(q))):
+            raise ValueError("Problem infeasible. Parameter m should lower or"
+                            " equal than min(|a|_1, |b|_1).")
+
+        cpt = 0
+        err = 1
+
+        logv = {"err": []}
+
+        while (err > self.tol and cpt < self.max_iter):
+            Tprev = T
+            M_entr = ot.partial.gwgrad_partial(C1, C2, T)
+            T = ot.partial.entropic_partial_wasserstein(p, q, M_entr, eps, self.m)
+
+            if cpt % 10 == 0:  # to speed up the computations
+                err =  self.back_end.nx.norm(T - Tprev)
+                logv['err'].append(err)
+
+                if self.verbose:
+                    if cpt % 200 == 0:
+                        print('{:5s}|{:12s}|{:12s}'.format(
+                            'It.', 'Err', 'Loss') + '\n' + '-' * 31)
+                    print('{:5d}|{:8e}|{:8e}'.format(cpt, err, ot.partial.gwloss_partial(C1, C2, T)))
+
+            cpt += 1
+
+        logv['gw_dist'] = ot.partial.gwloss_partial(C1, C2, T)
+        logv["ot"] = T
+        logv["cpt"] = cpt
+
+        # original part
+        if self.back_end.check_zeros(logv["ot"]):
+            logv["gw_dist"] = float("nan")
+            logv["acc"] = float("nan")
+
+        else:
+            pred = self.back_end.nx.argmax(logv["ot"], 1)
+            correct = (pred == self.back_end.nx.arange(len(logv["ot"]), type_as=logv["ot"])).sum()
+            logv["acc"] = correct / len(logv["ot"])
+
+        return logv
+
 
 # %%

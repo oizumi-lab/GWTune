@@ -1,16 +1,17 @@
 import colorsys
 from typing import Any, List, Tuple, Optional
-
+import os
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from matplotlib.patches import Rectangle
 from matplotlib.patches import Rectangle
 import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib.patches import Rectangle
 from mpl_toolkits.mplot3d import Axes3D
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE, Isomap, MDS
-
+import pandas as pd
+from matplotlib.colors import LogNorm
 
 def get_color_labels(
     n: int,
@@ -28,26 +29,9 @@ def get_color_labels(
         color_labels (List): color labels for each objects
     """
 
-    # Set the saturation and lightness values to maximum
-    saturation = 1.0
-    lightness = 0.5
-
-    if hue == "warm":
-        hue_list = np.linspace(-0.2, 0.1, n)
-    elif hue == "cool":
-        hue_list = np.linspace(0.5, 0.8, n)
-    else:
-        hue_list = np.linspace(0, 1, n, endpoint = False)
-
-    # Create a list to store the color labels
-    color_labels = []
-
-    # Generate the color labels
-    for i in range(n):
-        hue = hue_list[i]
-        r, g, b = colorsys.hls_to_rgb(hue, lightness, saturation)
-        color_labels.append((r, g, b))
-
+    cm = plt.get_cmap(hue)
+    color_labels = [cm(v) for v in np.linspace(0, 1, n)]
+    
     if show_labels:
         # Show color labels
         plt.figure(figsize=(10, 5))
@@ -57,7 +41,6 @@ def get_color_labels(
         plt.show()
 
     return color_labels
-
 
 def get_color_labels_for_category(
     n_category_list: List[int],
@@ -109,12 +92,14 @@ def get_color_labels_for_category(
 def add_colored_label(ax, x, y, bgcolor, width=1, height=1):
     rect = Rectangle((x, y), width, height, facecolor=bgcolor)
     ax.add_patch(rect)
+def add_colored_label(ax, x, y, bgcolor, width=1, height=1):
+    rect = Rectangle((x, y), width, height, facecolor=bgcolor)
+    ax.add_patch(rect)
 
 def show_heatmap(
     matrix: Any,
     title: Optional[str],
     save_file_name: Optional[str] = None,
-    ticks: Optional[str] = None,
     category_name_list: Optional[List[str]] = None,
     num_category_list: Optional[List[int]] = None,
     x_object_labels: Optional[List[str]] = None,
@@ -155,11 +140,13 @@ def show_heatmap(
     cbar_ticks_size = kwargs.get("cbar_ticks_size", 20)
     xticks_size = kwargs.get('xticks_size', 20)
     yticks_size = kwargs.get('yticks_size', 20)
-    cbar_format = kwargs.get('cbar_format', None)#"%.2e"
+    cbar_format = kwargs.get('cbar_format', None)
     cbar_label = kwargs.get('cbar_label', None)
     cbar_label_size = kwargs.get('cbar_label_size', 20)
+    cbar_range = kwargs.get('cbar_range', None)
     cmap = kwargs.get('cmap', 'cividis')
 
+    ticks = kwargs.get('ticks', None)
     ot_object_tick = kwargs.get("ot_object_tick", False)
     ot_category_tick = kwargs.get("ot_category_tick", False)
 
@@ -168,11 +155,13 @@ def show_heatmap(
     category_line_style = kwargs.get('category_line_style', 'dashed')
     category_line_color = kwargs.get('category_line_color', 'C2')
 
-    font = kwargs.get('font', 'Noto Sans CJK JP')
+    font = kwargs.get('font', 'Arial')
     show_figure = kwargs.get('show_figure', True)
     
     color_labels = kwargs.get('color_labels', None)
     color_label_width = kwargs.get('color_label_width', None)
+    
+    dpi = kwargs.get('dpi', 300)
 
     plt.style.use("default")
     plt.rcParams["grid.color"] = "black"
@@ -189,7 +178,7 @@ def show_heatmap(
         raise(ValueError, "please turn off either 'ot_category_tick' or 'ot_object_tick'.")
 
     if not ot_object_tick and ot_category_tick:
-        assert category_name_list is not None
+        assert category_name_list is not None, "please provide 'category_name_list' or set `OT_format` or `sim_mat_format` to `sorted`."
         assert num_category_list is not None
 
         if ticks == "objects":
@@ -198,8 +187,8 @@ def show_heatmap(
 
         elif ticks == "category":
             label_pos = [sum(num_category_list[:i + 1]) for i in range(len(category_name_list))]
-            plt.xticks(label_pos, labels = category_name_list, rotation = xticks_rotation, size = xticks_size, fontweight = "bold")
-            plt.yticks(label_pos, labels = category_name_list, rotation = yticks_rotation, size = yticks_size, fontweight = "bold")
+            plt.xticks(label_pos, labels = category_name_list, rotation = xticks_rotation, size = xticks_size)
+            plt.yticks(label_pos, labels = category_name_list, rotation = yticks_rotation, size = yticks_size)
 
             if draw_category_line:
                 for pos in label_pos:
@@ -208,9 +197,7 @@ def show_heatmap(
 
 
     if ot_object_tick and not ot_category_tick:
-        if ticks == "numbers":
-            # plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = xticks_size, rotation = xticks_rotation)
-            # plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = yticks_size, rotation = yticks_rotation)
+        if ticks is None:
             pass
         elif ticks == "objects":
             # assert object_labels is not None
@@ -237,18 +224,36 @@ def show_heatmap(
         
         for spine in ax.spines.values():
             spine.set_visible(False)
+    
+    if color_labels is not None:
+        for idx, color in enumerate(color_labels):
+            add_colored_label(ax, -color_label_width, idx, color, width=color_label_width)
+            add_colored_label(ax, idx, matrix.shape[0], color, height=color_label_width)
+
+        ax.set_aspect('equal')
+        ax.set_xlim(-color_label_width, matrix.shape[1])
+        ax.set_ylim(matrix.shape[0] + color_label_width, 0)
+        
+        for spine in ax.spines.values():
+            spine.set_visible(False)
 
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.1)
 
     cbar = fig.colorbar(aximg, cax=cax, format = cbar_format)
     cbar.set_label(cbar_label, size = cbar_label_size)
+    
+    if cbar_range is not None:
+        cmin, cmax = cbar_range
+        cbar.mappable.set_clim(cmin, cmax)
+    
+    
     cbar.ax.tick_params(axis='y', labelsize = cbar_ticks_size)
 
     plt.tight_layout()
 
     if save_file_name is not None:
-        plt.savefig(save_file_name)
+        plt.savefig(save_file_name, bbox_inches='tight', dpi=dpi)
 
     if show_figure:
         plt.show()
@@ -275,279 +280,405 @@ def plot_lower_triangular_histogram(matrix: Any, title: str) -> None:
     plt.show()
 
 
-class VisualizeEmbedding():
-    """A class to visualize embeddings in either 2D or 3D using PCA.
+def plot_embedding(
+    embedding_list: List[np.ndarray],
+    dim: int,
+    name_list: List[str],
+    category_name_list: Optional[List[str]] = None,
+    num_category_list: Optional[List[int]] = None,
+    title: Optional[str] = None,
+    has_legend: bool = True,
+    fig_name: str = "Aligned_embedding",
+    fig_dir: Optional[str] = None,
+    **kwargs,
+) -> matplotlib.axes.Axes:
+    """Plot the aligned embedding.
 
-    This class provides functions to visualize embeddings in a 2D or 3D space. Through the use of PCA, this class allows for
-    the reduction of high-dimensional embeddings down to 2 or 3 dimensions for visualization purposes. The class offers various
-    customization options, including the ability to color-code and differentiate multiple embeddings based on categories using
-    distinct markers and colors.
+    Args:
+        embedding_list (List[np.ndarray]):
+            low-dimensional embedding list
+        dim (int):
+            Dimension of the embedding. Can be 2 or 3.
+        name_list (List[str]):
+            List of names of the embedding/representation.
+        category_name_list (Optional[List[str]], optional):
+            List of category names. Defaults to None.
+        num_category_list (Optional[List[int]], optional):
+            List of number of categories. Defaults to None.
+        title (Optional[str], optional):
+            Title of the plot. Defaults to None.
+        has_legend (bool, optional):
+            Whether to show the legend. Defaults to True.
+        fig_name (str, optional):
+            Name of the saved figure if `fig_dir` is specified. Defaults to "Aligned_embedding".
+        fig_dir (Optional[str], optional):
+            Directory to save the plot. If None, the figure won't be saved. Defaults to None.
+         **kwargs: 
+            Other keyword arguments for customizing the plot.
 
-    Attributes:
-        embedding_list (List[np.ndarray]): A list of embeddings to be visualized.
-        dim (int): Dimension (either 2 or 3) for the visualization after applying PCA.
-        category_name_list (Optional[List[str]]): List of category names.
-        num_category_list (Optional[List[int]]): List of the number of items in each category.
-        category_idx_list (Optional[List[int]]): Index list for categories.
+    Raises:
+        ValueError: `dim` must be 2 or 3.
+
+    Returns:
+        matplotlib.axes.Axes: embedding plot.
     """
+    figsize = kwargs.get('figsize', (15, 15))
+    xlabel = kwargs.get('xlabel', "PC1")
+    xlabel_size = kwargs.get('xlabel_size', 25)
+    ylabel = kwargs.get('ylabel', "PC2")
+    ylabel_size = kwargs.get('ylabel_size', 25)
+    zlabel = kwargs.get('zlabel', "PC3")
+    zlabel_size = kwargs.get('zlabel_size', 25)
+    title_size = kwargs.get('title_size', 60)
+    legend_size = kwargs.get('legend_size')
+    color_labels = kwargs.get('color_labels', None)
+    color_hue = kwargs.get("color_hue", None)
+    colorbar_label = kwargs.get("colorbar_label", None)
+    colorbar_range = kwargs.get("colorbar_range", [0, 1])
+    colorbar_shrink = kwargs.get("colorbar_shrink", 0.8)
+    markers_list = kwargs.get('markers_list', None)
+    marker_size = kwargs.get('marker_size', 30)
+    cmap = kwargs.get('cmap', "viridis")
+    show_figure = kwargs.get('show_figure', True)
+    font = kwargs.get('font', 'Arial')
+    elev = kwargs.get('elev', 30)
+    azim = kwargs.get('azim' ,60)
+    alpha = kwargs.get('alpha', 1)
+    fig_ext = kwargs.get('fig_ext', "png")
+    dpi = kwargs.get('dpi', 300)
+    
+    if color_labels is None:
 
-    def __init__(
-        self,
-        embedding_list : List[np.ndarray],
-        dim: int,
-        method: Optional[str] = "PCA",
-        method_params: Optional[dict] = None,
-        category_name_list: Optional[List[str]] = None,
-        num_category_list: Optional[List[int]] = None,
-        category_idx_list: Optional[List[int]] = None,
-    ) -> None:
-        """Initialize the VisualizeEmbedding class.
-
-        Args:
-            embedding_list (List[np.ndarray]): A list of embeddings.
-            dim (int): Dimension (either 2 or 3) for the visualization after applying dimensionality reduction.
-            method (Optional[str]): Dimensionality reduction method. Defaults to "PCA". If None, the embedding will not be reduced.
-            category_name_list (Optional[List[str]]): List of category names. Defaults to None.
-            num_category_list (Optional[List[int]]): List of the number of items in each category. Defaults to None.
-            category_idx_list (Optional[List[int]]): Index list for categories. Defaults to None.
-        """
-
-        self.embedding_list = embedding_list
-        if category_idx_list is not None:
-            category_concat_embedding_list = []
-            for embedding in self.embedding_list:
-                concatenated_embedding = np.concatenate([embedding[category_idx_list[i]] for i in range(len(category_name_list))])
-                category_concat_embedding_list.append(concatenated_embedding)
-            self.embedding_list = category_concat_embedding_list
-
-        if method_params is None:
-            method_params = {}
-
-        self.embedding_list = self.apply_dim_reduction_to_embedding_list(
-            n_dim = dim,
-            method = method,
-            show_result = False,
-            **method_params
-        )
-
-        self.dim = dim
-        self.method = method
-        self.category_name_list = category_name_list
-        self.num_category_list = num_category_list
-        self.category_idx_list = category_idx_list
-
-    def apply_dim_reduction_to_embedding_list(
-        self,
-        n_dim: int,
-        method: Optional[str] = "PCA",
-        show_result: bool = True,
-        **kwargs
-    ) -> List[np.ndarray]:
-        """Apply dimensionality reduction to the embedding list.
-
-        Args:
-            embedding_list (list): A list of embeddings.
-            n_dim (int): Dimmension after dimensionality reduction.
-            method (str, optional): Dimensionality reduction method. Defaults to "PCA".
-            show_result (bool, optional): If true, show the cumulative contibution rate. Defaults to True.
-
-        Returns:
-            low_embedding_list (list): A list of embeddings after dimensionality reduction.
-        """
-        if method is None:
-            assert self.embedding_list[0].shape[1] <= 3, "The dimension of the embedding is less than 4. Please set 'method'."
-            low_embedding_list = self.embedding_list
+        if num_category_list is None:
+            color_labels = get_color_labels(
+                embedding_list[0].shape[0],
+                hue = color_hue, 
+                show_labels = False,
+            )
 
         else:
-            emb_transformer = self.load_emb_transformer(method=method, n_dim=n_dim, **kwargs)
-            n_object = self.embedding_list[0].shape[0]
-            embedding_list_cat = np.concatenate([self.embedding_list[i] for i in range(len(self.embedding_list))], axis = 0)
+            color_labels, main_colors = get_color_labels_for_category(
+                num_category_list,
+                min_saturation = 1,
+                show_labels = False
+            )
 
-            low_embedding_list = emb_transformer.fit_transform(embedding_list_cat)
-            low_embedding_list = [low_embedding_list[i*n_object:(i+1)*n_object] for i in range(len(self.embedding_list))]
+    if markers_list is None:
+        markers_list = ['o', 'x', '^', 's', 'v', '<', '>', 'p', '*', 'h', 'H', '+', 'D', 'd', '.', ',', '1', '2', '3', '4', '_', '|'][:len(embedding_list)]
 
-        if show_result:
-            assert method == "PCA", "show_result is only available for PCA."
-            fig = plt.figure()
-            ax = fig.add_subplot(1, 1, 1)
-            plt.gca().get_xaxis().set_major_locator(ticker.MaxNLocator(integer=True))
-            ax.plot([0] + list(np.cumsum(emb_transformer.explained_variance_ratio_)), "-o")
-            plt.xlabel("Number of principal components")
-            plt.ylabel("Cumulative contribution rate")
-            plt.grid()
-            plt.show()
+    plt.style.use("default")
+    plt.rcParams["grid.color"] = "black"
+    plt.rcParams['font.family'] = font
+    
+    if dim == 3:
+        # _, ax = plt.subplots(figsize = figsize, subplot_kw={'projection': '3d'})
 
-        return low_embedding_list
-
-    def load_emb_transformer(
-        self,
-        method: str = "PCA",
-        n_dim: int = 3,
-        **kwargs
-    ) -> Any:
-
-        if method == "PCA":
-            emb_transformer = PCA(n_components=n_dim, **kwargs)
-
-        elif method == "TSNE":
-            emb_transformer = TSNE(n_components=n_dim, **kwargs)
-
-        elif method == "Isomap":
-            emb_transformer = Isomap(n_components=n_dim, **kwargs)
-
-        elif method == "MDS":
-            emb_transformer = MDS(n_components=n_dim, normalized_stress="auto", **kwargs)
-
-        else:
-            raise ValueError(f"Unknown embedding algorithm: {method}")
-
-        return emb_transformer
-
-    def plot_embedding(
-        self,
-        name_list: Optional[List[str]] = None,
-        legend: bool = True,
-        title: Optional[str] = None,
-        save_dir: Optional[str] = None,
-        **kwargs
-    ) -> None:
-        """Plot the embeddings in 2D or 3D space.
-
-        Args:
-            name_list (Optional[List[str]]): Names for each embedding. Defaults to None.
-            legend (bool): Whether or not to show the legend. Defaults to True.
-            title (Optional[str]): Title for the plot. Defaults to None.
-            save_dir (Optional[str]): Directory to save the plot. If None, the plot won't be saved. Defaults to None.
-            **kwargs: Other keyword arguments for customizing the plot.
-
-        Returns:
-            None: Displays or saves the plot.
-        """
-        figsize = kwargs.get('figsize', (15, 15))
-        xlabel = kwargs.get('xlabel', "PC1")
-        xlabel_size = kwargs.get('xlabel_size', 25)
-        ylabel = kwargs.get('ylabel', "PC2")
-        ylabel_size = kwargs.get('ylabel_size', 25)
-        zlabel = kwargs.get('zlabel', "PC3")
-        zlabel_size = kwargs.get('zlabel_size', 25)
-        title_size = kwargs.get('title_size', 60)
-        legend_size = kwargs.get('legend_size')
-        color_labels = kwargs.get('color_labels', None)
-        color_hue = kwargs.get("color_hue", None)
-        colorbar_label = kwargs.get("colorbar_label", None)
-        colorbar_range = kwargs.get("colorbar_range", [0, 1])
-        colorbar_shrink = kwargs.get("colorbar_shrink", 0.8)
-        markers_list = kwargs.get('markers_list', None)
-        marker_size = kwargs.get('marker_size', 30)
-        cmap = kwargs.get('cmap', "viridis")
-        show_figure = kwargs.get('show_figure', True)
-        font = kwargs.get('font', 'Noto Sans CJK JP')
-
-        if color_labels is None:
-            if self.num_category_list is None:
-                color_labels = get_color_labels(self.embedding_list[0].shape[0], hue = color_hue, show_labels = False)
-            else:
-                color_labels, main_colors = get_color_labels_for_category(self.num_category_list, min_saturation = 1, show_labels = False)
-
-        if markers_list is None:
-            markers_list = ['o', 'x', '^', 's', 'v', '<', '>', 'p', '*', 'h', 'H', '+', 'D', 'd', '.', ',', '1', '2', '3', '4', '_', '|'][:len(self.embedding_list)]
-
-        plt.style.use("default")
-        plt.rcParams["grid.color"] = "black"
-        plt.rcParams['font.family'] = font
+        # # Adjust the scale of the axis.
+        # ax.get_proj = lambda: np.dot(Axes3D.get_proj(ax), np.diag([0.9, 0.9, 0.9, 1]))
+        
         fig = plt.figure(figsize = figsize)
+        ax = fig.add_subplot(111, projection='3d')
+    
+    elif dim == 2:
+        _, ax = plt.subplots(figsize = figsize)
+    
+    else:
+        raise ValueError("'dim' is either 2 or 3")
 
-        if self.dim == 3:
-            ax = fig.add_subplot(1, 1, 1, projection='3d')
-            ax.set_xlabel(xlabel, fontsize = xlabel_size)
-            ax.set_ylabel(ylabel, fontsize = ylabel_size)
-            ax.set_zlabel(zlabel, fontsize = zlabel_size)
-            ax.view_init(elev = 30, azim = 60)
-            ax.xaxis.pane.fill = False
-            ax.yaxis.pane.fill = False
-            ax.zaxis.pane.fill = False
-            ax.xaxis._axinfo["grid"].update({"color": "black"})
-            ax.yaxis._axinfo["grid"].update({"color": "black"})
-            ax.xaxis.pane.set_edgecolor('w')
-            ax.yaxis.pane.set_edgecolor('w')
-            ax.zaxis.set_ticklabels([])
-            ax.axes.get_zaxis().set_visible(True)
-            ax.zaxis._axinfo["grid"].update({"color": "black"})
-            ax.zaxis.pane.set_edgecolor('w')
+    # Set the axis
+    if dim == 3:
+        ax.set_xlabel(xlabel, fontsize = xlabel_size)
+        ax.set_ylabel(ylabel, fontsize = ylabel_size)
+        ax.set_zlabel(zlabel, fontsize = zlabel_size)
+        ax.view_init(elev = elev, azim = azim)
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
+        
+        # ax.w_xaxis.gridlines.set_color('black')
+        # ax.w_yaxis.gridlines.set_color('black')
+        # ax.w_zaxis.gridlines.set_color('black')
+        
+        ax.xaxis.pane.set_edgecolor('w')
+        ax.yaxis.pane.set_edgecolor('w')
+        ax.zaxis.set_ticklabels([])
+        ax.axes.get_zaxis().set_visible(True)
+        ax.zaxis.pane.set_edgecolor('w')
 
-        elif self.dim == 2:
-            ax = fig.add_subplot(1, 1, 1)
-            ax.set_xlabel(xlabel, fontsize = xlabel_size)
-            ax.set_ylabel(ylabel, fontsize = ylabel_size)
+    elif dim == 2:
+        ax.set_xlabel(xlabel, fontsize = xlabel_size)
+        ax.set_ylabel(ylabel, fontsize = ylabel_size)
+
+    else:
+        raise ValueError("'dim' is either 2 or 3")
+
+    ax.grid(True)
+    ax.xaxis.set_ticklabels([])
+    ax.yaxis.set_ticklabels([])
+    ax.axes.get_xaxis().set_visible(True)
+    ax.axes.get_yaxis().set_visible(True)
+
+    # Plot the embedding
+    for i in range(len(embedding_list)):
+        coords_i = embedding_list[i]
+        if dim == 3:
+            im = ax.scatter(
+                xs = coords_i[:, 0],
+                ys = coords_i[:, 1],
+                zs = coords_i[:, 2],
+                marker = markers_list[i],
+                color = color_labels,
+                s = marker_size,
+                alpha = alpha,
+            )
+
+            ax.scatter([], [], [], marker = markers_list[i], color = "black", s = marker_size, alpha = 1, label = name_list[i].replace("_", " "))
 
         else:
-            raise ValueError("'dim' is either 2 or 3")
+            im = ax.scatter(
+                x = coords_i[:, 0],
+                y = coords_i[:, 1],
+                marker = markers_list[i],
+                color = color_labels,
+                s = marker_size,
+                alpha = alpha,
+            )
 
-        # Adjust the scale of the axis.
-        ax.get_proj = lambda: np.dot(Axes3D.get_proj(ax), np.diag([0.9, 0.9, 0.9, 1]))
+            ax.scatter(x = [], y = [], marker = markers_list[i], color = "black", s = marker_size, alpha = 1, label = name_list[i].replace("_", " "))
 
-        ax.grid(True)
-        ax.xaxis.set_ticklabels([])
-        ax.yaxis.set_ticklabels([])
-        ax.axes.get_xaxis().set_visible(True)
-        ax.axes.get_yaxis().set_visible(True)
-
-        for i in range(len(self.embedding_list)):
-            coords_i = self.embedding_list[i]
-            if self.dim == 3:
-                im = ax.scatter(
-                    xs = coords_i[:, 0],
-                    ys = coords_i[:, 1],
-                    zs = coords_i[:, 2],
-                    marker = markers_list[i],
-                    c = color_labels,
-                    s = marker_size,
-                    alpha = 1,
-                    # cmap=cmap,
-                )
-
-                ax.scatter([], [], [], marker = markers_list[i], color = "black", s = marker_size, alpha = 1, label = name_list[i].replace("_", " "))
+    if category_name_list is not None:
+        for i, category in enumerate(category_name_list):
+            if dim == 3:
+                ax.scatter([], [], [], marker = "o", color = main_colors[i], s = marker_size, alpha = 1, label = category)
 
             else:
-                im = ax.scatter(
-                    x = coords_i[:, 0],
-                    y = coords_i[:, 1],
-                    marker = markers_list[i],
-                    c = color_labels,
-                    s = marker_size,
-                    alpha = 1,
-                    # cmap=cmap,
-                )
+                ax.scatter(x = [], y = [], marker = "o", color = main_colors[i], s = marker_size, alpha = 1, label = category)
+    ax.set_axisbelow(True)
 
-                ax.scatter(x = [], y = [], marker = markers_list[i], color = "black", s = marker_size, alpha = 1, label = name_list[i].replace("_", " "))
+    if has_legend:
+        ax.legend(fontsize = legend_size, loc = "best")
 
-        if self.category_name_list is not None:
-            for i, category in enumerate(self.category_name_list):
-                if self.dim == 3:
-                    ax.scatter([], [], [], marker = "o", color = main_colors[i], s = marker_size, alpha = 1, label = category)
+    if title is not None:
+        plt.title(title, fontsize = title_size)
 
-                else:
-                    ax.scatter(x = [], y = [], marker = "o", color = main_colors[i], s = marker_size, alpha = 1, label = category)
-        ax.set_axisbelow(True)
+    if colorbar_label is not None:
+        im.set_cmap(cmap)
+        cbar = plt.colorbar(im, shrink=colorbar_shrink, ax=ax)
+        cbar.set_label(colorbar_label, size=xlabel_size)
+        cbar.ax.tick_params(labelsize=xlabel_size)
+        cbar.mappable.set_clim(colorbar_range[0], colorbar_range[1])
 
-        if legend:
-            ax.legend(fontsize = legend_size, loc = "best")
+    fig.tight_layout()
+    
+    if fig_dir is not None:
+        fig_path = os.path.join(fig_dir, f"{fig_name}.{fig_ext}")
+        plt.savefig(fig_path, dpi=dpi, bbox_inches='tight')
 
-        if title is not None:
-            plt.title(title, fontsize = title_size)
+    if show_figure:
+        plt.show()
 
-        if colorbar_label is not None:
-            im.set_cmap(cmap)
-            cbar = plt.colorbar(im, shrink=colorbar_shrink, ax=ax)
-            cbar.set_label(colorbar_label, size=xlabel_size)
-            cbar.ax.tick_params(labelsize=xlabel_size)
-            cbar.mappable.set_clim(colorbar_range[0], colorbar_range[1])
+    plt.clf()
+    plt.close()
+    return ax
 
-        if save_dir is not None:
-            plt.savefig(save_dir)
 
-        if show_figure:
-            plt.show()
+def plot_optimization_log(
+    df_trial: pd.DataFrame,
+    pair_name: str,
+    eps_list : List[float],
+    fig_dir: Optional[str] = None,
+    *,
+    figsize: Tuple[int, int] = (8, 6),
+    title_size: int = 20,
+    xlabel_size: int = 20,
+    ylabel_size: int = 20,
+    xticks_rotation: int = 0,
+    xticks_size: int = 10,
+    yticks_size: int = 10,
+    cbar_format: Optional[str] = None,
+    cbar_label_size: int = 20,
+    cbar_ticks_size: int = 20,
+    cmap: str = "viridis",
+    grid_alpha : float = 1.0,
+    marker_size: int = 20,
+    plot_eps_log: bool = False,
+    lim_eps: Optional[Tuple[float, float]] = None,
+    lim_gwd: Optional[Tuple[float, float]] = None,
+    lim_acc: Optional[Tuple[float, float]] = None,
+    dpi: int = 300,
+    font: str = "Arial",
+    fig_ext: str = "png",
+    show_figure: bool = False,
+    edgecolor:Optional[int] = None,
+    linewidth:Optional[int] = None,
+    **kwargs,
+) -> Tuple[matplotlib.axes.Axes, matplotlib.axes.Axes]:
+    """Display a heatmap of the given matrix with various customization options.
 
-        plt.clf()
-        plt.close()
+    Args:
+        df_trial (pd.DataFrame): 
+            The dataframe of the optimization log.
+        pair_name (str): 
+            The name of the pair.
+        fig_dir (Optional[str], optional):
+            Directory to save the heatmap. If None, the heatmap won't be saved.
+
+    Keyword Args:
+        figsize (Tuple[int, int], optional): The size of the figure. Defaults to (8, 6).
+        title (Optional[str], optional): The title of the figure. Defaults to None.
+        title_size (int, optional): The size of the title. Defaults to 20.
+        xlabel_size (int, optional): The size of the x-axis label. Defaults to 20.
+        ylabel_size (int, optional): The size of the y-axis label. Defaults to 20.
+        xticks_rotation (int, optional): The rotation of the x-axis ticks. Defaults to 0.
+        cbar_ticks_size (int, optional): The size of the colorbar ticks. Defaults to 20.
+        xticks_size (int, optional): The size of the x-axis ticks. Defaults to 10.
+        yticks_size (int, optional): The size of the y-axis ticks. Defaults to 10.
+        cbar_format (Optional[str], optional): The format of the colorbar ticks. Defaults to None.
+        cbar_label_size (int, optional): The size of the colorbar label. Defaults to 20.
+        cbar_range (Optional[List[float]], optional): The range of the colorbar. Defaults to None.
+        cmap (str, optional): The colormap to use. Defaults to "viridis".
+        marker_size (int, optional): The size of the markers. Defaults to 20.
+        plot_eps_log (bool, optional): Whether to plot epsilon in log scale. Defaults to False.
+        lim_eps (Optional[Tuple[float, float]], optional): The limits of the range of epsilon. Defaults to None.
+        lim_gwd (Optional[Tuple[float, float]], optional): The limits of the range of GWD. Defaults to None.
+        lim_acc (Optional[Tuple[float, float]], optional): The limits of the range of accuracy. Defaults to None.
+        fig_ext (str, optional): The extension of the saved figure. Defaults to "png".
+        show_figure (bool, optional): Whether to show the figure. Defaults to True.
+    """
+    plt.style.use("default")
+    plt.rcParams["grid.color"] = "black"
+    plt.rcParams["grid.alpha"] = str(grid_alpha)
+    plt.rcParams['font.family'] = font
+    
+    # figure plotting epsilon as x-axis and GWD as y-axis
+    _, ax1 = plt.subplots(figsize=figsize)
+    sc1 = ax1.scatter(
+        df_trial["params_eps"],
+        df_trial["value"],
+        c = 100 * df_trial["user_attrs_best_acc"],
+        s=marker_size,
+        cmap=cmap,
+        edgecolor=edgecolor,
+        linewidth=linewidth,
+    )
+    
+    ax1.set_title(f"epsilon - GWD ({pair_name})", fontsize=title_size)
+    ax1.set_xlabel("epsilon", fontsize=xlabel_size)
+    ax1.set_ylabel("GWD", fontsize=ylabel_size)
+
+    if lim_eps is not None:
+        ax1.set_xlim(lim_eps)
+
+    if lim_gwd is not None:
+        ax1.set_ylim(lim_gwd)
+
+    if plot_eps_log:
+        ax1.set_xscale("log")
+
+    ax1.tick_params(
+        axis="x", 
+        which="both", 
+        labelsize=xticks_size, 
+        rotation=xticks_rotation,
+    )
+    ax1.tick_params(axis="y", which="major", labelsize=yticks_size)
+
+    ax1.grid(True, which="both")
+    cbar = plt.colorbar(sc1, ax=ax1)
+    cbar.set_label(label="Matching Rate (%)", size=cbar_label_size)
+    
+    if lim_acc is not None:
+        cmin, cmax = lim_acc
+        cbar.mappable.set_clim(cmin, cmax)
+    
+    cbar.ax.tick_params(labelsize=cbar_ticks_size)
+
+    plt.tight_layout()
+
+    if fig_dir is not None:
+        # save figure
+        os.makedirs(fig_dir, exist_ok=True)
+        plt.savefig(
+            os.path.join(fig_dir, f"Optim_log_eps_GWD_{pair_name.replace(' ', '_')}.{fig_ext}"),
+            bbox_inches='tight',
+            dpi=dpi,
+        )
+    
+    # show figure
+    if show_figure:
+        plt.show()
+    
+    plt.clf()
+    plt.close()
+    
+    plt.style.use("default")
+    plt.rcParams["grid.color"] = "black"
+    plt.rcParams["grid.alpha"] = str(grid_alpha)
+    plt.rcParams['font.family'] = font
+
+    # figure plotting accuracy as x-axis and GWD as y-axis
+    if plot_eps_log:
+        if lim_eps is not None:
+            norm = LogNorm(vmin=lim_eps[0], vmax=lim_eps[1])
+        else:
+            norm = LogNorm(vmin=eps_list[0], vmax=eps_list[1])
+    else:
+        norm = None
+
+    _, ax2 = plt.subplots(figsize=figsize)
+    sc2 = ax2.scatter(
+        100 * df_trial["user_attrs_best_acc"],
+        df_trial["value"].values,
+        c=df_trial["params_eps"],
+        cmap=cmap,
+        s=marker_size,
+        norm=norm,
+        edgecolor=edgecolor,
+        linewidth=linewidth,
+    )
+    
+   
+    ax2.set_title(f"Matching Rate - GWD ({pair_name})", fontsize=title_size)
+
+    if lim_acc is not None:
+        ax2.set_xlim(lim_acc)
+
+    if lim_gwd is not None:
+        ax2.set_ylim(lim_gwd)
+        
+    ax2.set_xlabel("Matching Rate (%)", fontsize=xlabel_size)
+    ax2.tick_params(axis="x", labelsize=xticks_size)
+    ax2.set_ylabel("GWD", fontsize=ylabel_size)
+    ax2.tick_params(axis="y", labelsize=yticks_size)
+    
+    cbar2 = plt.colorbar(mappable=sc2, ax=ax2, format=cbar_format)
+    cbar2.set_label(label="epsilon", size=cbar_label_size)
+    # cbar2.ax.set_yscale('log')
+    # cbar2.set_ticks(eps_list, minor=False)
+    cbar2.ax.tick_params(labelsize=cbar_ticks_size)
+    
+    if lim_eps is not None:
+        cmin, cmax = lim_eps
+        cbar2.mappable.set_clim(cmin, cmax)
+    
+   
+    
+    ax2.grid(True)
+    plt.tight_layout()
+
+    if fig_dir is not None:
+        # save figure
+        plt.savefig(
+            os.path.join(fig_dir, f"acc_gwd_eps({pair_name.replace(' ', '_')}).{fig_ext}"),
+            bbox_inches='tight',
+            dpi=dpi,
+        )
+    
+    if show_figure:
+        plt.show()
+        
+    plt.clf()
+    plt.close()
+
+    
+    
