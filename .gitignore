@@ -167,4 +167,4 @@ cython_debug/
 results/*
 !results/.gitkeep
 
-experiment
+experiment/*
