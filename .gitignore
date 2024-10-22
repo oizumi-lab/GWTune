@@ -3,6 +3,7 @@
 **/__pycache__/**
 *.py[cod]
 *$py.class
+*.pyc
 
 # C extensions
 *.so
@@ -168,4 +169,3 @@ results/*
 !results/.gitkeep
 
 experiment/*
-*.pyc
