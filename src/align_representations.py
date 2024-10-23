@@ -1639,6 +1639,9 @@ class PairwiseAnalysis:
             
         if lim_acc is not None:
             df_trial = df_trial[(df_trial["user_attrs_best_acc"] > lim_acc[0]) & (df_trial["user_attrs_best_acc"] < lim_acc[1])]
+            
+        if fig_dir is None:
+            fig_dir = self.save_path
         
         visualize_functions.plot_optimization_log(
             df_trial,
@@ -2354,6 +2357,9 @@ class AlignRepresentations:
             visualization_config (VisualizationConfig, optional):
                 container of parameters used for figure. Defaults to VisualizationConfig().
         """
+        if fig_dir is None:
+            fig_dir = os.path.join(self.main_figure_dir, "OT")
+            os.makedirs(fig_dir, exist_ok=True)
         
         for pairwise in self.pairwise_list:
                 pairwise.plot_OT(
@@ -2376,7 +2382,10 @@ class AlignRepresentations:
             visualization_config (VisualizationConfig, optional):
                 container of parameters used for figure. Defaults to VisualizationConfig().
         """
-
+        if fig_dir is None:
+            fig_dir = os.path.join(self.main_figure_dir, "log")
+            os.makedirs(fig_dir, exist_ok=True)
+            
         for pairwise in self.pairwise_list:
             pairwise.plot_optimization_log(
                 fig_dir=fig_dir,
@@ -2630,11 +2639,7 @@ class AlignRepresentations:
         """
 
         if fig_dir is None:
-            fig_dir = os.path.join(
-                self.main_results_dir, 
-                "visualize_embedding", 
-                self.config.init_mat_plan,
-            )
+            fig_dir = os.path.join(self.main_figure_dir, "visualize_embedding")
             os.makedirs(fig_dir, exist_ok=True)
         
         name_list = []
