@@ -1,0 +1,15 @@
+python>=3.9
+matplotlib
+numpy
+optuna>=3.2.0
+pandas
+pot=0.9.4
+pymysql
+scikit-learn
+scipy
+seaborn
+sqlalchemy
+sqlalchemy-utils
+pytorch
+tqdm
+umap-learn

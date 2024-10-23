@@ -1,5 +1,5 @@
-# Toolbox for Gromov-Wasserstein Optimal Transport (GWOT)
-This toolbox supports an easy-to-use hyperparameter tuning of GWOT and the evaluation of unsupervised alignment based on GWOT.  
+# Toolbox for Gromov-Wasserstein optimal transport (GWTune)
+This toolbox supports an easy-to-use hyperparameter tuning of Gromov-Wasserstein optimal transport (GWOT) and unsupervised alignment based on GWOT.  
 To find good local minima in GWOT, hyperparameter tuning is essential.  
 This toolbox uses [Optuna](https://optuna.org/) for hyperparameter tuning and [POT](https://pythonot.github.io/) for GWOT optimization.  
 
@@ -10,37 +10,68 @@ By replacing the tutorial data with your own data, you can easily test GWOT on y
 To further facilitate use cases of our toolbox, we also provide tutorials for other types of datasets, neural data (`AllenBrain`) and neural network models (`DNN`).   
 You can find these tutorials in the `tutorial_other_datasets` folder.   
 
-## Requirements
-Please see `pyproject.toml` for required libraries.  
-If you are using poetry, please run `poetry install` first and then, install `torch`, `torchvision`, `torchaudio` that are compatible with your environment.  
-For compatibility information, see the [official pytorch page](https://pytorch.org/get-started/locally/). 
+## Installation 
+We outline instructions for installing the required packages using `poetry`, `conda`, `pip`.
 
-## Folders in this repository  
+### Step1
+- `poetry`
+    
+    Install the required packages using `pyproject.toml`
+    ```
+    poetry install
+    ```
+- `conda`
 
-`data`: Datasets for tutorials.  
-`scripts`: Scripts for GWOT optimization tutorials.  
-`src`: Core modules for GWOT hyperparameter optimization.  
-`src/utils`: Utility modules that are not specific to GWOT optimization but are useful for general purposes.  
-`experiment`: Folder for development and testing. 
+    Install the required packages using `environemnt.yaml`
+    ```
+    conda env create -n GWTune -f environment.yaml
+    source activate GWTune
+    ```
+- `pip`
+    
+    Install the required packages using `requirements.txt`.
+    ```
+    virtualenv .env && source .env/bin/activate
+    pip install -r requirements.txt
+    ```
 
-## Core modules in src  
-
-`gw_alignment.py`  
-`align_representations.py`  
+### Step2
+Although this toolbox works on CPU only, using a GPU will be more effective, especially when the number of points to align is large.    
+If you are using a GPU, install `torch` that is compatible with your environment.    
+See the [official pytorch page](https://pytorch.org/get-started/locally/) for compatibility information.
 
 ## Datasets for the main tutorial
+1. `color`: Human similarity judgments of 93 colors from the data used in [Kawakita et al., 2023, PsyArxiv](https://psyarxiv.com/h3pqm/)
+2. `THINGS` : Human similarity judgments of 1854 objects from [the THINGS dataset](https://things-initiative.org/)  
 
-1. `color`: Human similarity judgements of 93 colors for 5 participant groups made from the data used in [Kawakita et al., 2023, PsyArxiv](https://psyarxiv.com/h3pqm/)
-2. `THINGS` : Human similarity judgments of 1854 objects for 4 participant groups made from [the THINGS dataset](https://things-initiative.org/)  
-
-### Other tutorials datasets 
+### Other tutorial datasets 
 3. `AllenBrain`: Neuropixels recordings in the primary visual cortex of mice from [the Visual Coding - Neuropixels dataset](https://portal.brain-map.org/explore/circuits/visual-coding-neuropixels)    
-4. `DNN`: Internal representations of vision DNNs (ResNet50 and VGG19) for a subset of visual images from the ImageNet dataset   
-5. `simulation`: Synthetic data illustrating differences between supervised alignment and unsupervised alignment   
+4. `DNN`: Internal representations of vision DNNs (ResNet50 and VGG19) for visual images from the ImageNet dataset   
+5. `simulation`: Synthetic data illustrating the differences between supervised and unsupervised alignment
+
+### Using and Citing the Toolbox
+If you use this toolbox in your research and find it useful, please cite the following papers and give a star ⭐.
+
+[1] Unsupervised Alignment in Neuroscience: Introducing a Toolbox for Gromov-Wasserstein Optimal Transport    
+Masaru Sasaki&dagger;, Ken Takeda&dagger;, Kota Abe, Masafumi Oizumi    
+[bioRxiv](https://www.biorxiv.org/content/10.1101/2023.09.15.558038v1)     
+&dagger;: equal contribution   
+
+[2] Is my "red" your "red"?: Unsupervised alignment of qualia structures via optimal transport  
+Genji Kawakita&dagger;, Ariel Zeleznikow-Johnston&dagger;, Ken Takeda&dagger;, Naotsugu Tsuchiya&Dagger;, Masafumi Oizumi&Dagger;  
+[PsyArxiv](https://psyarxiv.com/h3pqm/)   
+&dagger;, &Dagger;: equal contribution
 
 ## References
-If you are interested in the details of dataset used in the main tutorials (`color` and `THINGS`) or in the mathematical details of GWOT, please refer to the paper below.  
+If you are interested in the details of the datasets used in the tutorials or in the mathematical details of unsupervised alignment based on GWOT, please refer to the above papers [1,2].  
 
-Is my "red" your "red"?: Unsupervised alignment of qualia structures via optimal transport.  
-Genji Kawakita, Ariel Zeleznikow-Johnston, Ken Takeda, Naotsugu Tsuchiya, Masafumi Oizumi  
-PsyArxiv: https://psyarxiv.com/h3pqm/  
+## Creators and Maintainers
+This toolbox has been created and is maintained by:
+
+- Masaru Sasaki
+- Ken Takeda
+- Kota Abe
+- Masafumi Oizumi
+
+## Acknowledgements
+We thank Genji Kawakita for early code contributions. We also thank Ariel Zeleznikow-Johnston and Naotsugu Tsuchiya for providing the data on color similarity judgments.
