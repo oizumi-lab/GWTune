@@ -2516,6 +2516,13 @@ class AlignRepresentations:
         plt.close()
 
     def get_highest_top1_matching_rate(self):
+        """
+        Get the highest top1 matching rate for each pair.
+
+        Returns:
+            highest_top1 (pd.DataFrame):
+                A DataFrame containing the highest top1 matching rate for each pair.
+        """
         highest_top1_list = []
         for pairwise in self.pairwise_list:
             df = pairwise.study.trials_dataframe()
