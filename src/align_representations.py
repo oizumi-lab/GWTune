@@ -2582,7 +2582,6 @@ class AlignRepresentations:
         **kwargs,
     ) -> Optional[Union[plt.Figure, List[np.ndarray]]]:
         """
-        2024.6.19 re-wrote
         Visualizes the aligned embedding in the specified number of dimensions.
 
         Args:
