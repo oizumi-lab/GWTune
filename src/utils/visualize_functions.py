@@ -94,11 +94,12 @@ def add_colored_label(ax, x, y, bgcolor, width=1, height=1):
 def show_heatmap(
     matrix: Any,
     title: Optional[str],
-    save_file_name: Optional[str] = None,
     category_name_list: Optional[List[str]] = None,
     num_category_list: Optional[List[int]] = None,
     x_object_labels: Optional[List[str]] = None,
     y_object_labels: Optional[List[str]] = None,
+    fig_name: str = "heatmap",
+    fig_dir: Optional[str] = None,
     **kwargs
 ) -> None:
     """Display a heatmap of the given matrix with various customization options.
@@ -106,7 +107,6 @@ def show_heatmap(
     Args:
         matrix (Any): The matrix to be visualized as a heatmap.
         title (str, optional): The title of the heatmap.
-        save_file_name (str, optional): File name to save the heatmap. If None, the heatmap won't be saved.
         ticks (str, optional): Determines how ticks should be displayed. Options are "objects", "category", or "numbers".
         category_name_list (List[str], optional): List of category names if `ot_category_tick` is True.
         num_category_list (List[int], optional): List of the number of items in each category.
@@ -157,6 +157,8 @@ def show_heatmap(
     color_label_width = kwargs.get('color_label_width', None)
     
     dpi = kwargs.get('dpi', 300)
+    
+    fig_ext = kwargs.get('fig_ext', 'png')
 
     plt.style.use("default")
     plt.rcParams["grid.color"] = "black"
@@ -235,8 +237,9 @@ def show_heatmap(
 
     plt.tight_layout()
 
-    if save_file_name is not None:
-        plt.savefig(save_file_name, bbox_inches='tight', dpi=dpi)
+    if fig_dir is not None:
+        fig_path = os.path.join(fig_dir, f"{fig_name}.{fig_ext}")
+        plt.savefig(fig_path, dpi=dpi, bbox_inches='tight')
 
     if show_figure:
         plt.show()
