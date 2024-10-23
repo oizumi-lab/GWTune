@@ -8,7 +8,8 @@ import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.patches import Rectangle
 from mpl_toolkits.mplot3d import Axes3D
-
+import pandas as pd
+from matplotlib.colors import LogNorm
 
 def get_color_labels(
     n: int,
@@ -38,7 +39,6 @@ def get_color_labels(
         plt.show()
 
     return color_labels
-
 
 def get_color_labels_for_category(
     n_category_list: List[int],
@@ -95,7 +95,6 @@ def show_heatmap(
     matrix: Any,
     title: Optional[str],
     save_file_name: Optional[str] = None,
-    ticks: Optional[str] = None,
     category_name_list: Optional[List[str]] = None,
     num_category_list: Optional[List[int]] = None,
     x_object_labels: Optional[List[str]] = None,
@@ -136,12 +135,13 @@ def show_heatmap(
     cbar_ticks_size = kwargs.get("cbar_ticks_size", 20)
     xticks_size = kwargs.get('xticks_size', 20)
     yticks_size = kwargs.get('yticks_size', 20)
-    cbar_format = kwargs.get('cbar_format', None)#"%.2e"
+    cbar_format = kwargs.get('cbar_format', None)
     cbar_label = kwargs.get('cbar_label', None)
     cbar_label_size = kwargs.get('cbar_label_size', 20)
     cbar_range = kwargs.get('cbar_range', None)
     cmap = kwargs.get('cmap', 'cividis')
 
+    ticks = kwargs.get('ticks', None)
     ot_object_tick = kwargs.get("ot_object_tick", False)
     ot_category_tick = kwargs.get("ot_category_tick", False)
 
@@ -173,7 +173,7 @@ def show_heatmap(
         raise(ValueError, "please turn off either 'ot_category_tick' or 'ot_object_tick'.")
 
     if not ot_object_tick and ot_category_tick:
-        assert category_name_list is not None
+        assert category_name_list is not None, "please provide 'category_name_list' or set `OT_format` or `sim_mat_format` to `sorted`."
         assert num_category_list is not None
 
         if ticks == "objects":
@@ -182,8 +182,8 @@ def show_heatmap(
 
         elif ticks == "category":
             label_pos = [sum(num_category_list[:i + 1]) for i in range(len(category_name_list))]
-            plt.xticks(label_pos, labels = category_name_list, rotation = xticks_rotation, size = xticks_size, fontweight = "bold")
-            plt.yticks(label_pos, labels = category_name_list, rotation = yticks_rotation, size = yticks_size, fontweight = "bold")
+            plt.xticks(label_pos, labels = category_name_list, rotation = xticks_rotation, size = xticks_size)
+            plt.yticks(label_pos, labels = category_name_list, rotation = yticks_rotation, size = yticks_size)
 
             if draw_category_line:
                 for pos in label_pos:
@@ -192,9 +192,7 @@ def show_heatmap(
 
 
     if ot_object_tick and not ot_category_tick:
-        if ticks == "numbers":
-            # plt.xticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = xticks_size, rotation = xticks_rotation)
-            # plt.yticks(ticks = np.arange(len(matrix)) + 0.5, labels = np.arange(len(matrix)) + 1, size = yticks_size, rotation = yticks_rotation)
+        if ticks is None:
             pass
         elif ticks == "objects":
             # assert object_labels is not None
@@ -457,7 +455,7 @@ def plot_embedding(
     
     if fig_dir is not None:
         fig_path = os.path.join(fig_dir, f"{fig_name}.{fig_ext}")
-        plt.savefig(fig_path, dpi=300, bbox_inches='tight')
+        plt.savefig(fig_path, dpi=dpi, bbox_inches='tight')
 
     if show_figure:
         plt.show()
@@ -465,3 +463,205 @@ def plot_embedding(
     plt.clf()
     plt.close()
     return ax
+
+
+def plot_optimization_log(
+    df_trial: pd.DataFrame,
+    pair_name: str,
+    eps_list : List[float],
+    fig_dir: Optional[str] = None,
+    *,
+    figsize: Tuple[int, int] = (8, 6),
+    title_size: int = 20,
+    xlabel_size: int = 20,
+    ylabel_size: int = 20,
+    xticks_rotation: int = 0,
+    xticks_size: int = 10,
+    yticks_size: int = 10,
+    cbar_format: Optional[str] = None,
+    cbar_label_size: int = 20,
+    cbar_ticks_size: int = 20,
+    cmap: str = "viridis",
+    grid_alpha : float = 1.0,
+    marker_size: int = 20,
+    plot_eps_log: bool = False,
+    lim_eps: Optional[Tuple[float, float]] = None,
+    lim_gwd: Optional[Tuple[float, float]] = None,
+    lim_acc: Optional[Tuple[float, float]] = None,
+    dpi: int = 300,
+    font: str = "Arial",
+    fig_ext: str = "png",
+    show_figure: bool = False,
+    edgecolor:Optional[int] = None,
+    linewidth:Optional[int] = None,
+    **kwargs,
+) -> Tuple[matplotlib.axes.Axes, matplotlib.axes.Axes]:
+    """Display a heatmap of the given matrix with various customization options.
+
+    Args:
+        df_trial (pd.DataFrame): 
+            The dataframe of the optimization log.
+        pair_name (str): 
+            The name of the pair.
+        fig_dir (Optional[str], optional):
+            Directory to save the heatmap. If None, the heatmap won't be saved.
+
+    Keyword Args:
+        figsize (Tuple[int, int], optional): The size of the figure. Defaults to (8, 6).
+        title (Optional[str], optional): The title of the figure. Defaults to None.
+        title_size (int, optional): The size of the title. Defaults to 20.
+        xlabel_size (int, optional): The size of the x-axis label. Defaults to 20.
+        ylabel_size (int, optional): The size of the y-axis label. Defaults to 20.
+        xticks_rotation (int, optional): The rotation of the x-axis ticks. Defaults to 0.
+        cbar_ticks_size (int, optional): The size of the colorbar ticks. Defaults to 20.
+        xticks_size (int, optional): The size of the x-axis ticks. Defaults to 10.
+        yticks_size (int, optional): The size of the y-axis ticks. Defaults to 10.
+        cbar_format (Optional[str], optional): The format of the colorbar ticks. Defaults to None.
+        cbar_label_size (int, optional): The size of the colorbar label. Defaults to 20.
+        cbar_range (Optional[List[float]], optional): The range of the colorbar. Defaults to None.
+        cmap (str, optional): The colormap to use. Defaults to "viridis".
+        marker_size (int, optional): The size of the markers. Defaults to 20.
+        plot_eps_log (bool, optional): Whether to plot epsilon in log scale. Defaults to False.
+        lim_eps (Optional[Tuple[float, float]], optional): The limits of the range of epsilon. Defaults to None.
+        lim_gwd (Optional[Tuple[float, float]], optional): The limits of the range of GWD. Defaults to None.
+        lim_acc (Optional[Tuple[float, float]], optional): The limits of the range of accuracy. Defaults to None.
+        fig_ext (str, optional): The extension of the saved figure. Defaults to "png".
+        show_figure (bool, optional): Whether to show the figure. Defaults to True.
+    """
+    plt.style.use("default")
+    plt.rcParams["grid.color"] = "black"
+    plt.rcParams["grid.alpha"] = str(grid_alpha)
+    plt.rcParams['font.family'] = font
+    
+    # figure plotting epsilon as x-axis and GWD as y-axis
+    _, ax1 = plt.subplots(figsize=figsize)
+    sc1 = ax1.scatter(
+        df_trial["params_eps"],
+        df_trial["value"],
+        c = 100 * df_trial["user_attrs_best_acc"],
+        s=marker_size,
+        cmap=cmap,
+        edgecolor=edgecolor,
+        linewidth=linewidth,
+    )
+    
+    ax1.set_title(f"epsilon - GWD ({pair_name})", fontsize=title_size)
+    ax1.set_xlabel("epsilon", fontsize=xlabel_size)
+    ax1.set_ylabel("GWD", fontsize=ylabel_size)
+
+    if lim_eps is not None:
+        ax1.set_xlim(lim_eps)
+
+    if lim_gwd is not None:
+        ax1.set_ylim(lim_gwd)
+
+    if plot_eps_log:
+        ax1.set_xscale("log")
+
+    ax1.tick_params(
+        axis="x", 
+        which="both", 
+        labelsize=xticks_size, 
+        rotation=xticks_rotation,
+    )
+    ax1.tick_params(axis="y", which="major", labelsize=yticks_size)
+
+    ax1.grid(True, which="both")
+    cbar = plt.colorbar(sc1, ax=ax1)
+    cbar.set_label(label="Matching Rate (%)", size=cbar_label_size)
+    
+    if lim_acc is not None:
+        cmin, cmax = lim_acc
+        cbar.mappable.set_clim(cmin, cmax)
+    
+    cbar.ax.tick_params(labelsize=cbar_ticks_size)
+
+    plt.tight_layout()
+
+    if fig_dir is not None:
+        # save figure
+        os.makedirs(fig_dir, exist_ok=True)
+        plt.savefig(
+            os.path.join(fig_dir, f"Optim_log_eps_GWD_{pair_name.replace(' ', '_')}.{fig_ext}"),
+            bbox_inches='tight',
+            dpi=dpi,
+        )
+    
+    # show figure
+    if show_figure:
+        plt.show()
+    
+    plt.clf()
+    plt.close()
+    
+    plt.style.use("default")
+    plt.rcParams["grid.color"] = "black"
+    plt.rcParams["grid.alpha"] = str(grid_alpha)
+    plt.rcParams['font.family'] = font
+
+    # figure plotting accuracy as x-axis and GWD as y-axis
+    if plot_eps_log:
+        if lim_eps is not None:
+            norm = LogNorm(vmin=lim_eps[0], vmax=lim_eps[1])
+        else:
+            norm = LogNorm(vmin=eps_list[0], vmax=eps_list[1])
+    else:
+        norm = None
+
+    _, ax2 = plt.subplots(figsize=figsize)
+    sc2 = ax2.scatter(
+        100 * df_trial["user_attrs_best_acc"],
+        df_trial["value"].values,
+        c=df_trial["params_eps"],
+        cmap=cmap,
+        s=marker_size,
+        norm=norm,
+        edgecolor=edgecolor,
+        linewidth=linewidth,
+    )
+    
+   
+    ax2.set_title(f"Matching Rate - GWD ({pair_name})", fontsize=title_size)
+
+    if lim_acc is not None:
+        ax2.set_xlim(lim_acc)
+
+    if lim_gwd is not None:
+        ax2.set_ylim(lim_gwd)
+        
+    ax2.set_xlabel("Matching Rate (%)", fontsize=xlabel_size)
+    ax2.tick_params(axis="x", labelsize=xticks_size)
+    ax2.set_ylabel("GWD", fontsize=ylabel_size)
+    ax2.tick_params(axis="y", labelsize=yticks_size)
+    
+    cbar2 = plt.colorbar(mappable=sc2, ax=ax2, format=cbar_format)
+    cbar2.set_label(label="epsilon", size=cbar_label_size)
+    # cbar2.ax.set_yscale('log')
+    # cbar2.set_ticks(eps_list, minor=False)
+    cbar2.ax.tick_params(labelsize=cbar_ticks_size)
+    
+    if lim_eps is not None:
+        cmin, cmax = lim_eps
+        cbar2.mappable.set_clim(cmin, cmax)
+    
+   
+    
+    ax2.grid(True)
+    plt.tight_layout()
+
+    if fig_dir is not None:
+        # save figure
+        plt.savefig(
+            os.path.join(fig_dir, f"acc_gwd_eps({pair_name.replace(' ', '_')}).{fig_ext}"),
+            bbox_inches='tight',
+            dpi=dpi,
+        )
+    
+    if show_figure:
+        plt.show()
+        
+    plt.clf()
+    plt.close()
+
+    
+    

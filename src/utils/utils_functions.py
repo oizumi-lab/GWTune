@@ -147,6 +147,24 @@ def load_transformer(
 
     return emb_transformer
 
+
+def check_parameters(n_jobs: int, sampler_seed: Any) -> int:
+    """
+    Check the number of CPUs available for parallel processing.
+
+    Returns:
+        int: The number of CPUs available.
+    """
+
+    if n_jobs < 1:
+        raise ValueError("n_jobs > 0 is required in this toolbox.")
+
+    if isinstance(sampler_seed, int) and sampler_seed > -1:
+        pass
+    else:
+        raise ValueError("please 'sampler_seed' = True or False or int > 0.")
+
+
 # %%
 if __name__ == '__main__':
     os.chdir(os.path.dirname(__file__))
