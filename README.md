@@ -52,7 +52,7 @@ See the [official pytorch page](https://pytorch.org/get-started/locally/) for co
 ### Using and Citing the Toolbox
 If you use this toolbox in your research and find it useful, please cite the following papers and give a star ⭐.
 
-[1] Toolbox for Gromov-Wasserstein optimal transport: Application to unsupervised alignment in neuroscience   
+[1] Unsupervised Alignment in Neuroscience: Introducing a Toolbox for Gromov-Wasserstein Optimal Transport    
 Masaru Sasaki&dagger;, Ken Takeda&dagger;, Kota Abe, Masafumi Oizumi    
 [bioRxiv](https://www.biorxiv.org/content/10.1101/2023.09.15.558038v1)     
 &dagger;: equal contribution   

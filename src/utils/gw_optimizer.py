@@ -134,7 +134,7 @@ class RunOptuna:
         )
         return study
 
-    def load_study(self, seed: int = 42) -> optuna.study.Study:
+    def load_study(self, seed: int = 42, compute_OT=True) -> optuna.study.Study:
         """Load an existing Optuna study from the database.
 
         If a study with the specified name exists in the database, it will be loaded.
@@ -146,18 +146,24 @@ class RunOptuna:
         Returns:
             optuna.study.Study: Loaded Optuna study.
         """
-        study = optuna.load_study(
-            study_name=self.filename + "_" + self.init_mat_plan,
-            sampler=self.choose_sampler(seed=seed),
-            pruner=self.choose_pruner(),
-            storage=self.storage,
-        )
+        
+        if compute_OT:
+            study = optuna.load_study(
+                study_name=self.filename + "_" + self.init_mat_plan,
+                sampler=self.choose_sampler(seed=seed),
+                pruner=self.choose_pruner(),
+                storage=self.storage,
+            )
+        else:
+            study = optuna.load_study(
+                study_name=self.filename + "_" + self.init_mat_plan,
+                storage=self.storage,
+            )
         return study
 
     def run_study(
         self,
         objective: Any,
-        device: str,
         seed: int = 42,
         **kwargs
     ) -> optuna.study.Study:
@@ -167,7 +173,6 @@ class RunOptuna:
 
         Args:
             objective (Any): The objective function to be optimized.
-            device (str): The device to be used for computation, either "cpu" or "cuda".
             seed (int, optional): Seed for random number generation. Useful for reproducibility. Defaults to 42.
             **kwargs: Additional keyword arguments. Can include "search_space" for grid search.
 
@@ -187,8 +192,6 @@ class RunOptuna:
                 warnings.warn("except for grid search, search space is ignored.", UserWarning)
             del kwargs["search_space"]
 
-        objective = functools.partial(objective, **kwargs)
-
         try:
             # If there is no .db file or database of MySQL, multi_run will not work properly if you don't let it load here.
             study = self.load_study(seed=seed)
@@ -197,7 +200,7 @@ class RunOptuna:
             self.create_study()
             study = self.load_study(seed=seed)
 
-        objective_device = functools.partial(objective, device=device)
+        objective = functools.partial(objective, **kwargs)
 
         if self.n_jobs > 1:
             warnings.filterwarnings("always")
@@ -208,7 +211,7 @@ class RunOptuna:
             )
             warnings.filterwarnings("ignore")
 
-        study.optimize(objective_device, self.num_trial, n_jobs=self.n_jobs)
+        study.optimize(objective, self.num_trial, n_jobs=self.n_jobs)
 
         return study
 
@@ -282,41 +285,6 @@ class RunOptuna:
             raise ValueError("not implemented pruner yet.")
 
         return pruner
-
-    def define_eps_space(self, eps_list: List[float], eps_log: bool, num_trial: int) -> np.ndarray:
-        """Define the epsilon space based on the provided epsilon list.
-
-        Depending on the length of the eps_list and the value of eps_log, this method determines
-        the appropriate epsilon space using linear or logarithmic intervals.
-
-        Args:
-            eps_list (List[float]): List containing the bounds and possibly the step for epsilon.
-                                    If it contains two values, they represent the lower and upper bounds. If three values
-                                    are provided, they represent the lower bound, upper bound, and step size respectively.
-            eps_log (bool): If True, the epsilon search space is defined in a logarithmic scale.
-            num_trial (int): Number of trials.
-
-        Returns:
-            np.ndarray: Epsilon space array.
-
-        Raises:
-            ValueError: If the "eps_list" format doesn't match the expected lengths of 2 or 3.
-        """
-        if len(eps_list) == 2:
-            ep_lower, ep_upper = eps_list
-            if eps_log:
-                eps_space = np.logspace(np.log10(ep_lower), np.log10(ep_upper), num=num_trial)
-            else:
-                eps_space = np.linspace(ep_lower, ep_upper, num=num_trial)
-
-        elif len(eps_list) == 3:
-            ep_lower, ep_upper, ep_step = eps_list
-            eps_space = np.arange(ep_lower, ep_upper, ep_step)
-
-        else:
-            raise ValueError("The eps_list doesn't match.")
-
-        return eps_space
 
 
 def load_optimizer(
