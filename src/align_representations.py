@@ -427,7 +427,7 @@ class Representation:
         func_for_sort_sim_mat (Callable, optional):
             A function to rearrange the matrix so that stimuli belonging to the same coarse category are arranged adjacent to each other.
             Defaults to None.
-        save_rdm_path (str, optional):
+        save_conditional_rdm_path (str, optional):
             The path to save the conditional similarity matrix. Defaults to None.
             If None, the conditional similarity matrix is not created. The conditional similarity matrix is saved in the "save_rdm_path/metric" for each metric.
     """
@@ -445,7 +445,7 @@ class Representation:
         num_category_list: Optional[List[int]] = None,
         category_idx_list: Optional[List[int]] = None,
         func_for_sort_sim_mat: Optional[Callable] = None,
-        save_rdm_path: Optional[str] = None,
+        save_conditional_rdm_path: Optional[str] = None,
     ) -> None:
         
         self.name = name
@@ -463,7 +463,7 @@ class Representation:
         
         # save the conditional similarity matrix. If None, the conditional similarity matrix is not created. 
         # The conditional similarity matrix is saved in the "save_rdm_path/metric" for each metric.
-        self.save_rdm_path = save_rdm_path
+        self.save_conditional_rdm_path = save_conditional_rdm_path
         
         # compute the dissimilarity matrix from embedding if sim_mat is None,
         # or estimate embedding from the dissimilarity matrix using MDS if embedding is None.
@@ -521,7 +521,7 @@ class Representation:
         Returns:
             np.ndarray: _description_
         """
-        save_path = os.path.join(self.save_rdm_path, self.metric)
+        save_path = os.path.join(self.save_conditional_rdm_path, self.metric)
         os.makedirs(save_path, exist_ok=True)
         
         tar_path = os.path.join(save_path, f"{self.name}_{self.metric}.npy")
@@ -612,8 +612,8 @@ class Representation:
         else:
             sim_matrix = distance.cdist(self.embedding, self.embedding, metric=self.metric)
         
-        if self.save_rdm_path is not None:
-            assert isinstance(self.save_rdm_path, str) == True, "The save_rdm_path must be a string for the save path." 
+        if self.save_conditional_rdm_path is not None:
+            assert isinstance(self.save_conditional_rdm_path, str) == True, "The save_conditional_rdm_path must be a string for the save path." 
             sim_mat = self._conditional_sim_mat(sim_matrix)
         
         else:
