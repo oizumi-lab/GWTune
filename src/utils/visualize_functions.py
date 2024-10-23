@@ -451,7 +451,7 @@ def plot_embedding(
         cbar.ax.tick_params(labelsize=xlabel_size)
         cbar.mappable.set_clim(colorbar_range[0], colorbar_range[1])
 
-    fig.tight_layout()
+    plt.tight_layout()
     
     if fig_dir is not None:
         fig_path = os.path.join(fig_dir, f"{fig_name}.{fig_ext}")

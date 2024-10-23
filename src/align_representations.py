@@ -1113,7 +1113,7 @@ class PairwiseAnalysis:
             os.makedirs(p, exist_ok=True)
 
         # device setting
-        if self.config.to_types == "torch" and self.config.device == "cuda":
+        if self.config.to_types == "torch" and self.config.device == "cuda" and self.config.multi_gpu != False:
             if queue is None:
                 if target_device is None:
                     new_device = self.config.device
@@ -2193,7 +2193,12 @@ class AlignRepresentations:
             self.show_optimization_log(fig_dir, visualization_config)
         
         if return_data:
-            OT_list = [pairwise.OT for pairwise in self.pairwise_list]
+            if OT_format == "sorted":
+                OT_list = [pairwise.sorted_OT for pairwise in self.pairwise_list]
+            elif OT_format == "default":
+                OT_list = [pairwise.OT for pairwise in self.pairwise_list]
+            else:
+                raise ValueError("OT_format must be 'default' or 'sorted'.")
             return OT_list
    
     def _entropic_gwot(
