@@ -4,8 +4,6 @@ import os
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from matplotlib.patches import Rectangle
-from matplotlib.patches import Rectangle
 import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.patches import Rectangle
@@ -89,9 +87,6 @@ def get_color_labels_for_category(
 
     return color_labels, main_colors
 
-def add_colored_label(ax, x, y, bgcolor, width=1, height=1):
-    rect = Rectangle((x, y), width, height, facecolor=bgcolor)
-    ax.add_patch(rect)
 def add_colored_label(ax, x, y, bgcolor, width=1, height=1):
     rect = Rectangle((x, y), width, height, facecolor=bgcolor)
     ax.add_patch(rect)
@@ -212,18 +207,6 @@ def show_heatmap(
 
     plt.xlabel(xlabel, size = xlabel_size)
     plt.ylabel(ylabel, size = ylabel_size)
-    
-    if color_labels is not None:
-        for idx, color in enumerate(color_labels):
-            add_colored_label(ax, -color_label_width, idx, color, width=color_label_width)
-            add_colored_label(ax, idx, matrix.shape[0], color, height=color_label_width)
-
-        ax.set_aspect('equal')
-        ax.set_xlim(-color_label_width, matrix.shape[1])
-        ax.set_ylim(matrix.shape[0] + color_label_width, 0)
-        
-        for spine in ax.spines.values():
-            spine.set_visible(False)
     
     if color_labels is not None:
         for idx, color in enumerate(color_labels):
@@ -468,7 +451,7 @@ def plot_embedding(
         cbar.ax.tick_params(labelsize=xlabel_size)
         cbar.mappable.set_clim(colorbar_range[0], colorbar_range[1])
 
-    fig.tight_layout()
+    plt.tight_layout()
     
     if fig_dir is not None:
         fig_path = os.path.join(fig_dir, f"{fig_name}.{fig_ext}")

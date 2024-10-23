@@ -95,7 +95,7 @@ model_rep = Representation(
     category_idx_list=category_idx_list,
     num_category_list=num_category_list, 
     func_for_sort_sim_mat=sort_matrix_with_categories,
-    save_rdm_path=None,
+    save_conditional_rdm_path=None,
 )
     
 model_rep.plot_sim_mat(return_sorted = False)
@@ -112,7 +112,7 @@ model_rep = Representation(
     category_idx_list=category_idx_list,
     num_category_list=num_category_list, 
     func_for_sort_sim_mat=sort_matrix_with_categories,
-    save_rdm_path=None,
+    save_conditional_rdm_path=None,
 )
     
 model_rep.plot_sim_mat(return_sorted = False)
@@ -129,7 +129,7 @@ model_rep = Representation(
     category_idx_list=category_idx_list,
     num_category_list=num_category_list, 
     func_for_sort_sim_mat=sort_matrix_with_categories,
-    save_rdm_path=None,
+    save_conditional_rdm_path=None,
 )
     
 model_rep.plot_sim_mat(return_sorted = False)
@@ -146,7 +146,7 @@ model_rep = Representation(
     category_idx_list=category_idx_list,
     num_category_list=num_category_list, 
     func_for_sort_sim_mat=sort_matrix_with_categories,
-    save_rdm_path="../../data/DNN/",
+    save_conditional_rdm_path="../../data/DNN/",
 )
     
 model_rep.plot_sim_mat(return_sorted = False)
