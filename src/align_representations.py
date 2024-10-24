@@ -1640,8 +1640,8 @@ class PairwiseAnalysis:
         if lim_acc is not None:
             df_trial = df_trial[(df_trial["user_attrs_best_acc"] > lim_acc[0]) & (df_trial["user_attrs_best_acc"] < lim_acc[1])]
             
-        if fig_dir is None:
-            fig_dir = self.save_path
+        if fig_dir is not None:
+            os.makedirs(fig_dir, exist_ok=True)
         
         visualize_functions.plot_optimization_log(
             df_trial,
