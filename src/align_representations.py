@@ -636,7 +636,8 @@ class Representation:
                 title=self.name,
                 category_name_list=None,
                 num_category_list=None,
-                object_labels=self.object_labels,
+                x_object_labels=self.object_labels,
+                y_object_labels=self.object_labels,
                 fig_name=f"RDM {self.name}",
                 fig_dir=fig_dir,
                 **visualization_config(),
@@ -649,7 +650,8 @@ class Representation:
                 title=self.name,
                 category_name_list=self.category_name_list,
                 num_category_list=self.num_category_list,
-                object_labels=self.object_labels,
+                x_object_labels=self.object_labels,
+                y_object_labels=self.object_labels,
                 fig_name=f"RDM {self.name} (sorted)",
                 fig_dir=fig_dir,
                 **visualization_config(),
@@ -1589,7 +1591,8 @@ class PairwiseAnalysis:
                 title=title,
                 category_name_list=None,
                 num_category_list=None,
-                object_labels=self.source.object_labels,
+                x_object_labels=self.source.object_labels,
+                y_object_labels=self.target.object_labels,
                 fig_name=self.instance_name,
                 fig_dir=fig_dir,
                 **visualization_config(),
@@ -1601,7 +1604,8 @@ class PairwiseAnalysis:
                 title=title,
                 category_name_list=self.source.category_name_list,
                 num_category_list=self.source.num_category_list,
-                object_labels=self.source.object_labels,
+                x_object_labels=self.source.object_labels,
+                y_object_labels=self.target.object_labels,
                 fig_name=self.instance_name,
                 fig_dir=fig_dir,
                 **visualization_config(),
@@ -1635,6 +1639,9 @@ class PairwiseAnalysis:
             
         if lim_acc is not None:
             df_trial = df_trial[(df_trial["user_attrs_best_acc"] > lim_acc[0]) & (df_trial["user_attrs_best_acc"] < lim_acc[1])]
+            
+        if fig_dir is not None:
+            os.makedirs(fig_dir, exist_ok=True)
         
         visualize_functions.plot_optimization_log(
             df_trial,
@@ -2350,6 +2357,9 @@ class AlignRepresentations:
             visualization_config (VisualizationConfig, optional):
                 container of parameters used for figure. Defaults to VisualizationConfig().
         """
+        if fig_dir is None:
+            fig_dir = os.path.join(self.main_figure_dir, "OT")
+            os.makedirs(fig_dir, exist_ok=True)
         
         for pairwise in self.pairwise_list:
                 pairwise.plot_OT(
@@ -2372,7 +2382,10 @@ class AlignRepresentations:
             visualization_config (VisualizationConfig, optional):
                 container of parameters used for figure. Defaults to VisualizationConfig().
         """
-
+        if fig_dir is None:
+            fig_dir = os.path.join(self.main_figure_dir, "log")
+            os.makedirs(fig_dir, exist_ok=True)
+            
         for pairwise in self.pairwise_list:
             pairwise.plot_optimization_log(
                 fig_dir=fig_dir,
@@ -2626,11 +2639,7 @@ class AlignRepresentations:
         """
 
         if fig_dir is None:
-            fig_dir = os.path.join(
-                self.main_results_dir, 
-                "visualize_embedding", 
-                self.config.init_mat_plan,
-            )
+            fig_dir = os.path.join(self.main_figure_dir, "visualize_embedding")
             os.makedirs(fig_dir, exist_ok=True)
         
         name_list = []
@@ -2718,15 +2727,10 @@ class AlignRepresentations:
         self,
         pivot: int,
         n_iter: int,
-        compute_OT: bool = False,
-        delete_results: bool = False,
         return_data: bool = False,
-        return_figure: bool = True,
         OT_format: str = "default",
         visualization_config: VisualizationConfig = VisualizationConfig(),
-        show_log: bool = False,
         fig_dir: Optional[str] = None,
-        ticks: Optional[str] = None
     ) -> Optional[List[np.ndarray]]:
         """The unuspervised alignment method using Wasserstein barycenter proposed by Lian et al. (2021).
 
@@ -2735,25 +2739,15 @@ class AlignRepresentations:
                 The representation to which the other representations are aligned initially using gw alignment
             n_iter (int):
                 The number of iterations to calculate the location of the barycenter.
-            compute_OT (bool, optional):
-                If True, the GWOT will be computed. If False, saved results will be loaded. Defaults to False.
-            delete_results (bool, optional):
-                If True, all saved results will be deleted. Defaults to False.
             return_data (bool, optional):
                 If True, returns the computed OT. Defaults to False.
-            return_figure (bool, optional):
-                If True, visualizes the results. Defaults to True.
             OT_format (str, optional):
                 Format of similarity matrix to visualize. Options include "default", "sorted", and "both".
                 Defaults to "default".
             visualization_config (VisualizationConfig, optional):
                 Container of parameters used for figure. Defaults to VisualizationConfig().
-            show_log (bool, optional):
-                If True, displays the evaluation figure of GWOT. Defaults to False.
             fig_dir (Optional[str], optional):
                 Directory where figures are saved. Defaults to None.
-            ticks (Optional[str], optional):
-                Specifies the labels for the ticks.. Defaults to None.
 
         Returns:
             Optional[List[np.ndarray]]:
@@ -2766,28 +2760,21 @@ class AlignRepresentations:
         pivot_representation = self.representations_list[pivot]
         others_representaions = self.representations_list[:pivot] + self.representations_list[pivot + 1 :]
 
-        # GW alignment to the pivot
+        # # GW alignment to the pivot
         for representation in others_representaions:
+            
+            pair_name = f"{representation.name}_vs_{pivot_representation.name}"
+            instance_name = self.data_name + "_" + pair_name
+            pair_results_dir = self.main_results_dir + "/" + instance_name
+            
             pairwise = PairwiseAnalysis(
-                results_dir=self.main_results_dir,
+                data_name=self.data_name,
+                results_dir=pair_results_dir,
                 config=self.config,
                 source=representation,
                 target=pivot_representation,
-                data_name=self.data_name,
-                pair_name=self.main_pair_name,
-                filename=self.main_file_name,
-            )
-
-            pairwise.run_entropic_gwot(
-                compute_OT=compute_OT,
-                delete_results=delete_results,
-                return_data=return_data,
-                return_figure=return_figure,
-                OT_format=OT_format,
-                visualization_config=visualization_config,
-                show_log=show_log,
-                fig_dir=fig_dir,
-                ticks=ticks,
+                pair_name=pair_name,
+                instance_name=instance_name,
             )
 
             pairwise.source.embedding = pairwise.get_new_source_embedding()
@@ -2801,21 +2788,27 @@ class AlignRepresentations:
             category_name_list=self.representations_list[0].category_name_list,
             num_category_list=self.representations_list[0].num_category_list,
             category_idx_list=self.representations_list[0].category_idx_list,
-            func_for_sort_sim_mat=self.representations_list[0].func_for_sort_sim_mat
+            func_for_sort_sim_mat=self.representations_list[0].func_for_sort_sim_mat,
+            save_conditional_rdm_path=self.representations_list[0].save_conditional_rdm_path,
 
         )
 
         # Set pairwises whose target are the barycenter
         pairwise_barycenters = []
         for representation in self.representations_list:
+            
+            pair_name = f"{representation.name}_vs_{self.barycenter.name}"
+            instance_name = self.data_name + "_" + pair_name
+            pair_results_dir = self.main_results_dir + "/" + instance_name
+            
             pairwise = PairwiseAnalysis(
-                results_dir=self.main_results_dir,
+                data_name=self.data_name,
+                results_dir=pair_results_dir,
                 config=self.config,
                 source=representation,
                 target=self.barycenter,
-                data_name=self.data_name,
-                pair_name=self.main_pair_name,
-                filename=self.main_file_name,
+                pair_name=pair_name,
+                instance_name=instance_name,
             )
             pairwise_barycenters.append(pairwise)
 
@@ -2848,20 +2841,19 @@ class AlignRepresentations:
         self._get_OT_all_pair(pairwise_barycenters)
 
         # visualize
-        OT_list = []
-        for pairwise in self.pairwise_list:
-            OT = pairwise.show_OT(
-                title=f"$\Gamma$ ({pairwise.pair_name})",
-                return_data=return_data,
-                return_figure=return_figure,
-                OT_format=OT_format,
-                visualization_config=visualization_config,
+        if fig_dir is None:
+            fig_dir = os.path.join(self.main_figure_dir, "barycenter_alignment")
+            os.makedirs(fig_dir, exist_ok=True)
+        
+        for pairwise in pairwise_barycenters:
+            pairwise.plot_OT(
+                return_sorted = False if OT_format == "default" else True,
                 fig_dir=fig_dir,
-                ticks=ticks,
+                visualization_config=visualization_config,                
             )
-            OT_list.append(OT)
 
         if return_data:
+            OT_list = [pairwise.OT for pairwise in pairwise_barycenters]
             return OT_list
     
     def _get_OT_all_pair(self, pairwise_barycenters):
