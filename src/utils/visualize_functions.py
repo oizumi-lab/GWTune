@@ -1,6 +1,6 @@
 import colorsys
 from typing import Any, List, Tuple, Optional
-import os
+import os, re
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -94,11 +94,12 @@ def add_colored_label(ax, x, y, bgcolor, width=1, height=1):
 def show_heatmap(
     matrix: Any,
     title: Optional[str],
-    save_file_name: Optional[str] = None,
     category_name_list: Optional[List[str]] = None,
     num_category_list: Optional[List[int]] = None,
     x_object_labels: Optional[List[str]] = None,
     y_object_labels: Optional[List[str]] = None,
+    fig_name: str = "heatmap",
+    fig_dir: Optional[str] = None,
     **kwargs
 ) -> None:
     """Display a heatmap of the given matrix with various customization options.
@@ -106,7 +107,6 @@ def show_heatmap(
     Args:
         matrix (Any): The matrix to be visualized as a heatmap.
         title (str, optional): The title of the heatmap.
-        save_file_name (str, optional): File name to save the heatmap. If None, the heatmap won't be saved.
         ticks (str, optional): Determines how ticks should be displayed. Options are "objects", "category", or "numbers".
         category_name_list (List[str], optional): List of category names if `ot_category_tick` is True.
         num_category_list (List[int], optional): List of the number of items in each category.
@@ -157,6 +157,8 @@ def show_heatmap(
     color_label_width = kwargs.get('color_label_width', None)
     
     dpi = kwargs.get('dpi', 300)
+    
+    fig_ext = kwargs.get('fig_ext', 'png')
 
     plt.style.use("default")
     plt.rcParams["grid.color"] = "black"
@@ -235,8 +237,9 @@ def show_heatmap(
 
     plt.tight_layout()
 
-    if save_file_name is not None:
-        plt.savefig(save_file_name, bbox_inches='tight', dpi=dpi)
+    if fig_dir is not None:
+        fig_path = os.path.join(fig_dir, f"{fig_name}.{fig_ext}")
+        plt.savefig(fig_path, dpi=dpi, bbox_inches='tight')
 
     if show_figure:
         plt.show()
@@ -528,8 +531,16 @@ def plot_optimization_log(
         fig_ext (str, optional): The extension of the saved figure. Defaults to "png".
         show_figure (bool, optional): Whether to show the figure. Defaults to True.
     """
-    plt.style.use("default")
-    plt.rcParams["grid.color"] = "black"
+    # plt.style.use("default")
+    # plt.rcParams["grid.color"] = "black"
+    # plt.rcParams["grid.alpha"] = str(grid_alpha)
+    # plt.rcParams['font.family'] = font
+    
+    plt.rcParams.update(plt.rcParamsDefault)
+    styles = matplotlib.style.available
+    darkgrid_style = [s for s in styles if re.match(r"seaborn-.*-darkgrid", s)][0]
+    plt.style.use(darkgrid_style)
+    
     plt.rcParams["grid.alpha"] = str(grid_alpha)
     plt.rcParams['font.family'] = font
     
@@ -566,7 +577,7 @@ def plot_optimization_log(
     )
     ax1.tick_params(axis="y", which="major", labelsize=yticks_size)
 
-    ax1.grid(True, which="both")
+    ax1.grid(True, which="both", linewidth=0.5)
     cbar = plt.colorbar(sc1, ax=ax1)
     cbar.set_label(label="Matching Rate (%)", size=cbar_label_size)
     
@@ -594,8 +605,16 @@ def plot_optimization_log(
     plt.clf()
     plt.close()
     
-    plt.style.use("default")
-    plt.rcParams["grid.color"] = "black"
+    # plt.style.use("default")
+    # plt.rcParams["grid.color"] = "black"
+    # plt.rcParams["grid.alpha"] = str(grid_alpha)
+    # plt.rcParams['font.family'] = font
+    
+    plt.rcParams.update(plt.rcParamsDefault)
+    styles = matplotlib.style.available
+    darkgrid_style = [s for s in styles if re.match(r"seaborn-.*-darkgrid", s)][0]
+    plt.style.use(darkgrid_style)
+    
     plt.rcParams["grid.alpha"] = str(grid_alpha)
     plt.rcParams['font.family'] = font
 
@@ -646,7 +665,7 @@ def plot_optimization_log(
     
    
     
-    ax2.grid(True)
+    ax2.grid(True, linewidth=0.5)
     plt.tight_layout()
 
     if fig_dir is not None:
