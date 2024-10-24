@@ -1,6 +1,6 @@
 import colorsys
 from typing import Any, List, Tuple, Optional
-import os
+import os, re
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -531,8 +531,16 @@ def plot_optimization_log(
         fig_ext (str, optional): The extension of the saved figure. Defaults to "png".
         show_figure (bool, optional): Whether to show the figure. Defaults to True.
     """
-    plt.style.use("default")
-    plt.rcParams["grid.color"] = "black"
+    # plt.style.use("default")
+    # plt.rcParams["grid.color"] = "black"
+    # plt.rcParams["grid.alpha"] = str(grid_alpha)
+    # plt.rcParams['font.family'] = font
+    
+    plt.rcParams.update(plt.rcParamsDefault)
+    styles = matplotlib.style.available
+    darkgrid_style = [s for s in styles if re.match(r"seaborn-.*-darkgrid", s)][0]
+    plt.style.use(darkgrid_style)
+    
     plt.rcParams["grid.alpha"] = str(grid_alpha)
     plt.rcParams['font.family'] = font
     
@@ -569,7 +577,7 @@ def plot_optimization_log(
     )
     ax1.tick_params(axis="y", which="major", labelsize=yticks_size)
 
-    ax1.grid(True, which="both")
+    ax1.grid(True, which="both", linewidth=0.5)
     cbar = plt.colorbar(sc1, ax=ax1)
     cbar.set_label(label="Matching Rate (%)", size=cbar_label_size)
     
@@ -597,8 +605,16 @@ def plot_optimization_log(
     plt.clf()
     plt.close()
     
-    plt.style.use("default")
-    plt.rcParams["grid.color"] = "black"
+    # plt.style.use("default")
+    # plt.rcParams["grid.color"] = "black"
+    # plt.rcParams["grid.alpha"] = str(grid_alpha)
+    # plt.rcParams['font.family'] = font
+    
+    plt.rcParams.update(plt.rcParamsDefault)
+    styles = matplotlib.style.available
+    darkgrid_style = [s for s in styles if re.match(r"seaborn-.*-darkgrid", s)][0]
+    plt.style.use(darkgrid_style)
+    
     plt.rcParams["grid.alpha"] = str(grid_alpha)
     plt.rcParams['font.family'] = font
 
@@ -649,7 +665,7 @@ def plot_optimization_log(
     
    
     
-    ax2.grid(True)
+    ax2.grid(True, linewidth=0.5)
     plt.tight_layout()
 
     if fig_dir is not None:
