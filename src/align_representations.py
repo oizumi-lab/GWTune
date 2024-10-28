@@ -845,14 +845,21 @@ class PairwiseAnalysis:
                     database=self.study_name,
                     **self.config.db_params,
                 ).render_as_string(hide_password=False)
+        
+        self.__OT = None
     
     @property
     def OT(self):
         try:
-            ot = self._run_entropic_gwot(compute_OT=False)
+            if self.__OT is None:
+                self.__OT = self._run_entropic_gwot(compute_OT=False)
         except KeyError as e:
             raise ValueError(f'OT for {self.pair_name} has not been computed yet.')
-        return ot
+        return self.__OT
+    
+    @OT.setter
+    def OT(self, value):
+        self.__OT = value
 
     @property
     def sorted_OT(self):
@@ -2759,6 +2766,8 @@ class AlignRepresentations:
         # Select the pivot
         pivot_representation = self.representations_list[pivot]
         others_representaions = self.representations_list[:pivot] + self.representations_list[pivot + 1 :]
+        
+        pair_name_list = [pair.pair_name for pair in self.pairwise_list]
 
         # # GW alignment to the pivot
         for representation in others_representaions:
@@ -2776,20 +2785,31 @@ class AlignRepresentations:
                 pair_name=pair_name,
                 instance_name=instance_name,
             )
-
-            pairwise.source.embedding = pairwise.get_new_source_embedding()
+            
+            # check if the pair is already computed
+            if pair_name in pair_name_list:
+                representation.embedding = pairwise.get_new_source_embedding()
+            
+            elif f"{pivot_representation.name}_vs_{representation.name}" in pair_name_list:
+                OT_t = self.pairwise_list[pair_name_list.index(f"{pivot_representation.name}_vs_{representation.name}")].OT
+                representation.embedding = pairwise.procrustes(representation.embedding, pivot_representation.embedding, OT_t)
+            
+            else:
+                # Compute GWOT
+                raise ValueError(f"Pairwise {pair_name} is not computed yet. Please compute it first.")
+            
 
         # Set up barycenter
         init_embedding = self.calc_barycenter()
         self.barycenter = Representation(
             name="barycenter",
             embedding=init_embedding,
-            object_labels=self.representations_list[0].object_labels,
-            category_name_list=self.representations_list[0].category_name_list,
-            num_category_list=self.representations_list[0].num_category_list,
-            category_idx_list=self.representations_list[0].category_idx_list,
-            func_for_sort_sim_mat=self.representations_list[0].func_for_sort_sim_mat,
-            save_conditional_rdm_path=self.representations_list[0].save_conditional_rdm_path,
+            object_labels=pivot_representation.object_labels,
+            category_name_list=pivot_representation.category_name_list,
+            num_category_list=pivot_representation.num_category_list,
+            category_idx_list=pivot_representation.category_idx_list,
+            func_for_sort_sim_mat=pivot_representation.func_for_sort_sim_mat,
+            save_conditional_rdm_path=pivot_representation.save_conditional_rdm_path,
 
         )
 
