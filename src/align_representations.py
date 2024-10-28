@@ -846,20 +846,20 @@ class PairwiseAnalysis:
                     **self.config.db_params,
                 ).render_as_string(hide_password=False)
         
-        self._OT = None
+        self.__OT = None
     
     @property
     def OT(self):
         try:
-            if self._OT is None:
-                self._OT = self._run_entropic_gwot(compute_OT=False)
+            if self.__OT is None:
+                self.__OT = self._run_entropic_gwot(compute_OT=False)
         except KeyError as e:
             raise ValueError(f'OT for {self.pair_name} has not been computed yet.')
-        return self._OT
+        return self.__OT
     
     @OT.setter
     def OT(self, value):
-        self._OT = value
+        self.__OT = value
 
     @property
     def sorted_OT(self):
