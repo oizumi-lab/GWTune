@@ -169,3 +169,4 @@ results/*
 !results/.gitkeep
 
 experiment/*
+poetry.lock
