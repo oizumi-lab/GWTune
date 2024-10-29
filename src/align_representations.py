@@ -1794,30 +1794,32 @@ class AlignRepresentations:
     Attributes:
         config (OptimizationConfig):
             all the essential parameters for GWOT.
-            
-        data_name (str, optional):
-            The name of the folder to save the result for each pair. Defaults to "NoDefined".
-        metric (str, optional):
-            Please set the metric that can be used in "scipy.spatical.distance.cdist()". Defaults to "cosine".
+        pairwise_method (str):
+            The method to compute pairwise alignment. Defaults to "combination".
         representations_list (List[Representation]):
             List of Representation. used in the "combination" method.
         source_list (List[Representation]):
             List of source Representation. used in the "permutation" method.
         target_list (List[Representation]):
             List of target Representation. used in the "permutation" method.
-        histogram_matching (bool, optional):
+        histogram_matching (bool):
             This will adjust the histogram of target to that of source. Defaults to False.
-        main_results_dir (Optional[str], optional):
+        main_results_dir (Optional[str]):
             The main folder directory to save the results. Defaults to None.
-        main_pair_name (str):
-            Name identifier for the main representation pair. (Set internally)
-        main_file_name (str):
-            Filename identifier for the main results. (Set internally)
+        data_name (str):
+            The name of the folder to save the result for each pair. Defaults to "NoDefined".
+        metric (str):
+            The metric to compute the similarity matrix. Defaults to "cosine".
+        pairs_computed (Optional[List[str]]):
+            List of pairs that have been computed. Defaults to None.
+        specific_eps_list (Optional[dict]):
+            Dictionary to set specific eps_list for each representation. Defaults to None.
+        
         RSA_corr (dict):
             Dictionary to store RSA correlation values. (Set internally)
         name_list (List[str]):
             List of names from the provided representations.
-        all_pair_list (List[Tuple[int, int]]):
+        pairs_index_list (List[Tuple[int, int]]):
             All possible pairwise combinations of representations.
     """
 
