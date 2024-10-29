@@ -1777,6 +1777,11 @@ class PairwiseAnalysis:
             if len(top1_acc_list) != 0:
                 df = pd.concat([df, new_df])
                 df.to_csv(os.path.dirname(save_path) + "/result.csv")
+            
+            else:
+                if len(df) > num_seed:
+                    df = df.iloc[:num_seed]
+                    
             return df
 
 
