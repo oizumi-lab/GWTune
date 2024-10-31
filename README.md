@@ -10,6 +10,9 @@ By replacing the tutorial data with your own data, you can easily test GWOT on y
 To further facilitate use cases of our toolbox, we also provide tutorials for other types of datasets, neural data (`AllenBrain`) and neural network models (`DNN`).   
 You can find these tutorials in the `tutorial_other_datasets` folder.   
 
+## Update information
+- 2024/10/31 : Update the dataset of THINGS and AllenBrain.
+
 ## Installation 
 We outline instructions for installing the required packages using `poetry`, `conda`, `pip`.
 
