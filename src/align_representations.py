@@ -429,7 +429,8 @@ class Representation:
             Defaults to None.
         save_conditional_rdm_path (str, optional):
             The path to save the conditional similarity matrix. Defaults to None.
-            If None, the conditional similarity matrix is not created. The conditional similarity matrix is saved in the "save_rdm_path/metric" for each metric.
+            If None, the conditional similarity matrix is not created. 
+            The conditional similarity matrix is saved in the "save_conditional_rdm_path/metric" for each metric.
     """
 
     def __init__(
@@ -1795,7 +1796,7 @@ class AlignRepresentations:
         config (OptimizationConfig):
             all the essential parameters for GWOT.
         pairwise_method (str):
-            The method to compute pairwise alignment. Defaults to "combination".
+            The method to compute pairwise alignment. You can choose "combination" or "permutation". Defaults to "combination".
         representations_list (List[Representation]):
             List of Representation. used in the "combination" method.
         source_list (List[Representation]):
