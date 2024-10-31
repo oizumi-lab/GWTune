@@ -463,7 +463,7 @@ class Representation:
         self.func_for_sort_sim_mat = func_for_sort_sim_mat
         
         # save the conditional similarity matrix. If None, the conditional similarity matrix is not created. 
-        # The conditional similarity matrix is saved in the "save_rdm_path/metric" for each metric.
+        # The conditional similarity matrix is saved in the "save_conditional_rdm_path/metric" for each metric.
         self.save_conditional_rdm_path = save_conditional_rdm_path
         
         # compute the dissimilarity matrix from embedding if sim_mat is None,
