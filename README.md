@@ -59,7 +59,7 @@ If you use this toolbox in your research and find it useful, please cite the fol
 
 [1] Unsupervised Alignment in Neuroscience: Introducing a Toolbox for Gromov-Wasserstein Optimal Transport    
 Masaru Sasaki&dagger;, Ken Takeda&dagger;, Kota Abe, Masafumi Oizumi    
-[bioRxiv](https://www.biorxiv.org/content/10.1101/2023.09.15.558038v1)     
+[bioRxiv](https://www.biorxiv.org/content/10.1101/2023.09.15.558038v2)     
 &dagger;: equal contribution   
 
 [2] Is my "red" your "red"?: Unsupervised alignment of qualia structures via optimal transport  
