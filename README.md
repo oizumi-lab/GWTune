@@ -12,8 +12,8 @@ You can find these tutorials in the `tutorial_other_datasets` folder.
 
 ## Update information
 - 2024/10/31 : 
-  - Update the dataset of THINGS and AllenBrain.
-  - The paper on bioRxiv below has been updated and the data used in the paper has changed.
+  - The example data in the tutorials have been updated to match those used in the latest version of our toolbox paper on bioRxiv (see reference [1] below).
+  - Our toolbox paper has been updated to place more emphasis on neuroscience applications, although it is generally applicable to other fields.
 
 ## Installation 
 We outline instructions for installing the required packages using `poetry`, `conda`, `pip`.
