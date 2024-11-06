@@ -1809,8 +1809,6 @@ class AlignRepresentations:
             The main folder directory to save the results. Defaults to None.
         data_name (str):
             The name of the folder to save the result for each pair. Defaults to "NoDefined".
-        metric (str):
-            The metric to compute the similarity matrix. Defaults to "cosine".
         pairs_computed (Optional[List[str]]):
             List of pairs that have been computed. Defaults to None.
         specific_eps_list (Optional[dict]):
@@ -1834,13 +1832,11 @@ class AlignRepresentations:
         histogram_matching: bool = False,
         main_results_dir: Optional[str] = None,
         data_name: str = "NoDefined",
-        metric: str = "cosine",
         pairs_computed: Optional[List[str]] = None,
         specific_eps_list: Optional[dict] = None,
     ) -> None:
         self.config = config
         self.data_name = data_name
-        self.metric = metric
         self.histogram_matching = histogram_matching
         
         print(f"data_name : {self.data_name}")
@@ -2411,6 +2407,7 @@ class AlignRepresentations:
         self,
         top_k_list: List[int],
         eval_type: str = "ot_plan",
+        metric: str = "cosine",
         category_mat: Optional[Any] = None,
         barycenter: bool = False,
         return_dataframe: bool = False
@@ -2426,6 +2423,9 @@ class AlignRepresentations:
 
             eval_mat (Optional[Any], optional):
                 This will be used for the category info. Defaults to None.
+            
+            metric (str, optional):
+                The metric used to calculate the distance between the representations. Defaults to "cosine".
 
             barycenter (bool, optional):
                 Indicates if the accuracy should be evaluated with respect to a barycenter representation.
@@ -2447,7 +2447,7 @@ class AlignRepresentations:
                 top_k_list, 
                 eval_type=eval_type,
                 category_mat=category_mat, 
-                metric=self.metric, 
+                metric=metric, 
                 barycenter=barycenter, 
             )
 
@@ -2744,6 +2744,7 @@ class AlignRepresentations:
         n_iter: int,
         return_data: bool = False,
         OT_format: str = "default",
+        metric: str = "cosine",
         visualization_config: VisualizationConfig = VisualizationConfig(),
         fig_dir: Optional[str] = None,
     ) -> Optional[List[np.ndarray]]:
@@ -2759,6 +2760,8 @@ class AlignRepresentations:
             OT_format (str, optional):
                 Format of similarity matrix to visualize. Options include "default", "sorted", and "both".
                 Defaults to "default".
+            metric (str, optional):
+                The metric used to calculate the Wasserstein distance. Defaults to "cosine".
             visualization_config (VisualizationConfig, optional):
                 Container of parameters used for figure. Defaults to VisualizationConfig().
             fig_dir (Optional[str], optional):
@@ -2852,7 +2855,7 @@ class AlignRepresentations:
                 pairwise.target.embedding = embedding_barycenter
 
                 # OT to the barycenter
-                loss += pairwise.wasserstein_alignment(metric=self.metric)
+                loss += pairwise.wasserstein_alignment(metric=metric)
 
                 # update the embeddings of each representation
                 pairwise.source.embedding = pairwise.get_new_source_embedding()
