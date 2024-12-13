@@ -10,6 +10,7 @@ from matplotlib.patches import Rectangle
 from mpl_toolkits.mplot3d import Axes3D
 import pandas as pd
 from matplotlib.colors import LogNorm
+import matplotlib as mpl
 
 def get_color_labels(
     n: int,
@@ -231,7 +232,8 @@ def show_heatmap(
     if cbar_range is not None:
         cmin, cmax = cbar_range
         cbar.mappable.set_clim(cmin, cmax)
-    
+        cbar.ax.yaxis.get_offset_text().set_fontsize(int(cbar_ticks_size * 0.8))
+        # cbar.formatter = mpl.ticker.ScalarFormatter(useMathText=True)
     
     cbar.ax.tick_params(axis='y', labelsize = cbar_ticks_size)
 
