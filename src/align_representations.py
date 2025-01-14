@@ -2612,6 +2612,7 @@ class AlignRepresentations:
         legend: bool = True,
         fig_dir: Optional[str] = None,
         fig_name: str = "Aligned_embedding",
+        returned: str = "figure",
         **kwargs,
     ) -> Optional[Union[plt.Figure, List[np.ndarray]]]:
         """
@@ -2719,6 +2720,9 @@ class AlignRepresentations:
             fig_dir=fig_dir, 
             **visualization_config(),
         )
+        
+        if returned == "row_data":
+            return embedding_list
 
     def calc_barycenter(self, X_init=None):
         embedding_list = [representation.embedding for representation in self.representations_list]
