@@ -78,6 +78,7 @@ class OptimizationConfig:
             "min_resource": 2,
             "reduction_factor": 3,
         },
+        show_progress_bar: bool = True,
     ) -> None:
         """Initialization of the instance.
 
@@ -127,6 +128,8 @@ class OptimizationConfig:
             pruner_params (dict, optional):
                 Additional parameters for the pruner. See Optuna's pruner page for more details.
                 Defaults to {"n_startup_trials": 1, "n_warmup_steps": 2, "min_resource": 2, "reduction_factor": 3}.
+            show_progress_bar (bool, optional):
+                Indicates if the progress bar is shown during optimization. Defaults to True.
         """
 
         self.gw_type = gw_type
@@ -160,7 +163,7 @@ class OptimizationConfig:
 
         self.pruner_name = pruner_name
         self.pruner_params = pruner_params
-
+        self.show_progress = show_progress_bar
 
 class VisualizationConfig:
     """This is an instance for sharing the parameters to make the figures of GWOT with the instance PairwiseAnalysis.
@@ -1287,6 +1290,7 @@ class PairwiseAnalysis:
                 instance_name=self.instance_name,
                 first_random_init_seed=first_random_init_seed,
                 tol=self.config.tol,
+                show_progress=self.config.show_progress,
             )
 
             # setting for optimization

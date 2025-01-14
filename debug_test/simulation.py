@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import optuna
 import glob
+from tqdm import tqdm
 
 from src.align_representations import Representation, AlignRepresentations, OptimizationConfig, VisualizationConfig
 
@@ -66,18 +67,21 @@ def add_noise_to_one_dimension(points, noise_deg=0.0001, dimension=0):
 
 #%%
 # GWOT parameters
-eps_list = [1e-2, 10]
-num_trial = 10
+eps_list = [1e-2, 1]
+num_trial = 100
 
 compute_OT = True
 delete_results = True
+
+# optuna.logging.set_verbosity(optuna.logging.WARNING)
     
 # Parameters for starfish generation
 n_points = 50  # Total number of points
-sym_deg_list = np.linspace(0, 1, 3)
-noise_deg_list = np.linspace(0, 0.1, 3)
+sym_deg_list = np.linspace(0, 0.5, 20)
+noise_deg_list = np.linspace(0, 0.1, 5)
 sampler_initilizations = ["random_tpe", "random_grid", "uniform_grid"]
 
+#%%
 for sym_deg in sym_deg_list:
     for noise_deg in noise_deg_list:
         # Generate starfish shapes
@@ -110,7 +114,7 @@ for sym_deg in sym_deg_list:
         plt.tight_layout()
         plt.show()
 
-        for sampler_init in sampler_initilizations:
+        for sampler_init in tqdm(sampler_initilizations):
             if "random" in sampler_init:
                 initialization = "random"
             elif "uniform" in sampler_init:
@@ -143,6 +147,7 @@ for sym_deg in sym_deg_list:
                                 device="cpu",  # "cuda" or "cpu"; for numpy, only "cpu" can be used.
                                 sampler_name=sampler,
                                 init_mat_plan=initialization,
+                                show_progress_bar=False,
                             )
 
             vis_config = VisualizationConfig(
@@ -240,10 +245,8 @@ def get_min_values(df):
     return min_values
 
 
-sym_deg_list = np.linspace(0, 1, 3)
-noise_deg_list = np.linspace(0, 0.1, 3)
-sampler_initilizations = ["random_tpe", "random_grid", "uniform_grid"]
-
+min_values = []
+min_indices = []
 for sampler_init in sampler_initilizations:
     for sym_deg in sym_deg_list:
         for noise_deg in noise_deg_list:
@@ -254,6 +257,70 @@ for sampler_init in sampler_initilizations:
             
             df = optuna.load_study(study_name = os.path.basename(df_path).split(".db")[0], storage = f"sqlite:///{df_path}").trials_dataframe()
             
-            min_values = get_min_values(df)
+            min_gwds = get_min_values(df)
             
+            # get the min value in the min_gwds
+            min_value = min(min_gwds)
+            min_values.append(min_value)
+            
+            # get the index of when the min value is reached
+            min_index = min_gwds.index(min_value)
+            min_indices.append(min_index)
 
+# plot min_values and min_indices in 2d heatmap
+min_values = np.array(min_values).reshape((len(sampler_initilizations), len(sym_deg_list), len(noise_deg_list)))
+min_indices = np.array(min_indices).reshape((len(sampler_initilizations), len(sym_deg_list), len(noise_deg_list)))
+
+#%%
+for sampler_init in sampler_initilizations:
+    plt.figure(figsize=(15, 5))
+    plt.imshow(min_values[sampler_initilizations.index(sampler_init), :, :], cmap='viridis')
+    plt.colorbar()
+    plt.yticks(ticks=np.arange(len(sym_deg_list)), labels=sym_deg_list)
+    plt.ylabel("Symmetry Degree")
+    plt.xticks(ticks=np.arange(len(noise_deg_list)), labels=noise_deg_list, rotation=45)
+    plt.xlabel("Noise Degree")
+    plt.title(f"Min gwds for {sampler_init}")
+    plt.tight_layout()
+    plt.show()
+    
+    plt.figure(figsize=(15, 5))
+    plt.imshow(min_indices[sampler_initilizations.index(sampler_init), :, :], cmap='viridis')
+    plt.colorbar()
+    plt.yticks(ticks=np.arange(len(sym_deg_list)), labels=sym_deg_list)
+    plt.ylabel("Symmetry Degree")
+    plt.xticks(ticks=np.arange(len(noise_deg_list)), labels=noise_deg_list, rotation=45)
+    plt.xlabel("Noise Degree")
+    plt.title(f"Min indices for {sampler_init}")
+    plt.tight_layout()
+    plt.show()
+
+
+# %%
+# plot the min_gwds for the fixed noise degree
+noise_deg = noise_deg_list[2]
+plt.figure(figsize=(15, 5))
+for sampler_init in sampler_initilizations:
+    min_values = []
+    for sym_deg in sym_deg_list:
+        main_results_dir = f"../results/simulation_starfish/{sampler_init}"
+        data_name = f"Starfish_{n_points}_points_sym{sym_deg}_noise{noise_deg}_1_vs_2"
+        
+        df_path = glob.glob(f"{main_results_dir}/{data_name}/*/*.db")[0]
+        
+        df = optuna.load_study(study_name = os.path.basename(df_path).split(".db")[0], storage = f"sqlite:///{df_path}").trials_dataframe()
+        
+        min_gwds = get_min_values(df)
+        
+        # get the min value in the min_gwds
+        min_value = min(min_gwds)
+        min_values.append(min_value)
+        
+    plt.plot(sym_deg_list, min_values, label=sampler_init)
+plt.xlabel("Symmetry Degree")
+plt.ylabel("Min GWD")
+plt.title(f"Min GWDs for {sampler_init} with noise degree {noise_deg}")
+plt.tight_layout()
+plt.legend()
+plt.show()
+# %%

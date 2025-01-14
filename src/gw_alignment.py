@@ -51,6 +51,7 @@ class GW_Alignment:
         data_type: str = "double",
         sinkhorn_method: str = "sinkhorn",
         instance_name: Optional[str]= None,
+        show_progress: bool = True,
         **kwargs,
     ) -> None:
         """Initialize the Gromov-Wasserstein alignment object.
@@ -130,6 +131,7 @@ class GW_Alignment:
             gw_type=gw_type,
             sinkhorn_method=sinkhorn_method,
             instance_name=instance_name,
+            show_progress=show_progress,
             **kwargs
         )
 
@@ -252,6 +254,7 @@ class MainGromovWasserstainComputation:
         tol: float = 1e-9,
         verbose: bool = False,
         m: Optional[float]=None,
+        show_progress: bool = True,
     ) -> None:
         """Initialize the Gromov-Wasserstein alignment computation object.
 
@@ -340,6 +343,8 @@ class MainGromovWasserstainComputation:
         if self.gw_type == "entropic_partial_gromov_wasserstein":
             self.tol = 1e-7
             self.m = m
+        
+        self.show_progress = show_progress
 
     # main function
     def compute_GW_with_init_plans(
@@ -428,10 +433,16 @@ class MainGromovWasserstainComputation:
 
         best_gw_loss = float("inf")
 
-        pbar = tqdm(zip(init_mat_list, seeds), total=len(init_mat_list))
-        pbar.set_description(f"{self.instance_name} No.{trial.number}, eps:{eps:.3e}")
+        # pbar = tqdm(zip(init_mat_list, seeds), total=len(init_mat_list))
+        if self.show_progress:
+            iterable = tqdm(zip(init_mat_list, seeds), total=len(init_mat_list))
+            iterable.set_description(f"{self.instance_name} No.{trial.number}, eps:{eps:.3e}")
+            # pbar.set_description(f"{self.instance_name} No.{trial.number}, eps:{eps:.3e}")
+        else:
+            iterable = zip(init_mat_list, seeds)
+            optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-        for i, (init_mat, seed) in enumerate(pbar):
+        for i, (init_mat, seed) in enumerate(iterable):
             logv = self.gw_computation(eps, init_mat)
 
             if logv["gw_dist"] < best_gw_loss:
@@ -448,8 +459,9 @@ class MainGromovWasserstainComputation:
                     seed=seed,
                 )
                 
-                elapsed_time = pbar.format_dict["elapsed"]
-                trial.set_user_attr("elapsed_time", elapsed_time)
+                if self.show_progress:
+                    elapsed_time = iterable.format_dict["elapsed"]
+                    trial.set_user_attr("elapsed_time", elapsed_time)
 
             self._check_pruner_should_work(
                 logv["gw_dist"],
