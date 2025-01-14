@@ -9,7 +9,11 @@ def get_data(data_select):
     print(glob.glob(f"{path}/*/*/*.db"))
     random_path = glob.glob(f"{path}/*/random/*.db")[0]
     uniform_path = glob.glob(f"{path}/*/uniform/*.db")[0]
-    random_grid_path = glob.glob(f"../results/random+grid/{data_select}/*/random/*.db")[0]
+    
+    if "simulation" in data_select:
+        random_grid_path = glob.glob(f"{path}/random+grid/*/random/*.db")[0]
+    else:
+        random_grid_path = glob.glob(f"../results/random+grid/{data_select}/*/random/*.db")[0]
 
     df_random = optuna.load_study(study_name = os.path.basename(random_path).split(".db")[0], storage = f"sqlite:///{random_path}").trials_dataframe()
     df_uniform = optuna.load_study(study_name = os.path.basename(uniform_path).split(".db")[0], storage = f"sqlite:///{uniform_path}").trials_dataframe()
@@ -31,6 +35,52 @@ def get_min_values(df):
             min_values.append(current_min)
     
     return min_values
+
+def get_max_acc(df):
+    max_acc = []
+    current_max = df['value'][0]
+    for i in range(len(df)):
+        value = df['value'][i]
+
+        if value > current_max:
+            current_max = value
+            max_acc.append(current_max)
+        else:
+            max_acc.append(current_max)
+    
+    return max_acc
+
+#%%
+
+# data_select_list = ["simulation_corr0.9", "simulation_corr0.8", "simulation_corr0.7"] # 
+# data_select_list = ["simulation_clusters4", "simulation_clusters8", "simulation_clusters16"] #,, "simulation_clusters4"
+data_select_list = ["simulation_high_symmetry", "simulation_medium_symmetry", "simulation_low_symmetry"] #,, "simulation_clusters4"
+title_list = ["high symmetry", "medium symmetry", "low symmetry"] # , "4 clusters"
+
+all_data = []
+for data_select, title in zip(data_select_list, title_list):
+    random, uniform, random_grid = get_data(data_select)
+    all_data.append((random, uniform, random_grid))
+
+# plot
+plt.figure(figsize=(10, 12))
+plt.suptitle("Comparison of different search strategies")
+
+n = len(data_select_list)
+for i in range(n):
+    plt.subplot(n, 1, i+1)
+    plt.title(title_list[i])
+    plt.plot(get_min_values(all_data[i][1]), label = "uniform with grid")
+    plt.plot(get_min_values(all_data[i][2]), label = "random with grid")
+    plt.plot(get_min_values(all_data[i][0]), label = "random with TPE")
+    plt.xlim(0, 100)
+    plt.ylim(0.0, 0.2)
+    plt.xlabel("Trial")
+    plt.ylabel("minimum GWD")
+    plt.grid(True)
+    plt.legend()
+plt.tight_layout()
+plt.show()
 
 #%%
 things_random, things_uniform, things_random_grid = get_data("THINGS")

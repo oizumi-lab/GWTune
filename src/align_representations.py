@@ -2135,6 +2135,7 @@ class AlignRepresentations:
         fix_random_init_seed: bool = False,
         first_random_init_seed: Optional[int] = None,
         parallel_method :str = "multiprocess",
+        delete_confirmation: bool = True,
     ) -> Optional[List[np.ndarray]]:
         """
         compute GWOT for each pair.
@@ -2191,7 +2192,7 @@ class AlignRepresentations:
         utils_functions.check_parameters(self.config.n_jobs, sampler_seed)
         
         if delete_results:
-            self.drop_gw_alignment_files(drop_all=True, delete_database=True, delete_directory=True)
+            self.drop_gw_alignment_files(drop_all=True, delete_database=True, delete_directory=True, delete_confirmation=delete_confirmation)
 
         # compute the entropic GWOT in parallel.
         if compute_OT:
@@ -2292,6 +2293,7 @@ class AlignRepresentations:
         drop_all: bool = False,
         delete_database: bool = False,
         delete_directory: bool = False,
+        delete_confirmation: bool = False,
     ) -> None:
         """Delete the specified database and directory with the given filename and sampler name.
 
@@ -2315,12 +2317,14 @@ class AlignRepresentations:
         
         if drop_all:
             drop_list = all_drop_list
-            confirm = input(f"Are you sure you want to delete all the results of following list in {self.main_results_dir}?:\n{all_drop_list}\n(yes/no) : ")
             
-            if confirm == "yes":
-                pass
-            else:
-                return None
+            if delete_confirmation:
+                confirm = input(f"Are you sure you want to delete all the results of following list in {self.main_results_dir}?:\n{all_drop_list}\n(yes/no) : ")
+                
+                if confirm == "yes":
+                    pass
+                else:
+                    return None
         
         else:
             assert rep_or_pair_name_list is not None, "Specify the results name in drop_filenames or set drop_all=True"
