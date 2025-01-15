@@ -8,14 +8,11 @@ import matplotlib.ticker as ticker
 import optuna
 import glob
 from tqdm import tqdm
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 
 from src.align_representations import Representation, AlignRepresentations, OptimizationConfig, VisualizationConfig
 
 #%%
-
-main_compute = False
-main_visualize = True
-
 def create_starfish_3d_fixed_width_clean(num_arms=5, sym_deg=0.0, n_points=100, arm_length=1.0, arm_width=0.2):
     """
     Generates a starfish-like shape with fixed arm width and slight length perturbation.
@@ -71,8 +68,11 @@ def add_noise_to_one_dimension(points, noise_deg=0.0001, dimension=0):
     return points + noise
 
 #%%
+main_compute = True
+main_visualize = True
+
 # GWOT parameters
-eps_list = [1e-2, 1]
+eps_list = [1e-3, 1]
 num_trial = 100
 
 compute_OT = True
@@ -83,8 +83,102 @@ delete_results = True
 # Parameters for starfish generation
 n_points = 50  # Total number of points
 sym_deg_list = np.linspace(0, 0.5, 20)
-noise_deg_list = np.linspace(0, 0.1, 5)
+noise_deg_list = np.linspace(0, 1e0, 5)
 sampler_initilizations = ["random_tpe", "random_grid", "uniform_grid"]
+
+#%%
+vis_config = VisualizationConfig(
+    figsize=(8, 6), 
+    title_size = 0, 
+    cmap = "rocket_r",
+    cbar_ticks_size=10,
+    font="Arial",
+    # color_labels=colors,
+    color_label_width=3,
+    xlabel=f"{n_points} items",
+    ylabel=f"{n_points} items",
+    xlabel_size=40,
+    ylabel_size=40,
+)
+
+vis_config_ot = VisualizationConfig(
+    figsize=(8, 6), 
+    title_size = 0, 
+    cmap = "rocket_r",
+    cbar_ticks_size=10,
+    font="Arial",
+    # color_labels=colors,
+    color_label_width=3,
+    xlabel=f"{n_points} items of X",
+    ylabel=f"{n_points} items of Y",
+    xlabel_size=40,
+    ylabel_size=40,
+)
+
+vis_log = VisualizationConfig(
+    figsize=(8, 6), 
+    title_size = 0, 
+    cmap = "viridis",
+    cbar_ticks_size=15,
+    # font="Arial",
+    xlabel_size=20,
+    xticks_size=15,
+    ylabel_size=20,
+    yticks_size=15,
+    cbar_label_size=15,
+    plot_eps_log=True,
+    fig_ext='svg'
+)
+
+
+# %%
+def run_starfish_experiment(shape1, shape2_one_noise, sampler, initialization, main_results_dir):
+    # Create representations
+    rep1 = Representation(name="1", metric="euclidean", embedding=shape1)
+    rep2 = Representation(name="2", metric="euclidean", embedding=shape2_one_noise)
+
+    config = OptimizationConfig(
+        eps_list=eps_list,
+        num_trial=num_trial,
+        db_params={"drivername": "sqlite"},
+        sinkhorn_method="sinkhorn_log",
+        n_iter=1,
+        max_iter = 200,
+        to_types="numpy",  
+        device="cpu",
+        data_type = "double", 
+        sampler_name=sampler,
+        init_mat_plan=initialization,
+        show_progress_bar=False,
+    )
+
+    alignment = AlignRepresentations(
+        config=config,
+        representations_list=[rep1, rep2],
+        main_results_dir=main_results_dir,
+        data_name=f"Starfish_{n_points}_points_sym{sym_deg}_noise{noise_deg}",
+    )
+
+    # RSA
+    fig_dir = f"../results/figs/simulation_Starfish"
+    os.makedirs(fig_dir, exist_ok=True)
+    alignment.show_sim_mat(
+        visualization_config=vis_config, 
+        show_distribution=False,
+        fig_dir=fig_dir
+    )
+    alignment.RSA_get_corr(metric="pearson")
+
+    # GW
+    alignment.gw_alignment(
+        compute_OT=compute_OT,
+        delete_results=delete_results,
+        visualization_config=vis_config_ot,
+        fig_dir=fig_dir,
+        delete_confirmation=False
+    )
+
+    alignment.show_optimization_log(fig_dir=fig_dir, visualization_config=vis_log)
 
 #%%
 if main_compute:
@@ -93,7 +187,6 @@ if main_compute:
             # Generate starfish shapes
             shape1 = create_starfish_3d_fixed_width_clean(num_arms=5, sym_deg=sym_deg, n_points=n_points)
             shape2_one_noise = add_noise_to_one_dimension(shape1, noise_deg=noise_deg, dimension=0)
-
 
             # Visualize the shapes
             fig = plt.figure(figsize=(15, 5))
@@ -116,143 +209,60 @@ if main_compute:
             ax2.set_zlabel("Z")
             ax2.legend()
 
-
             plt.tight_layout()
             plt.show()
+            os.makedirs("../results/figs/simulation_Starfish", exist_ok=True)
             plt.savefig(f"../results/figs/simulation_Starfish/Starfish_{n_points}_points_sym{sym_deg}_noise{noise_deg}.png")
+            
+            pool = ProcessPoolExecutor(len(sampler_initilizations))
+            
+            with pool:
+                processes = []
+                for idx, sampler_init in enumerate(sampler_initilizations):
+                    if "random" in sampler_init:
+                        initialization = "random"
+                    elif "uniform" in sampler_init:
+                        initialization = "uniform"
 
-            for sampler_init in tqdm(sampler_initilizations):
-                if "random" in sampler_init:
-                    initialization = "random"
-                elif "uniform" in sampler_init:
-                    initialization = "uniform"
-
-                if "tpe" in sampler_init:
-                    sampler = "tpe"
-                elif "grid" in sampler_init:
-                    sampler = "grid"
-                
-                main_results_dir = f"../results/simulation_starfish/{sampler_init}"
+                    if "tpe" in sampler_init:
+                        sampler = "tpe"
+                    elif "grid" in sampler_init:
+                        sampler = "grid"
                     
-                # Create representations
-                rep1 = Representation(
-                    name="1",
-                    metric="euclidean",
-                    embedding=shape1)
-
-                rep2 = Representation(
-                    name="2",
-                    metric="euclidean",
-                    embedding=shape2_one_noise)
-
-                config = OptimizationConfig(
-                                    eps_list=eps_list,
-                                    num_trial=num_trial,
-                                    db_params={"drivername": "sqlite"},
-                                    n_iter=1,
-                                    to_types="numpy",  # user can choose "numpy" or "torch". please set "torch" if one wants to use GPU.
-                                    device="cpu",  # "cuda" or "cpu"; for numpy, only "cpu" can be used.
-                                    sampler_name=sampler,
-                                    init_mat_plan=initialization,
-                                    show_progress_bar=False,
-                                )
-
-                vis_config = VisualizationConfig(
-                                    figsize=(8, 6), 
-                                    title_size = 0, 
-                                    cmap = "rocket_r",
-                                    cbar_ticks_size=10,
-                                    font="Arial",
-                                    # color_labels=colors,
-                                    color_label_width=3,
-                                    xlabel=f"{n_points} items",
-                                    ylabel=f"{n_points} items",
-                                    xlabel_size=40,
-                                    ylabel_size=40,
-                                )
-
-                vis_config_ot = VisualizationConfig(
-                                    figsize=(8, 6), 
-                                    title_size = 0, 
-                                    cmap = "rocket_r",
-                                    cbar_ticks_size=10,
-                                    font="Arial",
-                                    # color_labels=colors,
-                                    color_label_width=3,
-                                    xlabel=f"{n_points} items of X",
-                                    ylabel=f"{n_points} items of Y",
-                                    xlabel_size=40,
-                                    ylabel_size=40,
-                                )
-
-                vis_log = VisualizationConfig(
-                                    figsize=(8, 6), 
-                                    title_size = 0, 
-                                    cmap = "viridis",
-                                    cbar_ticks_size=15,
-                                    # font="Arial",
-                                    xlabel_size=20,
-                                    xticks_size=15,
-                                    ylabel_size=20,
-                                    yticks_size=15,
-                                    cbar_label_size=15,
-                                    plot_eps_log=True,
-                                    fig_ext='svg'
-                                )
-
-                alignment = AlignRepresentations(
-                                    config=config,
-                                    representations_list=[rep1, rep2],
-                                    main_results_dir=main_results_dir,
-                                    data_name=f"Starfish_{n_points}_points_sym{sym_deg}_noise{noise_deg}",
-                                )
-
-                # RSA
-                fig_dir = f"../results/figs/simulation_Starfish"
-                os.makedirs(fig_dir, exist_ok=True)
-                alignment.show_sim_mat(
-                    visualization_config=vis_config, 
-                    show_distribution=False,
-                    fig_dir=fig_dir
-                    )
-                alignment.RSA_get_corr(metric="pearson")
-
-                # GW
-                alignment.gw_alignment(
-                    compute_OT=compute_OT,
-                    delete_results=delete_results,
-                    visualization_config=vis_config_ot,
-                    fig_dir=fig_dir,
-                    delete_confirmation=False
+                    main_results_dir = f"../results/simulation_starfish/{sampler_init}"
+                    
+                    future = pool.submit(
+                        run_starfish_experiment,
+                        shape1=shape1,
+                        shape2_one_noise=shape2_one_noise,
+                        sampler=sampler,
+                        initialization=initialization,
+                        main_results_dir=main_results_dir,
                     )
 
-                alignment.show_optimization_log(
-                    fig_dir=fig_dir,
-                    visualization_config=vis_log
-                    )
-                #alignment.visualize_embedding(dim=2, visualization_config=vis_emb, fig_dir=fig_dir)
+                    processes.append(future)
 
-                df = alignment.calc_accuracy(top_k_list=[1, 3, 5], eval_type="ot_plan", return_dataframe=True)
+                for future in as_completed(processes):
+                    future.result()
+
+                    
 # %%
+def get_min_values(df):
+    min_values = []
+    current_min = df['value'][0]
+    for i in range(len(df)):
+        value = df['value'][i]
+
+        if value < current_min:
+            current_min = value
+            min_values.append(current_min)
+        else:
+            min_values.append(current_min)
+    
+    return min_values
 
 if main_visualize:
     # plot the results
-
-    def get_min_values(df):
-        min_values = []
-        current_min = df['value'][0]
-        for i in range(len(df)):
-            value = df['value'][i]
-
-            if value < current_min:
-                current_min = value
-                min_values.append(current_min)
-            else:
-                min_values.append(current_min)
-        
-        return min_values
-
-
     min_values = []
     min_indices = []
     for sampler_init in sampler_initilizations:
