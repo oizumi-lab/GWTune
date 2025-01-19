@@ -68,7 +68,7 @@ def add_noise_to_one_dimension(points, noise_deg=0.0001, dimension=0):
     return points + noise
 
 #%%
-main_compute = False
+main_compute = True
 main_visualize = True
 
 # GWOT parameters
@@ -84,7 +84,7 @@ delete_results = True
 n_points = 100  # Total number of points
 sym_deg_list = np.linspace(0, 1, 11)
 noise_deg_list = np.linspace(0, 1, 11)
-sym_sample = 10
+sym_sample = 20
 sampler_initilizations = ["random_tpe", "random_grid", "uniform_grid"]
 
 #%%
