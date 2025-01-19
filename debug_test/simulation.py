@@ -68,7 +68,7 @@ def add_noise_to_one_dimension(points, noise_deg=0.0001, dimension=0):
     return points + noise
 
 #%%
-main_compute = True
+main_compute = False
 main_visualize = True
 
 # GWOT parameters
@@ -82,9 +82,9 @@ delete_results = True
 
 # Parameters for starfish generation
 n_points = 100  # Total number of points
-sym_deg_list = np.linspace(0, 1, 3)
-noise_deg_list = np.linspace(0, 1, 3)
-sym_sample = 5
+sym_deg_list = np.linspace(0, 1, 11)
+noise_deg_list = np.linspace(0, 1, 11)
+sym_sample = 10
 sampler_initilizations = ["random_tpe", "random_grid", "uniform_grid"]
 
 #%%
@@ -315,24 +315,26 @@ if main_visualize:
 
     #%%
     for sampler_init in sampler_initilizations:
-        gwd_result = min_values[sampler_initilizations.index(sampler_init), :, :, :].T
+        gwd_result = min_values[sampler_initilizations.index(sampler_init), :, :, :]
         mean_gwd_result = np.mean(gwd_result, axis=0)
         
-        indices_result = min_indices[sampler_initilizations.index(sampler_init), :, :, :].T
+        indices_result = min_indices[sampler_initilizations.index(sampler_init), :, :, :]
         mean_min_indices = np.mean(indices_result, axis=0)
         
-        acc_result = acc[sampler_initilizations.index(sampler_init), :, :, :].T
+        acc_result = acc[sampler_initilizations.index(sampler_init), :, :, :]
         mean_acc = np.mean(acc_result, axis=0)
         
         plt.figure()
         plt.title(f"average Min gwds for {sampler_init}")
         plt.imshow(mean_gwd_result, cmap='viridis')
         plt.colorbar()
-        plt.xticks(ticks=np.arange(len(sym_deg_list)), labels=sym_deg_list, rotation=45)
-        plt.xlabel("Symmetry Degree")
-        plt.gca().xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f'{x:.3f}'))
-        plt.yticks(ticks=np.arange(len(noise_deg_list)), labels=noise_deg_list)
-        plt.ylabel("Noise Degree")
+        
+        plt.ylabel("Symmetry Degree")
+        plt.yticks(ticks=np.arange(len(sym_deg_list)), labels=sym_deg_list)
+        
+        plt.xlabel("Noise Degree")
+        plt.xticks(ticks=np.arange(len(noise_deg_list)), labels=noise_deg_list, rotation=45)
+        plt.gca().yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f'{x:.3f}'))
         
         plt.tight_layout()
         plt.savefig(f"../results/figs/simulation_Starfish/mean_min_gwds_{sampler_init}.png")
@@ -341,13 +343,14 @@ if main_visualize:
         plt.figure()
         plt.title(f"average Min indices for {sampler_init}")
         plt.imshow(mean_min_indices, cmap='viridis')
-        plt.xlabel("Symmetry Degree")
-        plt.ylabel("Noise Degree")
         plt.colorbar()
         
-        plt.xticks(ticks=np.arange(len(sym_deg_list)), labels=sym_deg_list, rotation=45)
-        plt.gca().xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f'{x:.3f}'))
-        plt.yticks(ticks=np.arange(len(noise_deg_list)), labels=noise_deg_list)
+        plt.ylabel("Symmetry Degree")
+        plt.yticks(ticks=np.arange(len(sym_deg_list)), labels=sym_deg_list)
+        
+        plt.xlabel("Noise Degree")
+        plt.xticks(ticks=np.arange(len(noise_deg_list)), labels=noise_deg_list, rotation=45)
+        plt.gca().yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f'{x:.3f}'))
         
         plt.tight_layout()
         plt.savefig(f"../results/figs/simulation_Starfish/mean_min_indices_{sampler_init}.png")
@@ -356,13 +359,14 @@ if main_visualize:
         plt.figure()
         plt.title(f"mean Acc. for {sampler_init}")
         plt.imshow(mean_acc, cmap='viridis')
-        plt.xlabel("Symmetry Degree")
-        plt.ylabel("Noise Degree")
         plt.colorbar()
         
-        plt.xticks(ticks=np.arange(len(sym_deg_list)), labels=sym_deg_list, rotation=45)
-        plt.gca().xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f'{x:.3f}'))
-        plt.yticks(ticks=np.arange(len(noise_deg_list)), labels=noise_deg_list)
+        plt.ylabel("Symmetry Degree")
+        plt.yticks(ticks=np.arange(len(sym_deg_list)), labels=sym_deg_list)
+        
+        plt.xlabel("Noise Degree")
+        plt.xticks(ticks=np.arange(len(noise_deg_list)), labels=noise_deg_list, rotation=45)
+        plt.gca().yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f'{x:.3f}'))
         
         plt.tight_layout()
         plt.savefig(f"../results/figs/simulation_Starfish/mean_acc_{sampler_init}.png")
@@ -374,7 +378,7 @@ if main_visualize:
     for noise_idx in range(len(noise_deg_list)):
         plt.figure()
         for sampler_init in sampler_initilizations:
-            gwd_result = min_values[sampler_initilizations.index(sampler_init), :, :, noise_idx].T
+            gwd_result = min_values[sampler_initilizations.index(sampler_init), :, :, noise_idx]
             
             mean_gwd = np.mean(gwd_result, axis=0)
             std_gwd = np.std(gwd_result, axis=0)
@@ -384,10 +388,9 @@ if main_visualize:
         
         plt.xlabel("Symmetry Degree")
         plt.ylabel("Min GWD")
-        plt.title(f"Min GWDs for {sampler_init} with noise degree {noise_deg:.3f}")
+        plt.title(f"Min GWDs for {sampler_init} with noise degree from {noise_deg_list[0]:.2f} to {noise_deg_list[-1]:.2f}")
         plt.tight_layout()
         plt.legend()
-        # plt.show()
-        plt.savefig(f"../results/figs/simulation_Starfish/min_gwds_noise{noise_deg:.3f}.png")
+        plt.savefig(f"../results/figs/simulation_Starfish/min_gwds_noise{noise_deg:.2f}.png")
         plt.close()
 # %%
