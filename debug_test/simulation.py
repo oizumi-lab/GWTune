@@ -5,6 +5,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from typing import Optional
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import optuna
 import glob
 from tqdm.auto import tqdm
@@ -284,7 +285,7 @@ class CircleDataExperiment:
         if test:
             plt.show()
         else:
-            plt.savefig(f"{raw_save_fig_dir}/{self.data_name}.png")
+            plt.savefig(f"{raw_save_fig_dir}/{self.data_name}.svg")
         plt.close()
         
         mat1 = sp.spatial.distance.cdist(self.shape1, self.shape1)
@@ -337,7 +338,7 @@ def main_test_with_independent_noise(independent_noise_deg, max_workers=3):
 
 
 # %%
-main_compute = True
+main_compute = False
 main_visualize = True
 
 # GWOT parameters
@@ -352,6 +353,7 @@ common_noise_deg_list = [1e-1]
 independent_noise_deg_list = [0]
 sampler_initilizations = ["random_tpe", "random_grid", "uniform_grid"]
 
+graph_name_list = ["TPE + Random", "Grid Search + Random", "Grid Search + Uniform"]
 #%%
 main_common_noise_list = [0, 1, 4, 6, 8, 11, 14, 18]
 main_rot_index = 0
@@ -367,7 +369,7 @@ if test:
         dimension_noise_deg=0.1,
         rotation_index=0,
     )
-    experiment.visualize_raw_data(test=test)
+    experiment.visualize_raw_data(test=False)
     
 #%%
 if main_compute:
@@ -399,7 +401,7 @@ if main_visualize:
             plt.figure(figsize=(10, 10))
             
             min_values = []
-            for sampler_init in sampler_initilizations:
+            for idx_, sampler_init in enumerate(sampler_initilizations):
                 main_results_dir = f"../results/circle/{sampler_init}"
                 study = get_result_from_database(data_name, main_results_dir)
                 df = study.trials_dataframe()
@@ -409,11 +411,12 @@ if main_visualize:
 
                 plt.xlabel("eps")
                 plt.ylabel("GWD")
-                plt.title(f"{sampler_init}")
-                plt.colorbar()
+                plt.title(f"{graph_name_list[idx_]}")
+                cbar = plt.colorbar(label="Top-1 Accuracy")
+                cbar.mappable.set_clim([0, 100])
                 plt.xscale("log")
                 plt.yscale("log")
-                plt.ylim(1e-2, 1e-0)
+                plt.ylim(7e-3, 1e-0)
                 plt.grid(True)
                 
                 min_value = df.index[df["value"] == df["value"].min()]
@@ -421,7 +424,7 @@ if main_visualize:
             
             plt.tight_layout()
             
-            plt.savefig(f"../results/circle/fig/main_fig/log/opt_log/comparison_log_{data_name}.png")
+            plt.savefig(f"../results/circle/fig/main_fig/log/opt_log/comparison_log_{data_name}.svg")
             plt.close()
             
 
@@ -440,39 +443,54 @@ if main_visualize:
                 plt.grid(True)
             
             plt.tight_layout()
-            plt.savefig(f"../results/circle/fig/main_fig/log/opt_ot/comparison_ot_{data_name}.png")
+            plt.savefig(f"../results/circle/fig/main_fig/log/opt_ot/comparison_ot_{data_name}.svg")
             plt.close()
-                
+            
+            
+            save_fig_path = f"../results/circle/fig/main_fig/"
+            os.makedirs(save_fig_path, exist_ok=True)
+            
+            fig = plt.figure(figsize=(14, 6))  
+            outer = gridspec.GridSpec(3, 1, wspace=0.2, hspace=0.1)
+            # plt.suptitle(f"OT {sampler_init} (ascending sorted by GWD)", size=20, y=0.99)
+            adjust_list = [0.89, 0.62, 0.36]
+            
             for i, sampler_init in enumerate(sampler_initilizations[:]):
                 main_results_dir = f"../results/circle/{sampler_init}"
                 
                 study = get_result_from_database(data_name, main_results_dir)
                 df = study.trials_dataframe()
                 
-                save_fig_path = f"../results/circle/fig/main_fig/{sampler_init}/"
-                os.makedirs(save_fig_path, exist_ok=True)
-                
-                plt.subplots(10, 10, figsize=(18, 18))
-                plt.suptitle(f"OT {sampler_init} (ascending sorted by GWD)", size=20, y=0.99)
-                
-                for _, idx in enumerate(df.sort_values(by="value").index[:]):
+                inner = gridspec.GridSpecFromSubplotSpec(1, 10, subplot_spec=outer[i], wspace=0.1)
+
+                ax = []
+                for _, idx in enumerate(df.sort_values(by="value").index[:10]):
+                    ax.append(fig.add_subplot(inner[_]))
+                    
+                    # ヒートマップのデータを取得
                     ot = get_ot(data_name, main_results_dir, idx)
+                    ax[-1].imshow(ot, cmap="rocket_r")
                     
-                    plt.subplot(10, 10, _+1)
-                    plt.imshow(ot, cmap="rocket_r")
+                    # res = detect_diagonal_direction(ot)
                     
-                    res = detect_diagonal_direction(ot)
-                    
+                    # GWDの値を取得してタイトルに表示
                     gwd = df.loc[idx, "value"]
-                    
-                    if "R0" in res:
-                        plt.title(f"{res}, GWD:{gwd:.2e}", color="red")
-                    else:
-                        plt.title(f"{res}, GWD:{gwd:.2e}")
+                    ax[-1].set_title(f"GWD:{gwd:.2e}", fontsize=10)
+                    ax[-1].axis('off')  # 軸を非表示にする
+
+                # 各段のタイトルを設定（中央寄せ）
+                fig.text(0.5, adjust_list[i], graph_name_list[i], ha='center', fontsize=13)
+
+            # 全体のタイトルを追加
+            # fig.suptitle("bottom 10 OT (ascending sorted by GWD)", fontsize=20, y=0.98)
+
+            # レイアウト調整（余白を削減）
+            # plt.subplots_adjust(top=0.95, bottom=0.05, hspace=0.1)
                 
-                plt.tight_layout()
-                plt.savefig(f"{save_fig_path}/heatmap_ot_{data_name}.png")
-                plt.close() 
+            plt.tight_layout()
+            # plt.show()}
+            plt.savefig(f"{save_fig_path}/heatmap_ot.svg")
+            plt.close() 
 
 
 # %%
