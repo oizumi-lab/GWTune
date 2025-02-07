@@ -244,39 +244,44 @@ class CircleDataExperiment:
                 future.result()
     
     def visualize_raw_data(self, test=False):
+        plt.style.use("default")
+        # plt.rcParams["grid.color"] = "black"
+        plt.rcParams['font.family'] = "Arial"
+        
         # Visualize the shapes
         fig = plt.figure(figsize=(10, 6))
 
         # Shape 1
         ax1 = fig.add_subplot(121)
         ax1.axis("equal")
-        ax1.scatter(self.shape1[:, 0], self.shape1[:, 1], c="C0", label='Shape 1')
-        ax1.set_title("Shape 1")
+        ax1.scatter(self.shape1[:, 0], self.shape1[:, 1], c="C0", label='Shape 1', s=60)
+        ax1.set_title("Shape 1", fontsize=30)
         for i in range(self.n_points):
-            ax1.text(self.shape1[i, 0], self.shape1[i, 1] + 2e-2, str(i), ha='center', fontsize=12, color="black")
-        ax1.set_xlabel("X")
-        ax1.set_ylabel("Y")
-        ax1.grid()
+            ax1.text(self.shape1[i, 0], self.shape1[i, 1] + 2e-2, str(i), ha='center', fontsize=20, color="black")
+        # ax1.set_xlabel("X", fontsize=20)
+        # ax1.set_ylabel("Y", fontsize=20)
+
+        ax1.set_xticklabels([])
+        ax1.set_yticklabels([])
+        # ax1.grid()
         ax1.set_axisbelow(True)
-        ax1.legend(loc="upper right")
 
         # Shape 2
         ax2 = fig.add_subplot(122)
         ax2.axis("equal")
-        ax2.scatter(self.shape2[:, 0], self.shape2[:, 1], c="C1", label=f'Shape 2')
+        ax2.scatter(self.shape2[:, 0], self.shape2[:, 1], c="C1", label=f'Shape 2', s=60)
         for i in range(self.n_points):
             if i == 5:
-                ax2.text(self.shape2[i, 0] + 2e-2, self.shape2[i, 1], str(i), ha='left', fontsize=12, color="black")
+                ax2.text(self.shape2[i, 0] + 2e-2, self.shape2[i, 1], str(i), ha='left', fontsize=20, color="black")
             elif i == 6:
-                ax2.text(self.shape2[i, 0] - 2e-2, self.shape2[i, 1] -4e-2, str(i), ha='right', fontsize=12, color="black")
+                ax2.text(self.shape2[i, 0] - 2e-2, self.shape2[i, 1] -4e-2, str(i), ha='right', fontsize=20, color="black")
             else:
-                ax2.text(self.shape2[i, 0], self.shape2[i, 1] + 2e-2, str(i), ha='center', fontsize=12, color="black")
-        ax2.set_title("Shape 2")
-        ax2.set_xlabel("X")
-        ax2.set_ylabel("Y")
-        ax2.grid()
+                ax2.text(self.shape2[i, 0], self.shape2[i, 1] + 2e-2, str(i), ha='center', fontsize=20, color="black")
+        ax2.set_title("Shape 2", fontsize=30)
+        ax2.set_xticklabels([])
+        ax2.set_yticklabels([])
+        # ax2.grid()
         ax2.set_axisbelow(True)
-        ax2.legend(loc="upper right")
 
         plt.tight_layout()
         
@@ -353,7 +358,8 @@ common_noise_deg_list = [1e-1]
 independent_noise_deg_list = [0]
 sampler_initilizations = ["random_tpe", "random_grid", "uniform_grid"]
 
-graph_name_list = ["TPE + Random", "Grid Search + Random", "Grid Search + Uniform"]
+graph_name_list = ["Random + TPE", "Random + Grid Search", "Uniform + Grid Search"]
+
 #%%
 main_common_noise_list = [0, 1, 4, 6, 8, 11, 14, 18]
 main_rot_index = 0
@@ -450,10 +456,15 @@ if main_visualize:
             save_fig_path = f"../results/circle/fig/main_fig/"
             os.makedirs(save_fig_path, exist_ok=True)
             
-            fig = plt.figure(figsize=(14, 6))  
+            plt.style.use("default")
+            plt.rcParams['font.family'] = "Arial"
+            
+            fig = plt.figure(figsize=(10, 10))  
             outer = gridspec.GridSpec(3, 1, wspace=0.2, hspace=0.1)
             # plt.suptitle(f"OT {sampler_init} (ascending sorted by GWD)", size=20, y=0.99)
             adjust_list = [0.89, 0.62, 0.36]
+            
+            num_ot = 5
             
             for i, sampler_init in enumerate(sampler_initilizations[:]):
                 main_results_dir = f"../results/circle/{sampler_init}"
@@ -461,10 +472,19 @@ if main_visualize:
                 study = get_result_from_database(data_name, main_results_dir)
                 df = study.trials_dataframe()
                 
-                inner = gridspec.GridSpecFromSubplotSpec(1, 10, subplot_spec=outer[i], wspace=0.1)
+                inner = gridspec.GridSpecFromSubplotSpec(1, num_ot, subplot_spec=outer[i], wspace=0.2)
 
                 ax = []
-                for _, idx in enumerate(df.sort_values(by="value").index[:10]):
+                
+                if i == 0:
+                    ot_list = [0,1,2,5,6]
+                elif i == 1:
+                    ot_list = range(num_ot)
+                else:
+                    ot_list = range(num_ot)
+                
+                
+                for _, idx in enumerate(df.sort_values(by="value").index[ot_list]):
                     ax.append(fig.add_subplot(inner[_]))
                     
                     # ヒートマップのデータを取得
@@ -475,11 +495,11 @@ if main_visualize:
                     
                     # GWDの値を取得してタイトルに表示
                     gwd = df.loc[idx, "value"]
-                    ax[-1].set_title(f"GWD:{gwd:.2e}", fontsize=10)
+                    ax[-1].set_title(f"GWD:{gwd:.2e}", fontsize=16)
                     ax[-1].axis('off')  # 軸を非表示にする
 
                 # 各段のタイトルを設定（中央寄せ）
-                fig.text(0.5, adjust_list[i], graph_name_list[i], ha='center', fontsize=13)
+                fig.text(0.5, adjust_list[i], graph_name_list[i], ha='center', fontsize=23)
 
             # 全体のタイトルを追加
             # fig.suptitle("bottom 10 OT (ascending sorted by GWD)", fontsize=20, y=0.98)

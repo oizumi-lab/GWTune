@@ -4,6 +4,8 @@ import optuna
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+import seaborn as sns
+import torch
 
 #%%
 def get_data(data_select, init_plan, sampler_name):
@@ -141,4 +143,79 @@ plt.ylabel("90 short movies of VISal (pseudo mouse B)")
 
 plt.tight_layout()
 plt.show()
+
+#%%
+def get_ot(data_name, init_plan, sampler_name, idx):
+    npy_path = glob.glob(f"../results/{data_name}/{sampler_name}/*/{init_plan}/*/gw_{idx}.npy")
+    if len(npy_path) == 0:
+        npy_path = glob.glob(f"../results/{data_name}/{sampler_name}/*/{init_plan}/*/gw_{idx}.pt")[0]
+        ot = torch.load(npy_path, weights_only=False).numpy()
+        return ot
+    else:
+        npy_path = npy_path[0]
+        ot = np.load(npy_path)
+        return ot
+
+# %%
+sampler = "grid"
+init_plan = "random"
+data_name = "THINGS"
+
+
+#%%
+def plot_all_ot(data_name, init_plan, sampler):
+    df = get_data(data_name, init_plan, sampler)
+    
+    num_ot = 10
+    plt.subplots(num_ot, 10, figsize=(18, 18))
+    plt.suptitle(f"OT {init_plan}, {sampler} (ascending sorted by GWD)", size=20, y=0.99)
+
+    for _, idx in enumerate(df.sort_values(by="value").index[:num_ot*10]):
+        ot = get_ot(data_name, init_plan, sampler, idx)
+        
+        plt.subplot(num_ot, 10, _+1)
+        plt.imshow(ot, cmap="rocket_r")
+        
+        if data_name == "THINGS":
+            clim_max = 1e-10
+            plt.clim(0, clim_max)
+        elif data_name == "AllenBrain":
+            pass
+        elif data_name == "DNN":
+            clim_max = 1e-5
+            plt.clim(0, clim_max)
+        
+        gwd = df.loc[idx, "value"]
+        
+        plt.title(f"GWD:{gwd:.2e}")
+
+    plt.tight_layout()
+    plt.show()
+
+# %%
+plot_all_ot("THINGS", "random", "tpe")
+
+# %%
+plot_all_ot("THINGS", "random", "grid")
+
+# %%
+plot_all_ot("THINGS", "uniform", "grid")
+
+# %%
+plot_all_ot("AllenBrain", "random", "tpe")
+
+# %%
+plot_all_ot("AllenBrain", "random", "grid")
+
+# %%
+plot_all_ot("AllenBrain", "uniform", "grid")
+
+# %%
+plot_all_ot("DNN", "random", "tpe")
+
+# %%
+plot_all_ot("DNN", "random", "grid")
+
+# %%
+plot_all_ot("DNN", "uniform", "grid")
 # %%
