@@ -60,14 +60,17 @@ dnn_random_grid = get_data("DNN", "random", "grid")
 
 
 # %%
-plt.figure(figsize=(10, 12))
-plt.suptitle("Comparison of different search strategies")
+plt.style.use("default")
+# plt.rcParams["grid.color"] = "black"
+plt.rcParams['font.family'] = "Arial"
+plt.figure(figsize=(8, 8))
+plt.suptitle("Comparison of different initialization strategies")
 
 plt.subplot(3, 1, 1)
 plt.title("Behavioral data: Human psychological embeddings of natural objects")
-plt.plot(get_min_values(things_uniform), label = "uniform with grid")
-plt.plot(get_min_values(things_random_grid), label = "random with grid")
-plt.plot(get_min_values(things_random), label = "random with TPE")
+plt.plot(get_min_values(things_random), label = "Random + TPE")
+plt.plot(get_min_values(things_random_grid), label = "Random + Grid Search")
+plt.plot(get_min_values(things_uniform), label = "Uniform + Grid Search")
 plt.xlabel("Trial")
 plt.ylabel("minimum GWD")
 plt.grid(True)
@@ -75,9 +78,9 @@ plt.legend()
 
 plt.subplot(3, 1, 2)
 plt.title("Neural data: Neuropixels visual coding in mice")
-plt.plot(get_min_values(allen_uniform), label = "uniform with grid")
-plt.plot(get_min_values(allen_random_grid), label = "random with grid")
-plt.plot(get_min_values(allen_random), label = "random with TPE")
+plt.plot(get_min_values(allen_random), label = "Random + TPE")
+plt.plot(get_min_values(allen_random_grid), label = "Random + Grid Search")
+plt.plot(get_min_values(allen_uniform), label = "Uniform + Grid Search")
 plt.xlabel("Trial")
 plt.ylabel("minimum GWD")
 plt.grid(True)
@@ -85,9 +88,9 @@ plt.legend()
 
 plt.subplot(3, 1, 3)
 plt.title("Model: Vision Deep Neural Networks")
-plt.plot(get_min_values(dnn_uniform), label = "uniform with grid")
-plt.plot(get_min_values(dnn_random_grid), label = "random with grid")
-plt.plot(get_min_values(dnn_random), label = "random with TPE")
+plt.plot(get_min_values(dnn_random), label = "Random + TPE")
+plt.plot(get_min_values(dnn_random_grid), label = "Random + Grid Search")
+plt.plot(get_min_values(dnn_uniform), label = "Uniform + Grid Search")
 plt.xlabel("Trial")
 plt.ylabel("minimum GWD")
 plt.grid(True)
@@ -95,12 +98,45 @@ plt.legend()
 
 
 plt.tight_layout()
-plt.show()
+plt.savefig("../results/comparison.svg")
+# plt.show()
+plt.close()
 
 # %%
-min_allen = pd.DataFrame({"TPE + Random": allen_random["value"].min(), "Grid Search + Random": allen_random_grid["value"].min(), "Grid Search + Uniform": allen_uniform["value"].min()}, index = ["Minimum GWD"])
-# %%
-min_allen.plot(figsize = (8,6), kind = "bar", rot = 0, title = "Minimum GWD for AllenBrain data")
+min_allen = pd.DataFrame({"Random + TPE": allen_random["value"].min(), "Random + Grid Search": allen_random_grid["value"].min(), "Uniform + Grid Search": allen_uniform["value"].min()}, index = ["Minimum GWD"])
+
+min_things = pd.DataFrame({"Random + TPE": things_random["value"].min(), "Random + Grid Search": things_random_grid["value"].min(), "Uniform + Grid Search": things_uniform["value"].min()}, index = ["Minimum GWD"])
+
+min_dnn = pd.DataFrame({"Random + TPE": dnn_random["value"].min(), "Random + Grid Search": dnn_random_grid["value"].min(), "Uniform + Grid Search": dnn_uniform["value"].min()}, index = ["Minimum GWD"])
+
+#%%
+plt.style.use("default")
+plt.rcParams['font.family'] = "Arial"
+fig, ax = plt.subplots(1, 3, figsize=(10, 6))
+
+# plt.suptitle("Comparison of Minimum GWD for different initialization strategies", fontsize=15)
+min_things.plot(ax=ax[0], kind = "bar", rot = 0, title = "Behavioral data : THINGS", legend = False, fontsize=12)
+min_allen.plot(ax=ax[1], kind = "bar", rot = 0, title = "Neural Data : AllenBrain", legend=False, fontsize=12)
+min_dnn.plot(ax=ax[2], kind = "bar", rot = 0, title = "Model : DNN", legend=False, fontsize=12)
+
+ax[0].set_ylabel("GWD value", fontsize=12)
+ax[1].set_ylabel("GWD value", fontsize=12)
+ax[2].set_ylabel("GWD value", fontsize=12)
+
+ax[0].title.set_size(15)
+ax[1].title.set_size(15)
+ax[2].title.set_size(15)
+
+
+# 凡例をfigレベルで設定（全体のバランスをとる）
+handles, labels = ax[2].get_legend_handles_labels()
+fig.legend(handles, labels, loc='lower center', bbox_to_anchor=(0.5, -0.05), ncol=3, fontsize=12)
+
+
+# タイトレイアウトの適用
+plt.tight_layout()
+plt.savefig("../results/comparison.svg", bbox_inches='tight')
+plt.show()
 
 #%%
 def get_ot(df, init_plan, sampler_name):
@@ -177,7 +213,7 @@ def plot_all_ot(data_name, init_plan, sampler):
         plt.imshow(ot, cmap="rocket_r")
         
         if data_name == "THINGS":
-            clim_max = 1e-10
+            clim_max = 2e-6
             plt.clim(0, clim_max)
         elif data_name == "AllenBrain":
             pass

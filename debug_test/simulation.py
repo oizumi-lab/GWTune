@@ -249,10 +249,10 @@ class CircleDataExperiment:
         plt.rcParams['font.family'] = "Arial"
         
         # Visualize the shapes
-        fig = plt.figure(figsize=(10, 6))
+        fig = plt.figure(figsize=(6, 10))
 
         # Shape 1
-        ax1 = fig.add_subplot(121)
+        ax1 = fig.add_subplot(211)
         ax1.axis("equal")
         ax1.scatter(self.shape1[:, 0], self.shape1[:, 1], c="C0", label='Shape 1', s=60)
         ax1.set_title("Shape 1", fontsize=30)
@@ -267,7 +267,7 @@ class CircleDataExperiment:
         ax1.set_axisbelow(True)
 
         # Shape 2
-        ax2 = fig.add_subplot(122)
+        ax2 = fig.add_subplot(212)
         ax2.axis("equal")
         ax2.scatter(self.shape2[:, 0], self.shape2[:, 1], c="C1", label=f'Shape 2', s=60)
         for i in range(self.n_points):
