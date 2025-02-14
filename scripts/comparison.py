@@ -8,10 +8,12 @@ import seaborn as sns
 import torch
 
 #%%
-def get_data(data_select, init_plan, sampler_name):
+def get_data(data_select, init_plan, sampler_name, index=None):
     path = f"../results/{data_select}/{sampler_name}"
     db_path = glob.glob(f"{path}/*/{init_plan}/*.db")[0]
     df = optuna.load_study(study_name = os.path.basename(db_path).split(".db")[0], storage = f"sqlite:///{db_path}").trials_dataframe()
+    if index is not None:
+        df = df[:index]
     return df
 
 #%%
@@ -44,30 +46,31 @@ def get_max_acc(df):
     return max_acc
 
 #%%
-things_random = get_data("THINGS", "random", "tpe")
-things_uniform = get_data("THINGS", "uniform", "grid") 
-things_random_grid = get_data("THINGS", "random", "grid")
+ind = 100
+#%%
+things_random = get_data("THINGS", "random", "tpe", index=ind)
+things_uniform = get_data("THINGS", "uniform", "grid", index=ind)
+things_random_grid = get_data("THINGS", "random", "grid", index=ind)
 
 #%%
-allen_random = get_data("AllenBrain", "random", "tpe")
-allen_uniform = get_data("AllenBrain", "uniform", "grid") 
-allen_random_grid = get_data("AllenBrain", "random", "grid")
+allen_random = get_data("AllenBrain", "random", "tpe", index=ind)
+allen_uniform = get_data("AllenBrain", "uniform", "grid", index=ind)
+allen_random_grid = get_data("AllenBrain", "random", "grid", index=ind)
 
 #%%
-dnn_random = get_data("DNN", "random", "tpe")
-dnn_uniform = get_data("DNN", "uniform", "grid") 
-dnn_random_grid = get_data("DNN", "random", "grid")
-
+dnn_random = get_data("DNN", "random", "tpe", index=ind)
+dnn_uniform = get_data("DNN", "uniform", "grid", index=ind)
+dnn_random_grid = get_data("DNN", "random", "grid", index=ind)
 
 # %%
 plt.style.use("default")
 # plt.rcParams["grid.color"] = "black"
 plt.rcParams['font.family'] = "Arial"
-plt.figure(figsize=(8, 8))
-plt.suptitle("Comparison of different initialization strategies")
+plt.figure(figsize=(6, 8))
+# plt.suptitle("Comparison of different initialization strategies")
 
 plt.subplot(3, 1, 1)
-plt.title("Behavioral data: Human psychological embeddings of natural objects")
+plt.title("Behavioral data : THINGS")
 plt.plot(get_min_values(things_random), label = "Random + TPE")
 plt.plot(get_min_values(things_random_grid), label = "Random + Grid Search")
 plt.plot(get_min_values(things_uniform), label = "Uniform + Grid Search")
@@ -77,7 +80,7 @@ plt.grid(True)
 plt.legend()
 
 plt.subplot(3, 1, 2)
-plt.title("Neural data: Neuropixels visual coding in mice")
+plt.title("Neural data : AlenBrain")
 plt.plot(get_min_values(allen_random), label = "Random + TPE")
 plt.plot(get_min_values(allen_random_grid), label = "Random + Grid Search")
 plt.plot(get_min_values(allen_uniform), label = "Uniform + Grid Search")
@@ -87,7 +90,7 @@ plt.grid(True)
 plt.legend()
 
 plt.subplot(3, 1, 3)
-plt.title("Model: Vision Deep Neural Networks")
+plt.title("Model : DNN")
 plt.plot(get_min_values(dnn_random), label = "Random + TPE")
 plt.plot(get_min_values(dnn_random_grid), label = "Random + Grid Search")
 plt.plot(get_min_values(dnn_uniform), label = "Uniform + Grid Search")
@@ -96,89 +99,126 @@ plt.ylabel("minimum GWD")
 plt.grid(True)
 plt.legend()
 
-
 plt.tight_layout()
-plt.savefig("../results/comparison.svg")
-# plt.show()
-plt.close()
-
-# %%
-min_allen = pd.DataFrame({"Random + TPE": allen_random["value"].min(), "Random + Grid Search": allen_random_grid["value"].min(), "Uniform + Grid Search": allen_uniform["value"].min()}, index = ["Minimum GWD"])
-
-min_things = pd.DataFrame({"Random + TPE": things_random["value"].min(), "Random + Grid Search": things_random_grid["value"].min(), "Uniform + Grid Search": things_uniform["value"].min()}, index = ["Minimum GWD"])
-
-min_dnn = pd.DataFrame({"Random + TPE": dnn_random["value"].min(), "Random + Grid Search": dnn_random_grid["value"].min(), "Uniform + Grid Search": dnn_uniform["value"].min()}, index = ["Minimum GWD"])
-
-#%%
-plt.style.use("default")
-plt.rcParams['font.family'] = "Arial"
-fig, ax = plt.subplots(1, 3, figsize=(10, 6))
-
-# plt.suptitle("Comparison of Minimum GWD for different initialization strategies", fontsize=15)
-min_things.plot(ax=ax[0], kind = "bar", rot = 0, title = "Behavioral data : THINGS", legend = False, fontsize=12)
-min_allen.plot(ax=ax[1], kind = "bar", rot = 0, title = "Neural Data : AllenBrain", legend=False, fontsize=12)
-min_dnn.plot(ax=ax[2], kind = "bar", rot = 0, title = "Model : DNN", legend=False, fontsize=12)
-
-ax[0].set_ylabel("GWD value", fontsize=12)
-ax[1].set_ylabel("GWD value", fontsize=12)
-ax[2].set_ylabel("GWD value", fontsize=12)
-
-ax[0].title.set_size(15)
-ax[1].title.set_size(15)
-ax[2].title.set_size(15)
-
-
-# 凡例をfigレベルで設定（全体のバランスをとる）
-handles, labels = ax[2].get_legend_handles_labels()
-fig.legend(handles, labels, loc='lower center', bbox_to_anchor=(0.5, -0.05), ncol=3, fontsize=12)
-
-
-# タイトレイアウトの適用
-plt.tight_layout()
-plt.savefig("../results/comparison.svg", bbox_inches='tight')
 plt.show()
 
 #%%
-def get_ot(df, init_plan, sampler_name):
+def get_ot(df, dataset, init_plan, sampler_name):
     idx = df[df["value"] == df["value"].min()].index[0]
     print("acc.", df[df["value"] == df["value"].min()]["user_attrs_best_acc"].values[0])
-    npy_path = glob.glob(f"../results/AllenBrain/{sampler_name}/*/{init_plan}/*/gw_{idx}.npy")[0]
-    ot = np.load(npy_path)
+    npy_path = glob.glob(f"../results/{dataset}/{sampler_name}/*/{init_plan}/*/gw_{idx}.npy")
     
+    if len(npy_path) == 0:
+        torch_path = glob.glob(f"../results/{dataset}/{sampler_name}/*/{init_plan}/*/gw_{idx}.pt")[0]
+        ot = torch.load(torch_path, weights_only=False).numpy()
+    else:
+        ot = np.load(npy_path[0])
     return ot
 
 #%%
-ot_random = get_ot(allen_random, "random", "tpe")
-ot_uniform = get_ot(allen_uniform, "uniform", "grid")
-ot_random_grid = get_ot(allen_random_grid, "random", "grid")
+ot_things_random = get_ot(things_random, "THINGS", "random", "tpe")
+ot_things_uniform = get_ot(things_uniform, "THINGS", "uniform", "grid")
+ot_things_random_grid = get_ot(things_random_grid, "THINGS", "random", "grid")
+
+#%%
+ot_allen_random = get_ot(allen_random, "AllenBrain", "random", "tpe")
+ot_allen_uniform = get_ot(allen_uniform, "AllenBrain", "uniform", "grid")
+ot_allen_random_grid = get_ot(allen_random_grid, "AllenBrain", "random", "grid")
+
+#%%
+ot_dnn_random = get_ot(dnn_random, "DNN", "random", "tpe")
+ot_dnn_uniform = get_ot(dnn_uniform, "DNN", "uniform", "grid")
+ot_dnn_random_grid = get_ot(dnn_random_grid, "DNN", "random", "grid")
 
 
 # %%
 import seaborn as sns
-plt.figure(figsize=(10, 3.6))
-plt.suptitle("Neural data: Neuropixels visual coding in mice")
+plt.style.use("default")
+plt.rcParams['font.family'] = "Arial"
+plt.figure(figsize=(12, 16))
 
-plt.subplot(1, 3, 1)
-plt.title("TPE + Random")
-plt.imshow(ot_random, cmap="rocket_r")
-plt.xlabel("90 short movies of VISam (pseudo mouse A)")
-plt.ylabel("90 short movies of VISal (pseudo mouse B)")
+plt.subplot(3, 3, 1)
+plt.title("THINGS : Random + TPE", fontsize=15)
+plt.imshow(ot_things_random, cmap="rocket_r")
+plt.xticks(fontsize=12)
+plt.yticks(fontsize=12)
+# plt.colorbar()
+plt.clim(0, 1e-4)
+plt.xlabel("1854 objects", fontsize=13)
+plt.ylabel("1854 objects", fontsize=13)
 
-plt.subplot(1, 3, 2)
-plt.title("Grid Search + Random")
-plt.imshow(ot_random_grid, cmap="rocket_r")
-plt.xlabel("90 short movies of VISam (pseudo mouse A)")
-plt.ylabel("90 short movies of VISal (pseudo mouse B)")
+plt.subplot(3, 3, 2)
+plt.title("THINGS : Random + Grid Search", fontsize=15)
+plt.imshow(ot_things_random_grid, cmap="rocket_r")
+plt.xticks(fontsize=12)
+plt.yticks(fontsize=12)
+plt.clim(0, 1e-4)
+plt.xlabel("1854 objects", fontsize=13)
+plt.ylabel("1854 objects", fontsize=13)
 
-plt.subplot(1, 3, 3)
-plt.title("Grid Search + Uniform")
-plt.imshow(ot_uniform, cmap="rocket_r")
-plt.xlabel("90 short movies of VISam (pseudo mouse A)")
-plt.ylabel("90 short movies of VISal (pseudo mouse B)")
+plt.subplot(3, 3, 3)
+plt.title("THINGS : Uniform + Grid Search", fontsize=15)
+plt.imshow(ot_things_uniform, cmap="rocket_r")
+plt.xticks(fontsize=12)
+plt.yticks(fontsize=12)
+plt.clim(0, 1e-4)
+plt.xlabel("1854 objects", fontsize=13)
+plt.ylabel("1854 objects", fontsize=13)
 
+plt.subplot(3, 3, 4)
+plt.title("AllenBrain : Random + TPE", fontsize=15)
+plt.imshow(ot_allen_random, cmap="rocket_r")
+plt.xticks(fontsize=12)
+plt.yticks(fontsize=12)
+plt.xlabel("90 short movies of VISam (pseudo mouse A)", fontsize=13)
+plt.ylabel("90 short movies of VISal (pseudo mouse B)", fontsize=13)
+
+plt.subplot(3, 3, 5)
+plt.title("AllenBrain : Random + Grid Search", fontsize=15)
+plt.imshow(ot_allen_random_grid, cmap="rocket_r")
+plt.xticks(fontsize=12)
+plt.yticks(fontsize=12)
+plt.xlabel("90 short movies of VISam (pseudo mouse A)", fontsize=13)
+plt.ylabel("90 short movies of VISal (pseudo mouse B)", fontsize=13)
+
+plt.subplot(3, 3, 6)
+plt.title("AllenBrain : Uniform + Grid Search", fontsize=15)
+plt.imshow(ot_allen_uniform, cmap="rocket_r")
+plt.xticks(fontsize=12)
+plt.yticks(fontsize=12)
+plt.xlabel("90 short movies of VISam (pseudo mouse A)", fontsize=13)
+plt.ylabel("90 short movies of VISal (pseudo mouse B)", fontsize=13)
+
+plt.subplot(3, 3, 7)
+plt.title("DNN : Random + TPE", fontsize=15)
+plt.imshow(ot_dnn_random, cmap="rocket_r")
+plt.xticks(fontsize=12)
+plt.yticks(fontsize=12)
+plt.clim(0, 1e-4)
+plt.xlabel("1000 images of ResNet50", fontsize=13)
+plt.ylabel("1000 images of VGG19", fontsize=13)
+
+plt.subplot(3, 3, 8)
+plt.title("DNN : Random + Grid Search", fontsize=15)
+plt.imshow(ot_dnn_random_grid, cmap="rocket_r")
+plt.xticks(fontsize=12)
+plt.yticks(fontsize=12)
+plt.clim(0, 1e-4)
+plt.xlabel("1000 images of ResNet50", fontsize=13)
+plt.ylabel("1000 images of VGG19", fontsize=13)
+
+plt.subplot(3, 3, 9)
+plt.title("DNN : Uniform + Grid Search", fontsize=15)
+plt.imshow(ot_dnn_uniform, cmap="rocket_r")
+plt.xticks(fontsize=12)
+plt.yticks(fontsize=12)
+plt.clim(0, 1e-4)
+plt.xlabel("1000 images of ResNet50", fontsize=13)
+plt.ylabel("1000 images of VGG19", fontsize=13)
 
 plt.tight_layout()
-plt.show()
+# plt.show()
+plt.savefig("../results/real_data_ot.svg")
 
 #%%
 def get_ot(data_name, init_plan, sampler_name, idx):
@@ -204,7 +244,7 @@ def plot_all_ot(data_name, init_plan, sampler):
     
     num_ot = 10
     plt.subplots(num_ot, 10, figsize=(18, 18))
-    plt.suptitle(f"OT {init_plan}, {sampler} (ascending sorted by GWD)", size=20, y=0.99)
+    # plt.suptitle(f"OT {init_plan}, {sampler} (ascending sorted by GWD)", size=20, y=0.99)
 
     for _, idx in enumerate(df.sort_values(by="value").index[:num_ot*10]):
         ot = get_ot(data_name, init_plan, sampler, idx)
