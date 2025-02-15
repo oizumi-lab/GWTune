@@ -46,7 +46,7 @@ def get_max_acc(df):
     return max_acc
 
 #%%
-ind = 100
+ind = None
 #%%
 things_random = get_data("THINGS", "random", "tpe", index=ind)
 things_uniform = get_data("THINGS", "uniform", "grid", index=ind)
@@ -101,6 +101,17 @@ plt.legend()
 
 plt.tight_layout()
 plt.show()
+
+#%%
+plt.figure()
+plt.title("Neural data : AlenBrain")
+plt.plot(get_min_values(allen_random), label = "Random + TPE")
+plt.plot(get_min_values(allen_random_grid), label = "Random + Grid Search")
+plt.plot(get_min_values(allen_uniform), label = "Uniform + Grid Search")
+plt.xlabel("Trial")
+plt.ylabel("minimum GWD")
+plt.grid(True)
+plt.legend()
 
 #%%
 def get_ot(df, dataset, init_plan, sampler_name):
